@@ -41,6 +41,7 @@ function RootLayoutNav() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />            {/* 스플래시(인앱) */}
         <Stack.Screen name="signup" />           {/* 회원가입 */}
+        <Stack.Screen name="signup-finish" />           {/* 회원가입 완료 */}
         <Stack.Screen name="(tabs)" />           {/* 탭 루트 */}
         <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
       </Stack>
