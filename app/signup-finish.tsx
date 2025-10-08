@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import React, { useMemo } from 'react';
-import { Dimensions, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Image, TouchableOpacity, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -10,7 +10,8 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
-
+import { SafeAreaView } from 'react-native-safe-area-context';
+import AppText from '../components/AppText';
 
 const { width } = Dimensions.get('window');
 
@@ -20,8 +21,8 @@ function Bubble({
   x,
   delay = 0,
 }: {
-  size: number;  // 지름
-  x: number;     // 왼쪽 위치(px)
+  size: number;  // 지름
+  x: number;     // 왼쪽 위치(px)
   delay?: number;
 }) {
   const upDown = useSharedValue(0);
@@ -85,45 +86,37 @@ export default function SignupFinish() {
   const bubbles = useMemo(
     () => [
       { size: 112, x: width * 0.44, delay: 0 },
-      { size: 88,  x: width * 0.60, delay: 150 },
-      { size: 72,  x: width * 0.35, delay: 250 },
-      { size: 48,  x: width * 0.30, delay: 400 },
-      { size: 20,  x: width * 0.25, delay: 300 },
+      { size: 88,  x: width * 0.60, delay: 150 },
+      { size: 72,  x: width * 0.35, delay: 250 },
+      { size: 48,  x: width * 0.30, delay: 400 },
+      { size: 20,  x: width * 0.25, delay: 300 },
     ],
     []
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#FFFCF5', padding: 24, justifyContent: 'space-between' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFCF5', padding: 24, justifyContent: 'space-between' }}>
+      
       {/* 상단 인사 */}
-      <View style={{ marginTop: 40 }}>
-        <Text style={{ fontSize: 12, color: '#C4C4C4', marginBottom: 12 }}>회원가입</Text>
-        <Text style={{ fontSize: 24, fontWeight: '800', color: '#3B82F6', textAlign: 'center' }}>
-          안녕하세요, 형원님!
-        </Text>
-        <Text style={{ marginTop: 8, color: '#6B7280', textAlign: 'center' }}>
-          어쩌구 저쩌구 따뜻하고 좋은 문장{'\n'}스크립트 스크립트 스크립트
-        </Text>
+      {/* 🚨 수정: alignItems: 'center'를 추가하여 내부 이미지 및 텍스트를 수평 중앙 정렬 */}
+      <View style={{ marginTop: 40, alignItems: 'center' }}> 
+        <Image
+          source={require('../assets/images/BlueHeart.png')}
+        />
+        <AppText style={{ margin:30,fontSize: 24, color: '#3B82F6', textAlign: 'center' }}>
+          안녕하세요, 00님!
+        </AppText>
+        <AppText type="medium" style={{ marginTop: 8, color: '#6B7280', textAlign: 'center', fontSize:12}}>
+          어쩌구 저쩌구 따뜻하고 좋은 문장스크립트 스크립트 스크립트
+        </AppText>
       </View>
 
-      {/* 버블 군집 */}
-      <View style={{ height: 220, alignSelf: 'stretch', marginVertical: 8 }}>
-        <View
-          style={{
-            position: 'absolute',
-            left: width * 0.18,
-            top: 100,
-            width: 10,
-            height: 10,
-            borderRadius: 5,
-            backgroundColor: '#5B8EF7',
-            opacity: 0.9,
-          }}
-        />
-        {bubbles.map((b, i) => (
-          <Bubble key={i} size={b.size} x={b.x} delay={b.delay} />
-        ))}
-      </View>
+      {/* 중앙 이미지 */}
+      <Image
+        source={require('../assets/images/Union.png')}
+        // 🚨 수정: alignSelf: 'center'를 추가하여 이미지를 컨테이너 중앙에 배치
+        style={{ alignSelf: 'center' }} 
+      />
 
       {/* 시작 버튼 */}
       <TouchableOpacity
@@ -137,37 +130,8 @@ export default function SignupFinish() {
           marginBottom: 8,
         }}
       >
-        <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>시작하기</Text>
+        <AppText style={{ color: '#fff', fontSize: 14 }}>시작하기</AppText>
       </TouchableOpacity>
-    </View>
+    </SafeAreaView>
   );
 }
-
-
-
-
-// import { View, Text, TouchableOpacity } from 'react-native';
-// import { router } from 'expo-router';
-
-// export default function SignupFinish() {
-//   return (
-//     <View style={{ flex:1, justifyContent:'center', alignItems:'center', backgroundColor:'#FFFCF8' }}>
-//       <Text style={{ fontSize:26, fontWeight:'800', color:'#3B82F6', marginBottom:6 }}>안녕하세요, 형원님!</Text>
-//       <Text style={{ textAlign:'center', color:'#6B7280', marginBottom:30 }}>
-//         어쩌구 저쩌구 따뜻하고 좋은 스크립트{'\n'}스크립트스크립트스크립트
-//       </Text>
-
-//       <TouchableOpacity
-//         onPress={() => router.replace('/(tabs)')}
-//         style={{
-//           backgroundColor:'#3B82F6',
-//           borderRadius:24,
-//           paddingVertical:14,
-//           paddingHorizontal:48,
-//         }}
-//       >
-//         <Text style={{ color:'#fff', fontWeight:'700' }}>시작하기</Text>
-//       </TouchableOpacity>
-//     </View>
-//   );
-// }

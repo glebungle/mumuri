@@ -9,14 +9,21 @@ import { useEffect } from 'react';
 import 'react-native-reanimated';
 
 export const unstable_settings = {
-  // 앱 리로드/최초 진입을 index(스플래시)로
-  initialRouteName: 'index',
+  initialRouteName: 'index', //앱 최초 진입
 };
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
+    'Pretendard-ExtraBold': require('../assets/fonts/Pretendard-ExtraBold.ttf'),
+    'Pretendard-Bold': require('../assets/fonts/Pretendard-Bold.ttf'),
+    'Pretendard-Medium': require('../assets/fonts/Pretendard-Medium.ttf'),
+    'Pretendard-SemiBold': require('../assets/fonts/Pretendard-SemiBold.ttf'),
+    'Pretendard-Regular': require('../assets/fonts/Pretendard-Regular.ttf'),
+    'Pretendard-Light': require('../assets/fonts/Pretendard-Light.ttf'),
+    'Pretendard-ExtraLight': require('../assets/fonts/Pretendard-ExtraLight.ttf'),
+    'Pretendard-Thin': require('../assets/fonts/Pretendard-Thin.ttf'),
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
     ...FontAwesome.font,
   });
