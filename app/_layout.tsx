@@ -1,5 +1,6 @@
 import { useColorScheme } from '@/components/useColorScheme';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+// import { initializeKakaoSDK } from "@react-native-kakao/core";
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
@@ -19,6 +20,11 @@ export default function RootLayout() {
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
     ...FontAwesome.font,
   });
+  
+  // const kakaoNativeAppKey = process.env.EXPO_PUBLIC_NATIVE_APP_KEY || "";
+  // useEffect(() => {
+	//   initializeKakaoSDK(kakaoNativeAppKey);
+  // }, []);
 
   useEffect(() => {
     if (error) throw error;
@@ -35,14 +41,12 @@ export default function RootLayout() {
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
 
+  
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      {/* 스택에 필요한 화면만 옵션으로 선언. 나머지는 자동 등록됨 */}
       <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index" />            {/* 스플래시(인앱) */}
-        <Stack.Screen name="signup" />           {/* 회원가입 */}
-        <Stack.Screen name="signup-finish" />           {/* 회원가입 완료 */}
-        <Stack.Screen name="(tabs)" />           {/* 탭 루트 */}
+        <Stack.Screen name="index" />
+        <Stack.Screen name="(tabs)" />
         <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
       </Stack>
     </ThemeProvider>

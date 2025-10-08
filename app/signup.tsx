@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
-// 간단 유효성 검사
+// 간단 유효성 검사. 추후 수정 필요
 const isDate = (s: string) => /^\d{4}\.\s?\d{2}\.\s?\d{2}$/.test(s.trim());
 
 type StepKey = 'name' | 'birthday' | 'anniversary' | 'partnerCode';
@@ -33,7 +33,7 @@ export default function Signup() {
       case 'name':        return values.name.trim().length >= 1;
       case 'birthday':    return isDate(values.birthday);
       case 'anniversary': return isDate(values.anniversary);
-      case 'partnerCode': return values.partnerCode.trim().length >= 4; // 임의 기준. 추후 수정 가능
+      case 'partnerCode': return values.partnerCode.trim().length >= 4; // 임의 기준. 추후 수정
     }
   })();
 
