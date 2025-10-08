@@ -26,6 +26,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // bundleIdentifier 필요 시 여기에 지정
   },
   android: {
+    package:'mumuri.test',
     adaptiveIcon: {
       foregroundImage: './assets/images/adaptive-icon.png',
       backgroundColor: '#ffffff',
@@ -40,9 +41,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     favicon: './assets/images/favicon.png',
   },
   extra: {
-    // eas: {
-    //   projectId: '92184daa-ec19-4fe6-af1a-f26a1f94be39',
-    // },
+    eas: {
+      projectId: '92184daa-ec19-4fe6-af1a-f26a1f94be39',
+    },
     // (옵션) 공개 환경변수 노출
     EXPO_PUBLIC_KAKAO_REST_KEY: process.env.EXPO_PUBLIC_KAKAO_REST_KEY,
     EXPO_PUBLIC_KAKAO_NATIVE_KEY: process.env.EXPO_PUBLIC_NATIVE_APP_KEY,
