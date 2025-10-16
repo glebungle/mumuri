@@ -23,6 +23,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   ios: {
     supportsTablet: true,
+    infoPlist: {
+      NSCameraUsageDescription: '미션 사진 촬영을 위해 카메라 접근이 필요합니다.',
+      NSPhotoLibraryAddUsageDescription: '촬영한 사진을 앨범에 저장합니다.',
+    },
     // bundleIdentifier 필요 시 여기에 지정
   },
   android: {
@@ -33,6 +37,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     },
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
+    permissions: [
+      'android.permission.CAMERA',
+      // Android 13+ 저장 권한 분리
+      'android.permission.READ_MEDIA_IMAGES',
+      // (선택) 캡처 저장을 위해 쓰기 권한 필요할 수 있음 (SDK/타겟에 따라)
+      'android.permission.WRITE_EXTERNAL_STORAGE',
+    ],
     // package 필요 시 여기에 지정
   },
   web: {
@@ -45,9 +56,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       projectId: '92184daa-ec19-4fe6-af1a-f26a1f94be39',
     },
     // (옵션) 공개 환경변수 노출
-    EXPO_PUBLIC_KAKAO_REST_KEY: process.env.EXPO_PUBLIC_KAKAO_REST_KEY,
-    EXPO_PUBLIC_KAKAO_NATIVE_KEY: process.env.EXPO_PUBLIC_NATIVE_APP_KEY,
+    // EXPO_PUBLIC_KAKAO_REST_KEY: process.env.EXPO_PUBLIC_KAKAO_REST_KEY,
+    // EXPO_PUBLIC_KAKAO_NATIVE_KEY: process.env.EXPO_PUBLIC_NATIVE_APP_KEY,
   },
+  
   plugins: [
     // expo-router는 그대로 유지
     'expo-router',
