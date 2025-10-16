@@ -1,19 +1,24 @@
 // app/(tabs)/_layout.tsx
-import { Ionicons } from '@expo/vector-icons';
-import { Tabs } from 'expo-router';
+import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
+import { withLayoutContext } from 'expo-router';
+
+const { Navigator } = createMaterialTopTabNavigator();
+export const TopTabs = withLayoutContext(Navigator);
 
 export default function TabsLayout() {
   return (
-    <Tabs screenOptions={{ headerShown: false }}>
-      <Tabs.Screen
-        name="camera"
-        options={{
-          title: '카메라',
-          tabBarIcon: ({ color, size }) => <Ionicons name="camera" color={color} size={size} />
-        }}
-      />
-      {/* share는 탭바 숨기고 push로만 들어가게 */}
-      <Tabs.Screen name="share" options={{ href: null }} />
-    </Tabs>
+    <TopTabs
+      // ✅ 탭바 완전 숨김: screenOptions가 아니라 여기!
+      tabBar={() => null}
+      screenOptions={{
+        swipeEnabled: true,   // 좌우 스와이프 허용
+        lazy: true,           // 필요할 때 렌더
+      }}
+    >
+      <TopTabs.Screen name="camera" options={{ title: '카메라' }} />
+      <TopTabs.Screen name="two" options={{ title: 'two' }} />
+      {/* push 로만 진입: 스와이프/탭 목록에서 숨김 */}
+      <TopTabs.Screen name="share" options={{ href: null }} />
+    </TopTabs>
   );
 }

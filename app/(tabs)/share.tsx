@@ -46,10 +46,10 @@ export default function ShareScreen() {
 
       <View style={styles.bottomActions}>
         <Pressable style={styles.roundBtn} onPress={sendToPartner}>
-          <Ionicons name="paper-plane" size={28} color="#FF9191" />
+          <Ionicons name="paper-plane" size={40} color="#FF9191" />
         </Pressable>
         <Pressable style={styles.saveBtn} onPress={saveToAlbum} disabled={saving}>
-          <Ionicons name="download-outline" size={28} color="#FF9191" />
+          <Ionicons name="download-outline" size={32} color="#FF9191" />
         </Pressable>
       </View>
     </View>
@@ -58,20 +58,36 @@ export default function ShareScreen() {
 
 const styles = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: '#FFFCF5', paddingHorizontal: 16, paddingTop: 24 },
-  title: { color: '#3279FF', fontSize: 12, marginTop:10,marginBottom: 12, textAlign: 'center' },
+  title: { color: '#3279FF', fontSize: 12, marginTop: 10, marginBottom: 12, textAlign: 'center' },
   image: { width: '100%', aspectRatio: 3 / 4, borderRadius: 16, backgroundColor: '#e5e7eb' },
+
+  // ✅ 하단 바: 가운데 정렬만 두고, 아이템은 개별 위치 지정
   bottomActions: {
-    position: 'absolute', left: 0, right: 0, bottom: 28,
-    flexDirection: 'row', justifyContent: 'space-evenly', alignItems: 'center',
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 28,
+    alignItems: 'center',   // 중앙 정렬
+    height: 90,             // 배치 여유
   },
+
+  // ✅ 전송(가운데)
   roundBtn: {
-    width: 76, height: 76, borderRadius: 76, backgroundColor: '#ffff',
-    alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 8, elevation: 3,
+    alignSelf: 'center',
+    width: 76, height: 76, borderRadius: 76, backgroundColor: '#fff',
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 8, elevation: 3,
   },
+
+  // ✅ 저장(오른쪽)
   saveBtn: {
-    width: 80, height: 80, borderRadius: 64, backgroundColor: '#fdeaea',
+    position: 'absolute',
+    right: 50,             // 화면 오른쪽 여백
+    bottom: 6,             // 중앙 버튼과 수직 정렬 보정
+    width: 70, height: 70,
     alignItems: 'center', justifyContent: 'center',
   },
+
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   backBtn: { marginTop: 14, backgroundColor: '#2563eb', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8 },
 });
