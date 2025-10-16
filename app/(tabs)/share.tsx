@@ -3,6 +3,7 @@ import * as MediaLibrary from 'expo-media-library';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import AppText from '../../components/AppText';
 
 export default function ShareScreen() {
   const { uri } = useLocalSearchParams<{ uri?: string }>();
@@ -40,15 +41,15 @@ export default function ShareScreen() {
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.title}>상대방이 주말을 어떻게 보내고 있을지 찍어 보내주세요</Text>
+      <AppText style={styles.title}>상대방이 주말을 어떻게 보내고 있을지 찍어 보내주세요</AppText>
       <Image source={{ uri: photoUri }} style={styles.image} resizeMode="cover" />
 
       <View style={styles.bottomActions}>
         <Pressable style={styles.roundBtn} onPress={sendToPartner}>
-          <Ionicons name="paper-plane" size={28} color="#ef4444" />
+          <Ionicons name="paper-plane" size={28} color="#FF9191" />
         </Pressable>
         <Pressable style={styles.saveBtn} onPress={saveToAlbum} disabled={saving}>
-          <Ionicons name="download-outline" size={28} color="#ef4444" />
+          <Ionicons name="download-outline" size={28} color="#FF9191" />
         </Pressable>
       </View>
     </View>
@@ -56,19 +57,19 @@ export default function ShareScreen() {
 }
 
 const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: '#fff', paddingHorizontal: 16, paddingTop: 24 },
-  title: { color: '#2563eb', fontWeight: '700', fontSize: 16, marginBottom: 12, textAlign: 'center' },
+  wrap: { flex: 1, backgroundColor: '#FFFCF5', paddingHorizontal: 16, paddingTop: 24 },
+  title: { color: '#3279FF', fontSize: 12, marginTop:10,marginBottom: 12, textAlign: 'center' },
   image: { width: '100%', aspectRatio: 3 / 4, borderRadius: 16, backgroundColor: '#e5e7eb' },
   bottomActions: {
     position: 'absolute', left: 0, right: 0, bottom: 28,
     flexDirection: 'row', justifyContent: 'space-evenly', alignItems: 'center',
   },
   roundBtn: {
-    width: 76, height: 76, borderRadius: 76, backgroundColor: '#fdeaea',
+    width: 76, height: 76, borderRadius: 76, backgroundColor: '#ffff',
     alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 8, elevation: 3,
   },
   saveBtn: {
-    width: 64, height: 64, borderRadius: 64, backgroundColor: '#fdeaea',
+    width: 80, height: 80, borderRadius: 64, backgroundColor: '#fdeaea',
     alignItems: 'center', justifyContent: 'center',
   },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },

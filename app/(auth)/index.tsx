@@ -14,7 +14,13 @@ import AppText from '../../components/AppText';
 const { width, height } = Dimensions.get('window');
 
 export default function StartScreen() {
+  // 🚨 임시: 카메라 테스트를 위해 바로 탭 화면으로 이동하는 함수 추가
+  const handleSkipLogin = () => {
+    // 경고 없이 바로 메인 화면으로 이동합니다.
+    router.replace('/(tabs)');
+  };
   return (
+    
     <SafeAreaView style={s.wrap}>
 
       <View pointerEvents="none" style={s.bubbles}>
@@ -27,12 +33,16 @@ export default function StartScreen() {
       <View style={s.center}>
         <AppText style={s.title}>mumuri</AppText>
       </View>
+      {/* 🚨 임시 테스트 버튼: 로그인 없이 바로 카메라로 이동 */}
+        <Pressable onPress={handleSkipLogin} style={s.skipButton}>
+            <AppText type='regular' style={s.skipButtonText}>카메라/메인 테스트 (임시)</AppText>
+        </Pressable>
 
       {/* 하단 액션 영역 */}
       <View style={s.bottom}>
         <KakaoLoginButton />
         <Pressable onPress={() => router.push('/signup')} style={{ marginTop: 14 }}>
-          <AppText style={s.signupLink}>회원가입</AppText>
+          <AppText type='regular'style={s.signupLink}>회원가입</AppText>
         </Pressable>
       </View>
     </SafeAreaView>
@@ -59,11 +69,23 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  title: { fontFamily: 'Pretendard-Bold', fontSize: 100,  color: '#444444', letterSpacing: 0 },
+  title: { fontSize: 100,  color: '#444444', letterSpacing: 0 },
   bottom: {
     paddingHorizontal: 20,
     paddingBottom:70,
     alignItems: 'center',
   },
-  signupLink: { fontFamily: 'Pretendard-Medium', color: '#75787B', fontSize: 10 },
+  // 🚨 임시 버튼 스타일
+    skipButton: {
+        margin: 10,
+        paddingHorizontal: 8,
+        paddingVertical: 8,
+        borderRadius: 8,
+        backgroundColor: '#75787B',
+    },
+    skipButtonText: {
+        color: '#FFFFFF',
+        fontSize: 14,
+    },
+  signupLink: { color: '#75787B', fontSize: 10 },
 });
