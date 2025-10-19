@@ -1,93 +1,149 @@
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as MediaLibrary from 'expo-media-library';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Pressable, StyleSheet, View } from 'react-native';
 import AppText from '../../components/AppText';
+// import * as FileSystem from 'expo-file-system'; // 🚨 FormData 사용 시 필요 없음
+// import { FileSystemUploadType } from 'expo-file-system'; // 🚨 제거
+
+// 임시 설정 (BASE_URL과 COUPLE_ID는 로그인 시 저장된 것을 사용해야 함)
+const BASE_URL = 'https://40b57014557d.ngrok-free.app'; 
 
 export default function ShareScreen() {
-  const { uri } = useLocalSearchParams<{ uri?: string }>();
-  const [saving, setSaving] = useState(false);
-  const photoUri = uri || '';
+    // 카메라에서 넘어온 파라미터
+  const { uri, mission } = useLocalSearchParams<{ uri?: string, mission?: string }>();
+  const [saving, setSaving] = useState(false);
+    const [sending, setSending] = useState(false); // 전송 상태 추가
+  const photoUri = uri || '';
 
-  const saveToAlbum = async () => {
+  // 앨범 저장 로직 (수정 없음)
+  const saveToAlbum = async () => {
+        try {
+            setSaving(true);
+            const libPerm = await MediaLibrary.requestPermissionsAsync();
+            if (!libPerm.granted) {
+                Alert.alert('권한 필요', '사진을 앨범에 저장하려면 권한이 필요합니다.');
+                return;
+            }
+            // 🚨 MediaLibrary.createAssetAsync은 URI를 바로 받으므로 FileSystem 필요 없음
+            await MediaLibrary.createAssetAsync(photoUri); 
+            Alert.alert('저장 완료', '사진이 앨범에 저장되었어요.');
+        } catch (e) {
+            console.error(e);
+            Alert.alert('저장 실패', '사진 저장 중 문제가 발생했습니다.');
+        } finally {
+            setSaving(false);
+        }
+  };
+
+    // ====== 상대방에게 전송 (API 연동) ======
+  const sendToPartner = async () => {
+    if (!photoUri || sending) return;
+    setSending(true);
+
     try {
-      setSaving(true);
-      await MediaLibrary.createAssetAsync(photoUri);
-      Alert.alert('저장 완료', '사진이 앨범에 저장되었어요.');
-    } catch (e) {
-      console.error(e);
-      Alert.alert('저장 실패', '사진 저장 중 문제가 발생했습니다.');
+      const token = await AsyncStorage.getItem('token');    // 로그인 시 저장
+      const coupleId = await AsyncStorage.getItem('coupleId'); // 로그인/회원가입 시 저장
+
+      if (!token || !coupleId) {
+        Alert.alert('오류', '로그인 정보가 없습니다. 다시 로그인해 주세요.');
+        return;
+      }
+
+      // ✅ 실제 업로드 엔드포인트: POST /photo/{couple_id}
+      const url = `${BASE_URL}/photo/${encodeURIComponent(coupleId)}`;
+      console.log('[UPLOAD] url =', url);
+
+      // RN FormData: 파일 파트는 { uri, name, type } 형태
+      const form = new FormData();
+      form.append('file', {
+        // @ts-ignore (RN FormData 특성)
+        uri: photoUri,
+        name: `photo_${Date.now()}.jpg`,
+        type: 'image/jpeg',
+      });
+
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,          // 🔐 백엔드가 인증을 요구하면 필수
+          'ngrok-skip-browser-warning': 'true',      // ngrok 경고 우회
+          Accept: 'application/json',
+          // ⚠️ Content-Type 은 지정하지 마세요 (boundary 자동 설정)
+        },
+        body: form,
+      });
+
+      const body = await res.text();
+      console.log('[UPLOAD] status=', res.status, 'body=', body.slice(0, 200));
+
+      if (!res.ok) {
+        // 흔한 오류 힌트
+        // 401/403: 토큰/권한 문제, 404: 경로(=coupleId) 문제, 413: 파일 용량 초과
+        throw new Error(`HTTP ${res.status}`);
+      }
+
+      Alert.alert('업로드 완료', '상대에게 전송했어요!');
+      // 필요시 라우팅: router.replace('/(tabs)');
+
+    } catch (e: any) {
+      Alert.alert('전송 실패', e?.message || '서버 전송 중 오류가 발생했어요.');
     } finally {
-      setSaving(false);
+      setSending(false);
     }
   };
 
-  const sendToPartner = async () => {
-    // TODO: 채팅방/상대에게 업로드 연동(API)
-    Alert.alert('전송', '상대에게 전송하는 API는 다음 단계에서 연결할게요!');
-  };
 
-  if (!photoUri) {
-    return (
-      <View style={styles.center}>
-        <Text>사진 정보가 없어요.</Text>
-        <Pressable style={styles.backBtn} onPress={() => router.replace('../camera')}>
-          <Text style={{ color: '#fff' }}>홈으로</Text>
-        </Pressable>
-      </View>
-    );
-  }
+  if (!photoUri) {
+    return (
+      <View style={styles.center}>
+        <AppText>사진 정보가 없어요.</AppText>
+        <Pressable style={styles.backBtn} onPress={() => router.replace('/')}>
+          <AppText style={{ color: '#fff' }}>홈으로</AppText>
+        </Pressable>
+      </View>
+    );
+  }
 
-  return (
-    <View style={styles.wrap}>
-      <AppText style={styles.title}>상대방이 주말을 어떻게 보내고 있을지 찍어 보내주세요</AppText>
-      <Image source={{ uri: photoUri }} style={styles.image} resizeMode="cover" />
+  return (
+    <View style={styles.wrap}>
+      <AppText style={styles.title}>{mission || '상대방이 주말을 어떻게 보내고 있을지 찍어 보내주세요'}</AppText>
+      <Image source={{ uri: photoUri }} style={styles.image} resizeMode="cover" />
 
-      <View style={styles.bottomActions}>
-        <Pressable style={styles.roundBtn} onPress={sendToPartner}>
-          <Ionicons name="paper-plane" size={40} color="#FF9191" />
-        </Pressable>
-        <Pressable style={styles.saveBtn} onPress={saveToAlbum} disabled={saving}>
-          <Ionicons name="download-outline" size={32} color="#FF9191" />
-        </Pressable>
-      </View>
-    </View>
-  );
+      <View style={styles.bottomActions}>
+        <Pressable style={styles.sendBtn} onPress={sendToPartner} disabled={sending}>
+          <Ionicons name="paper-plane" size={32} color={sending ? '#999' : '#fff'} />
+        </Pressable>
+        
+        <Pressable style={styles.saveBtn} onPress={saveToAlbum} disabled={saving || sending}>
+          <Ionicons name="download-outline" size={24} color="#FF9191" />
+        </Pressable>
+      </View>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: '#FFFCF5', paddingHorizontal: 16, paddingTop: 24 },
-  title: { color: '#3279FF', fontSize: 12, marginTop: 10, marginBottom: 12, textAlign: 'center' },
-  image: { width: '100%', aspectRatio: 3 / 4, borderRadius: 16, backgroundColor: '#e5e7eb' },
-
-  // ✅ 하단 바: 가운데 정렬만 두고, 아이템은 개별 위치 지정
-  bottomActions: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 28,
-    alignItems: 'center',   // 중앙 정렬
-    height: 90,             // 배치 여유
-  },
-
-  // ✅ 전송(가운데)
-  roundBtn: {
-    alignSelf: 'center',
-    width: 76, height: 76, borderRadius: 76, backgroundColor: '#fff',
-    alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 8, elevation: 3,
-  },
-
-  // ✅ 저장(오른쪽)
-  saveBtn: {
-    position: 'absolute',
-    right: 50,             // 화면 오른쪽 여백
-    bottom: 6,             // 중앙 버튼과 수직 정렬 보정
-    width: 70, height: 70,
-    alignItems: 'center', justifyContent: 'center',
-  },
-
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  backBtn: { marginTop: 14, backgroundColor: '#2563eb', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8 },
+  wrap: { flex: 1, backgroundColor: '#FFFCF5', paddingHorizontal: 16, paddingTop: 24 },
+  title: { color: '#3279FF', fontSize: 12, marginTop:10,marginBottom: 12, textAlign: 'center' },
+  image: { width: '100%', aspectRatio: 3 / 4, borderRadius: 16, backgroundColor: '#e5e7eb' },
+  bottomActions: {
+    position: 'absolute', left: 0, right: 0, bottom: 28,
+    flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
+  },
+  sendBtn: {
+    width: 76, height: 76, borderRadius: 38,
+    backgroundColor: '#FF9191',
+    alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 8, elevation: 4,
+  },
+  saveBtn: {
+    position: 'absolute', right: 40, 
+    width: 50, height: 50, borderRadius: 25, 
+    backgroundColor: '#fdeaea',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  backBtn: { marginTop: 14, backgroundColor: '#2563eb', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8 },
 });
