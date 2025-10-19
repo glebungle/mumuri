@@ -237,8 +237,8 @@ export default function CameraHome() {
 
 const styles = StyleSheet.create({
   loadingScreen: { flex: 1, backgroundColor: '#fff' },
-  fullScreenContainer: { flex: 1, backgroundColor: '#000' },
-  backgroundDim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
+  fullScreenContainer: { flex: 1, backgroundColor: '#ffffffff' },
+  backgroundDim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255, 255, 255, 0.4)' },
 
   cameraFrame: {
     width: screenWidth * 0.9,

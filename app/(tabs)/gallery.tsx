@@ -1,4 +1,4 @@
-// app/(tabs)/index.tsx  — GalleryTab (API 경로 반영판)
+// app/(tabs)/index.tsx — GalleryTab (테스트용 couple_id=0, 로딩/새로고침/저장/삭제 포함)
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
@@ -20,34 +20,46 @@ import AppText from '../../components/AppText';
 // ===== 서버 베이스 URL =====
 const BASE_URL = 'https://40b57014557d.ngrok-free.app';
 
-// 서버에서 내려오는 필드명이 달라도 맞춰주기 위한 노멀라이저
-type Photo = { id: string; url: string; thumbUrl?: string; createdAt?: string; mission?: string };
+// ===== 타입/노멀라이저 =====
+type Photo = {
+  id: string;
+  url: string;
+  thumbUrl?: string;
+  createdAt?: string;
+  mission?: string;
+};
+
 function normalizePhoto(raw: any): Photo | null {
   if (!raw) return null;
-  // 백엔드 필드명 후보들에 대응
   const id = raw.id ?? raw.photo_id ?? raw.photoId ?? raw.uuid;
   const url = raw.url ?? raw.imageUrl ?? raw.photo_url ?? raw.path;
   const thumbUrl = raw.thumbUrl ?? raw.thumbnail ?? raw.thumb_url;
   if (!id || !url) return null;
-  return { id: String(id), url: String(url), thumbUrl, createdAt: raw.createdAt ?? raw.created_at, mission: raw.mission };
+  return {
+    id: String(id),
+    url: String(url),
+    thumbUrl: thumbUrl ? String(thumbUrl) : undefined,
+    createdAt: raw.createdAt ?? raw.created_at,
+    mission: raw.mission,
+  };
 }
 
 export default function GalleryTab() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
   const [preview, setPreview] = useState<Photo | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   const tokenRef = useRef<string | null>(null);
-  const coupleIdRef = useRef<string | null>(null);
 
-  // 공통 fetch (토큰/커플ID 로딩)
+  // 공통 fetch
   const authedFetch = useCallback(async (path: string, init?: RequestInit) => {
     if (!tokenRef.current) tokenRef.current = await AsyncStorage.getItem('token');
-    if (!coupleIdRef.current) coupleIdRef.current = await AsyncStorage.getItem('coupleId');
 
+    const url = `${BASE_URL}${path}`;
     const headers: Record<string, string> = {
       Accept: 'application/json',
       ...(init?.headers as any),
@@ -55,10 +67,18 @@ export default function GalleryTab() {
       'ngrok-skip-browser-warning': 'true',
     };
 
-    const res = await fetch(`${BASE_URL}${path}`, { ...init, headers });
+    const res = await fetch(url, { ...init, headers });
     const raw = await res.text();
+    console.log('[GET]', url, 'status=', res.status, 'raw=', raw.slice(0, 300));
+
+    if (res.status === 204 || raw.trim() === '') return null;
+
     let data: any;
-    try { data = JSON.parse(raw); } catch { data = raw; }
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      data = raw;
+    }
 
     if (!res.ok) {
       const msg = (data && (data.message || data.error)) || `HTTP ${res.status}`;
@@ -67,20 +87,23 @@ export default function GalleryTab() {
     return data;
   }, []);
 
-  // 전체 목록 로드: GET /photo/{couple_id}/all
+  // 전체 목록 로드: GET /photo/{couple_id}/all  — 테스트로 couple_id=0 고정
   const loadAll = useCallback(async () => {
     setInitialLoading(true);
     try {
-      const coupleId = (await AsyncStorage.getItem('coupleId')) || '';
-      if (!coupleId) throw new Error('커플 ID가 없습니다.');
-
-      const data = await authedFetch(`/photo/${encodeURIComponent(coupleId)}/all`, { method: 'GET' });
-
-      // 배열/객체 형태 모두 안전 처리
-      const arr = Array.isArray(data) ? data : data?.items || [];
-      const normalized = arr.map(normalizePhoto).filter(Boolean) as Photo[];
+      const data = (await authedFetch(`/photo/0/all`, { method: 'GET' })) ?? [];
+      const arr =
+        (Array.isArray(data) && data) ||
+        data.items ||
+        data.data ||
+        data.content ||
+        data.list ||
+        data.records ||
+        [];
+      const normalized = (arr as any[]).map(normalizePhoto).filter(Boolean) as Photo[];
       setPhotos(normalized);
     } catch (e: any) {
+      console.warn('loadAll error:', e?.message);
       Alert.alert('로드 실패', e?.message || '사진 목록을 불러오지 못했어요.');
       setPhotos([]);
     } finally {
@@ -88,11 +111,18 @@ export default function GalleryTab() {
     }
   }, [authedFetch]);
 
-  useEffect(() => { loadAll(); }, [loadAll]);
+  useEffect(() => {
+    loadAll();
+  }, [loadAll]);
 
-  const onRefresh = useCallback(async () => {
+  // 당겨서 새로고침
+  const onRefreshFn = useCallback(async () => {
     setRefreshing(true);
-    try { await loadAll(); } finally { setRefreshing(false); }
+    try {
+      await loadAll();
+    } finally {
+      setRefreshing(false);
+    }
   }, [loadAll]);
 
   // 저장(다운로드)
@@ -100,9 +130,12 @@ export default function GalleryTab() {
     if (!p?.url) return;
     try {
       setSaving(true);
+
       const baseDir = FileSystem.documentDirectory as string;
       const downloadDir = `${baseDir}downloads/`;
-      try { await FileSystem.makeDirectoryAsync(downloadDir, { intermediates: true }); } catch {}
+      try {
+        await FileSystem.makeDirectoryAsync(downloadDir, { intermediates: true });
+      } catch {}
 
       const filename = `photo_${p.id || Date.now()}.jpg`;
       const target = `${downloadDir}${filename}`;
@@ -118,37 +151,36 @@ export default function GalleryTab() {
     }
   }, []);
 
-  // 삭제: DELETE /delete/{couple_id}/{photo_id}
-  const deletePhoto = useCallback(async (p: Photo) => {
-    if (!p?.id) return;
-    Alert.alert('삭제', '정말 삭제할까요?', [
-      { text: '취소', style: 'cancel' },
-      {
-        text: '삭제',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            setDeleting(true);
-            const coupleId = (await AsyncStorage.getItem('coupleId')) || '';
-            if (!coupleId) throw new Error('커플 ID가 없습니다.');
-
-            await authedFetch(`/delete/${encodeURIComponent(coupleId)}/${encodeURIComponent(p.id)}`, {
-              method: 'DELETE',
-            });
-
-            setPhotos((prev) => prev.filter((x) => x.id !== p.id));
-            setPreview(null);
-          } catch (e: any) {
-            Alert.alert('삭제 실패', e?.message || '사진을 삭제하지 못했어요.');
-          } finally {
-            setDeleting(false);
-          }
+  // 삭제: DELETE /delete/{couple_id}/{photo_id}  — 테스트로 couple_id=0
+  const deletePhoto = useCallback(
+    async (p: Photo) => {
+      if (!p?.id) return;
+      Alert.alert('삭제', '정말 삭제할까요?', [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '삭제',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setDeleting(true);
+              await authedFetch(`/delete/0/${encodeURIComponent(p.id)}`, {
+                method: 'DELETE',
+              });
+              setPhotos((prev) => prev.filter((x) => x.id !== p.id));
+              setPreview(null);
+            } catch (e: any) {
+              Alert.alert('삭제 실패', e?.message || '사진을 삭제하지 못했어요.');
+            } finally {
+              setDeleting(false);
+            }
+          },
         },
-      },
-    ]);
-  }, [authedFetch]);
+      ]);
+    },
+    [authedFetch],
+  );
 
-  // 그리드
+  // 렌더러/키/푸터
   const numColumns = 3;
   const renderItem = useCallback(({ item }: { item: Photo }) => {
     const src = item.thumbUrl || item.url;
@@ -159,9 +191,9 @@ export default function GalleryTab() {
     );
   }, []);
   const keyExtractor = useCallback((item: Photo) => item.id, []);
+  const ListFooter = useMemo(() => null, []);
 
-  const ListFooter = useMemo(() => null, []); // (현재 API는 페이지네이션 없음)
-
+  // 최초 로딩
   if (initialLoading) {
     return (
       <View style={styles.loadingWrap}>
@@ -171,6 +203,7 @@ export default function GalleryTab() {
     );
   }
 
+  // 본문
   return (
     <View style={styles.wrap}>
       <FlatList
@@ -181,34 +214,33 @@ export default function GalleryTab() {
         contentContainerStyle={photos.length === 0 ? styles.emptyWrap : undefined}
         ListEmptyComponent={<AppText style={styles.emptyText}>아직 업로드된 사진이 없어요.</AppText>}
         ListFooterComponent={ListFooter}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6198FF" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefreshFn} tintColor="#6198FF" />}
       />
 
       {/* 미리보기 모달 */}
       <Modal visible={!!preview} transparent animationType="fade" onRequestClose={() => setPreview(null)}>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
+            {/* 상단 닫기 */}
             <View style={styles.modalTopBar}>
               <Pressable onPress={() => setPreview(null)} style={styles.iconBtn}>
                 <Ionicons name="close" size={22} color="#333" />
               </Pressable>
             </View>
 
-            {preview && (
-              <Image source={{ uri: preview.url }} style={styles.previewImage} resizeMode="contain" />
-            )}
+            {/* 이미지 */}
+            {preview && <Image source={{ uri: preview.url }} style={styles.previewImage} resizeMode="contain" />}
 
+            {/* 하단 액션 */}
             <View style={styles.actions}>
               <Pressable style={styles.actionBtn} onPress={() => preview && savePhoto(preview)} disabled={saving}>
                 <Ionicons name="download-outline" size={22} color="#3279FF" />
-                <AppText type="semibold" style={styles.actionText}>{saving ? '저장 중…' : '저장'}</AppText>
+                <AppText style={styles.actionText}>{saving ? '저장 중…' : '저장'}</AppText>
               </Pressable>
 
               <Pressable style={styles.actionBtn} onPress={() => preview && deletePhoto(preview)} disabled={deleting}>
                 <Ionicons name="trash-outline" size={22} color="#FF4D4F" />
-                <AppText type="semibold" style={[styles.actionText, { color: '#FF4D4F' }]}>
-                  {deleting ? '삭제 중…' : '삭제'}
-                </AppText>
+                <AppText style={[styles.actionText, { color: '#FF4D4F' }]}>{deleting ? '삭제 중…' : '삭제'}</AppText>
               </Pressable>
             </View>
           </View>
@@ -220,6 +252,7 @@ export default function GalleryTab() {
 
 const styles = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: '#FFF' },
+
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF' },
   loadingText: { marginTop: 8, color: '#666' },
 

@@ -44,50 +44,54 @@ export default function ShareScreen() {
     setSending(true);
 
     try {
-      const token = await AsyncStorage.getItem('token');    // 로그인 시 저장
-      const coupleId = await AsyncStorage.getItem('coupleId'); // 로그인/회원가입 시 저장
+      const token = await AsyncStorage.getItem('token');
+      const coupleIdStr = await AsyncStorage.getItem('coupleId'); // 로그인/페어링 때 저장해야 함
+      const coupleId = Number(coupleIdStr);
 
-      if (!token || !coupleId) {
+      if (!token) {
         Alert.alert('오류', '로그인 정보가 없습니다. 다시 로그인해 주세요.');
+        setSending(false);
+        return;
+      }
+      if (!Number.isFinite(coupleId)) {
+        Alert.alert('오류', '커플 ID가 비어있거나 올바르지 않아요.');
+        setSending(false);
         return;
       }
 
-      // ✅ 실제 업로드 엔드포인트: POST /photo/{couple_id}
-      const url = `${BASE_URL}/photo/${encodeURIComponent(coupleId)}`;
+      // ✅ 스웨거와 동일한 실제 엔드포인트
+      const url = `${BASE_URL}/photo/${coupleId}`;
       console.log('[UPLOAD] url =', url);
 
-      // RN FormData: 파일 파트는 { uri, name, type } 형태
       const form = new FormData();
       form.append('file', {
-        // @ts-ignore (RN FormData 특성)
+        // @ts-ignore (RN 전용 형태)
         uri: photoUri,
         name: `photo_${Date.now()}.jpg`,
         type: 'image/jpeg',
-      });
+      } as any);
+      if (mission) form.append('mission', String(mission));
 
       const res = await fetch(url, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${token}`,          // 🔐 백엔드가 인증을 요구하면 필수
-          'ngrok-skip-browser-warning': 'true',      // ngrok 경고 우회
+          Authorization: `Bearer ${token}`,
+          'ngrok-skip-browser-warning': 'true',
           Accept: 'application/json',
-          // ⚠️ Content-Type 은 지정하지 마세요 (boundary 자동 설정)
+          // ⚠️ Content-Type 직접 설정 금지 (FormData가 boundary 추가)
         },
         body: form,
       });
 
-      const body = await res.text();
-      console.log('[UPLOAD] status=', res.status, 'body=', body.slice(0, 200));
+      const text = await res.text();
+      console.log('[UPLOAD] status =', res.status, 'body =', text.slice(0, 200));
 
       if (!res.ok) {
-        // 흔한 오류 힌트
-        // 401/403: 토큰/권한 문제, 404: 경로(=coupleId) 문제, 413: 파일 용량 초과
+        // 401/403: 토큰/권한, 404: 경로(커플ID), 413: 파일 용량
         throw new Error(`HTTP ${res.status}`);
       }
 
       Alert.alert('업로드 완료', '상대에게 전송했어요!');
-      // 필요시 라우팅: router.replace('/(tabs)');
-
     } catch (e: any) {
       Alert.alert('전송 실패', e?.message || '서버 전송 중 오류가 발생했어요.');
     } finally {
@@ -146,4 +150,4 @@ const styles = StyleSheet.create({
   },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   backBtn: { marginTop: 14, backgroundColor: '#2563eb', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8 },
-});
+}); 
