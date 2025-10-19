@@ -15,8 +15,9 @@ export default function TabsLayout() {
         lazy: true,           // 필요할 때 렌더
       }}
     >
+      <TopTabs.Screen name="gallery" options={{ title: '게시판' }} />
       <TopTabs.Screen name="camera" options={{ title: '카메라' }} />
-      <TopTabs.Screen name="two" options={{ title: 'two' }} />
+      <TopTabs.Screen name="index" options={{ title: '임시' }} />
       {/* push 로만 진입: 스와이프/탭 목록에서 숨김 */}
       <TopTabs.Screen name="share" options={{ href: null }} />
     </TopTabs>

@@ -32,7 +32,7 @@ export default function ShareScreen() {
     return (
       <View style={styles.center}>
         <Text>사진 정보가 없어요.</Text>
-        <Pressable style={styles.backBtn} onPress={() => router.replace('/')}>
+        <Pressable style={styles.backBtn} onPress={() => router.replace('../camera')}>
           <Text style={{ color: '#fff' }}>홈으로</Text>
         </Pressable>
       </View>

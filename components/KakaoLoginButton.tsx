@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Alert, Image, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 
-const BACKEND_CALLBACK_URL = 'https://6bae212f5ad0.ngrok-free.app/api/auth/kakao/callback';
+const BACKEND_CALLBACK_URL = 'https://40b57014557d.ngrok-free.app/api/auth/kakao/callback';
 const REST_API_KEY = process.env.EXPO_PUBLIC_KAKAO_REST_KEY || '';
 const REDIRECT_URI = BACKEND_CALLBACK_URL;
 
