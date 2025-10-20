@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import React, { useMemo } from 'react';
+import React from 'react';
 import { Dimensions, Image, TouchableOpacity, View } from 'react-native';
 import Animated, {
   Easing,
@@ -15,14 +15,13 @@ import AppText from '../components/AppText';
 
 const { width } = Dimensions.get('window');
 
-// 개별 말풍선(버블) 컴포넌트
 function Bubble({
   size,
   x,
   delay = 0,
 }: {
-  size: number;  // 지름
-  x: number;     // 왼쪽 위치(px)
+  size: number; 
+  x: number; 
   delay?: number;
 }) {
   const upDown = useSharedValue(0);
@@ -73,7 +72,7 @@ function Bubble({
           height: size,
           borderRadius: size / 2,
           left: x,
-          backgroundColor: '#5B8EF7', // 파란 버블
+          backgroundColor: '#5B8EF7', 
         },
         style,
       ]}
@@ -82,23 +81,11 @@ function Bubble({
 }
 
 export default function SignupFinish() {
-  // 버블 구성은 랜덤으로 한 번 생성
-  const bubbles = useMemo(
-    () => [
-      { size: 112, x: width * 0.44, delay: 0 },
-      { size: 88,  x: width * 0.60, delay: 150 },
-      { size: 72,  x: width * 0.35, delay: 250 },
-      { size: 48,  x: width * 0.30, delay: 400 },
-      { size: 20,  x: width * 0.25, delay: 300 },
-    ],
-    []
-  );
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFCF5', padding: 24, justifyContent: 'space-between' }}>
       
       {/* 상단 인사 */}
-      {/* 🚨 수정: alignItems: 'center'를 추가하여 내부 이미지 및 텍스트를 수평 중앙 정렬 */}
       <View style={{ marginTop: 40, alignItems: 'center' }}> 
         <Image
           source={require('../assets/images/BlueHeart.png')}
@@ -114,7 +101,6 @@ export default function SignupFinish() {
       {/* 중앙 이미지 */}
       <Image
         source={require('../assets/images/Union.png')}
-        // 🚨 수정: alignSelf: 'center'를 추가하여 이미지를 컨테이너 중앙에 배치
         style={{ alignSelf: 'center' }} 
       />
 

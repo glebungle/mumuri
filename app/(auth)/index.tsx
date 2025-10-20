@@ -14,9 +14,9 @@ import AppText from '../../components/AppText';
 const { width, height } = Dimensions.get('window');
 
 export default function StartScreen() {
-  // 🚨 임시: 카메라 테스트를 위해 바로 탭 화면으로 이동하는 함수 추가
+  // 카메라 테스트를 위해 바로 탭 화면으로 이동
   const handleSkipLogin = () => {
-    // 경고 없이 바로 메인 화면으로 이동합니다.
+    // 경고 없이 바로 메인 화면으로 
     router.replace('/(tabs)/camera');
   };
   return (
@@ -33,7 +33,7 @@ export default function StartScreen() {
       <View style={s.center}>
         <AppText style={s.title}>mumuri</AppText>
       </View>
-      {/* 🚨 임시 테스트 버튼: 로그인 없이 바로 카메라로 이동 */}
+      {/* 로그인 없이 바로 카메라로 이동 */}
         <Pressable onPress={handleSkipLogin} style={s.skipButton}>
             <AppText type='regular' style={s.skipButtonText}>카메라/메인 테스트 (임시)</AppText>
         </Pressable>
@@ -75,7 +75,6 @@ const s = StyleSheet.create({
     paddingBottom:70,
     alignItems: 'center',
   },
-  // 🚨 임시 버튼 스타일
     skipButton: {
         margin: 10,
         paddingHorizontal: 8,

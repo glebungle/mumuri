@@ -5,10 +5,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert, Image, Pressable, StyleSheet, View } from 'react-native';
 import AppText from '../../components/AppText';
-// import * as FileSystem from 'expo-file-system'; // 🚨 FormData 사용 시 필요 없음
-// import { FileSystemUploadType } from 'expo-file-system'; // 🚨 제거
 
-// 임시 설정 (BASE_URL과 COUPLE_ID는 로그인 시 저장된 것을 사용해야 함)
 const BASE_URL = 'https://870dce98a8c7.ngrok-free.app'; 
 
 export default function ShareScreen() {
@@ -27,7 +24,6 @@ export default function ShareScreen() {
                 Alert.alert('권한 필요', '사진을 앨범에 저장하려면 권한이 필요합니다.');
                 return;
             }
-            // 🚨 MediaLibrary.createAssetAsync은 URI를 바로 받으므로 FileSystem 필요 없음
             await MediaLibrary.createAssetAsync(photoUri); 
             Alert.alert('저장 완료', '사진이 앨범에 저장되었어요.');
         } catch (e) {
@@ -38,7 +34,7 @@ export default function ShareScreen() {
         }
   };
 
-    // ====== 상대방에게 전송 (API 연동) ======
+    // ====== 사진 전송 ======
   const sendToPartner = async () => {
     if (!photoUri || sending) return;
     setSending(true);
@@ -65,7 +61,6 @@ export default function ShareScreen() {
 
       const form = new FormData();
       form.append('file', {
-        // @ts-ignore (RN 전용 형태)
         uri: photoUri,
         name: `photo_${Date.now()}.jpg`,
         type: 'image/jpeg',
@@ -78,7 +73,6 @@ export default function ShareScreen() {
           Authorization: `Bearer ${token}`,
           'ngrok-skip-browser-warning': 'true',
           Accept: 'application/json',
-          // ⚠️ Content-Type 직접 설정 금지 (FormData가 boundary 추가)
         },
         body: form,
       });
@@ -87,7 +81,6 @@ export default function ShareScreen() {
       console.log('[UPLOAD] status =', res.status, 'body =', text.slice(0, 200));
 
       if (!res.ok) {
-        // 401/403: 토큰/권한, 404: 경로(커플ID), 413: 파일 용량
         throw new Error(`HTTP ${res.status}`);
       }
 

@@ -4,24 +4,22 @@ import { Image, ScrollView, StyleSheet, TextInput, TextInputProps, TouchableOpac
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppText from '../components/AppText';
 
-// 간단 유효성 검사. 추후 수정 필요
+// 날짜용 간단 유효성 검사. 추후 수정 필요
 const isDate = (s: string) => /^\d{4}\.\s?\d{2}\.\s?\d{2}$/.test(s.trim());
 
 type StepKey = 'name' | 'birthday' | 'anniversary' | 'partnerCode';
 
 const HEART_ICON = require('../assets/images/BlueHeart.png');
 
-// PastCard 컴포넌트를 Signup 함수 외부로 이동하고 useCallback으로 감쌉니다.
 const PastCard = React.memo(({ label, value }: { label: string; value: string }) => (
     <View
-        style={[styles.pastCardBase, { height: 90 }]} // 높이 조정 (이전 로그 기반)
+        style={[styles.pastCardBase, { height: 90 }]} 
     >
         <AppText style={styles.pastCardLabel}>{label}</AppText>
         <AppText style={styles.pastCardValue}>{value || '-'}</AppText>
     </View>
 ));
 
-// InputField 컴포넌트를 Signup 함수 밖으로 이동
 const InputField = React.memo(({ label, value, placeholder, onChangeText, keyboardType = 'default' }: { 
     label: string; 
     value: string; 
@@ -64,7 +62,7 @@ export default function Signup() {
         partnerCode: '',
     });
 
-    // 내 코드(랜덤) – 실제로는 서버가 발급
+    // 내 코드(랜덤) – 추후 수정!
     const myCode = useMemo(() => Math.random().toString(36).slice(2, 10), []);
 
     const steps: { key: StepKey; title: string; hint: string; accent: string; placeholder: string }[] = useMemo(() => [
@@ -76,7 +74,6 @@ export default function Signup() {
 
     const current = steps[step];
 
-    // 렌더링 최적화: canNext 로직을 useMemo로 감싸 불필요한 계산 방지
     const canNext = useMemo(() => {
         switch (current.key) {
             case 'name': return values.name.trim().length >= 1;
@@ -86,12 +83,11 @@ export default function Signup() {
         }
     }, [current.key, values]);
 
-    // 렌더링 최적화: onNext/onBack 함수를 useCallback으로 감싸 불필요한 재생성 방지
     const onNext = useCallback(() => {
         if (!canNext) return;
         if (step < steps.length - 1) setStep(step + 1);
         else {
-            // 완료 화면으로 이동
+            //완료 화면 이동
             router.replace('/signup-finish');
         }
     }, [canNext, step, steps.length]);
@@ -108,7 +104,6 @@ export default function Signup() {
                 
                 {/* 상단 타이틀 */}
                 <View style={styles.headerContainer}>
-                    {/* 🚨 수정된 부분: 상수화된 HEART_ICON 변수를 source에 사용 */}
                     <Image
                         source={HEART_ICON} 
                         style={[styles.heartImage, { tintColor: current.accent }]}
@@ -121,7 +116,7 @@ export default function Signup() {
 
                 {/* 현재 단계 입력 카드 */}
                 <View
-                    key={current.key} // key를 사용하여 단계 변경 시 카드 리마운트
+                    key={current.key} 
                     style={[styles.currentCardBase, { borderColor: current.accent }]}
                 >
                     {current.key === 'partnerCode' ? (
@@ -152,7 +147,7 @@ export default function Signup() {
                     )}
                 </View>
 
-                {/* 아래로 쌓이는 이전 값 카드들 */}
+                {/* 이전 값 카드들 스택*/}
                 <View style={{ marginTop: 14 }}>
                     {steps.slice(0, step).reverse().map((stepItem) => (
                         <PastCard 
@@ -224,13 +219,12 @@ const styles = StyleSheet.create({
         padding: 14,
         backgroundColor: 'transparent',
     },
-    // PastCard 스타일
     pastCardBase: {
         borderWidth: 2,
         borderColor: '#75787B',
         borderRadius: 16,
         paddingHorizontal: 14,
-        paddingVertical: 11, // 높이 90에 맞게 조정
+        paddingVertical: 11, 
         marginTop: 8,
         justifyContent: 'center',
         overflow: 'hidden',
@@ -238,13 +232,12 @@ const styles = StyleSheet.create({
     pastCardLabel: {
         fontSize: 12, 
         color: '#75787B',
-        marginBottom: 4, // 간격 조정
+        marginBottom: 4,
     },
     pastCardValue: {
         fontSize: 16, 
         color: '#75787B'
     },
-    // TextInput 관련 스타일
     inputLabel: {
         fontSize: 12, 
         color: '#6B7280', 
@@ -267,7 +260,6 @@ const styles = StyleSheet.create({
         color: '#6B7280', 
         marginBottom: 6 
     },
-    // 버튼 스타일
     buttonContainer: { 
         padding: 20, 
         gap: 10, 

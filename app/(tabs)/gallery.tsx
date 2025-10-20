@@ -1,5 +1,4 @@
-// app/(tabs)/index.tsx — GalleryTab (로그인 시 저장된 coupleId 사용)
-/* eslint-disable react-hooks/exhaustive-deps */
+// app/(tabs)/gallery.tsx 
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
@@ -18,7 +17,6 @@ import {
 } from 'react-native';
 import AppText from '../../components/AppText';
 
-// ===== 서버 베이스 URL =====
 const BASE_URL = 'https://870dce98a8c7.ngrok-free.app';
 
 type Photo = { id: string; url: string; uploadedBy?: string };
@@ -26,7 +24,7 @@ type Photo = { id: string; url: string; uploadedBy?: string };
 function normalizePhoto(raw: any): Photo | null {
   if (!raw || typeof raw !== 'object') return null;
   const id = raw.id ?? raw.photo_id ?? raw.photoId ?? raw.uuid;
-  const url = raw.presignedUrl ?? raw.url; // presignedUrl 우선
+  const url = raw.presignedUrl ?? raw.url; 
   if (id == null || !url) return null;
   return { id: String(id), url: String(url), uploadedBy: raw.uploadedBy != null ? String(raw.uploadedBy) : undefined };
 }
@@ -73,11 +71,10 @@ export default function GalleryTab() {
   }, []);
 
   // 전체 목록 로드: GET /photo/{couple_id}/all
-  // ===== loadAll 수정 =====
     const loadAll = useCallback(async () => {
     setInitialLoading(true);
     try {
-        // 1) coupleId 확보 (없으면 임시 1로)
+        // 1) coupleId 
         let coupleId = (await AsyncStorage.getItem('coupleId')) ?? '';
         if (!coupleId || coupleId === 'null' || coupleId === 'undefined') {
         console.warn('[Gallery] coupleId not set; using fallback 1 for test');
@@ -118,12 +115,6 @@ export default function GalleryTab() {
     if (!p?.url) return;
 
     try {
-        // // 0) 웹이면 바로 종료
-        // if (Platform.OS === 'web') {
-        // Alert.alert('안내', '웹 환경에서는 앨범 저장이 지원되지 않아요. iOS/Android에서 시도해 주세요.');
-        // return;
-        // }
-
         setSaving(true);
 
         // 1) 권한
@@ -133,7 +124,7 @@ export default function GalleryTab() {
         return;
         }
 
-        // 2) 저장할 임시 경로: cache → document 순서로 폴백
+        // 2) 저장할 임시 경로:수정필요
         const base =
         FileSystem.cacheDirectory ??
         (FileSystem as any).documentDirectory ?? // 타입 경고 피하기 위함
@@ -227,7 +218,7 @@ export default function GalleryTab() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefreshFn} tintColor="#6198FF" />}
       />
 
-      {/* 미리보기 모달 */}
+      {/* 모달 */}
       <Modal visible={!!preview} transparent animationType="fade" onRequestClose={() => setPreview(null)}>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>

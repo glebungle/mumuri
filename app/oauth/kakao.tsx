@@ -4,7 +4,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef } from 'react';
 import { ActivityIndicator, Alert, View } from 'react-native';
 
-const BASE_URL = 'https://870dce98a8c7.ngrok-free.app'; // 동일한 BASE 적용
+const BASE_URL = 'https://870dce98a8c7.ngrok-free.app'; 
 
 export default function KakaoDeepLinkHandler() {
   const { token, nickname, status, couple_id, coupleId } = useLocalSearchParams<{
@@ -53,7 +53,7 @@ export default function KakaoDeepLinkHandler() {
           } catch {}
         }
 
-        Alert.alert('로그인 완료', name ? `${name}님 환영합니다 🎉` : '성공적으로 로그인했어요!');
+        Alert.alert('로그인 완료', `${name}님 환영합니다! `);
         setTimeout(() => {
           if (status === 'NEW' || status === 'NEED_INFO') router.replace('/signup');
           else router.replace('/(tabs)/camera');
