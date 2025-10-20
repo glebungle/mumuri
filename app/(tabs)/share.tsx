@@ -9,7 +9,7 @@ import AppText from '../../components/AppText';
 // import { FileSystemUploadType } from 'expo-file-system'; // 🚨 제거
 
 // 임시 설정 (BASE_URL과 COUPLE_ID는 로그인 시 저장된 것을 사용해야 함)
-const BASE_URL = 'https://40b57014557d.ngrok-free.app'; 
+const BASE_URL = 'https://870dce98a8c7.ngrok-free.app'; 
 
 export default function ShareScreen() {
     // 카메라에서 넘어온 파라미터
@@ -60,7 +60,7 @@ export default function ShareScreen() {
       }
 
       // ✅ 스웨거와 동일한 실제 엔드포인트
-      const url = `${BASE_URL}/photo/${coupleId}`;
+      const url = `${BASE_URL}/photo/1`;
       console.log('[UPLOAD] url =', url);
 
       const form = new FormData();

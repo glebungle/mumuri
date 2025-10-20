@@ -1,4 +1,5 @@
-// app/(tabs)/index.tsx — GalleryTab (테스트용 couple_id=0, 로딩/새로고침/저장/삭제 포함)
+// app/(tabs)/index.tsx — GalleryTab (로그인 시 저장된 coupleId 사용)
+/* eslint-disable react-hooks/exhaustive-deps */
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
@@ -18,30 +19,16 @@ import {
 import AppText from '../../components/AppText';
 
 // ===== 서버 베이스 URL =====
-const BASE_URL = 'https://40b57014557d.ngrok-free.app';
+const BASE_URL = 'https://870dce98a8c7.ngrok-free.app';
 
-// ===== 타입/노멀라이저 =====
-type Photo = {
-  id: string;
-  url: string;
-  thumbUrl?: string;
-  createdAt?: string;
-  mission?: string;
-};
+type Photo = { id: string; url: string; uploadedBy?: string };
 
 function normalizePhoto(raw: any): Photo | null {
-  if (!raw) return null;
+  if (!raw || typeof raw !== 'object') return null;
   const id = raw.id ?? raw.photo_id ?? raw.photoId ?? raw.uuid;
-  const url = raw.url ?? raw.imageUrl ?? raw.photo_url ?? raw.path;
-  const thumbUrl = raw.thumbUrl ?? raw.thumbnail ?? raw.thumb_url;
-  if (!id || !url) return null;
-  return {
-    id: String(id),
-    url: String(url),
-    thumbUrl: thumbUrl ? String(thumbUrl) : undefined,
-    createdAt: raw.createdAt ?? raw.created_at,
-    mission: raw.mission,
-  };
+  const url = raw.presignedUrl ?? raw.url; // presignedUrl 우선
+  if (id == null || !url) return null;
+  return { id: String(id), url: String(url), uploadedBy: raw.uploadedBy != null ? String(raw.uploadedBy) : undefined };
 }
 
 export default function GalleryTab() {
@@ -54,10 +41,12 @@ export default function GalleryTab() {
   const [deleting, setDeleting] = useState(false);
 
   const tokenRef = useRef<string | null>(null);
+  const coupleIdRef = useRef<string | null>(null);
 
   // 공통 fetch
   const authedFetch = useCallback(async (path: string, init?: RequestInit) => {
     if (!tokenRef.current) tokenRef.current = await AsyncStorage.getItem('token');
+    if (!coupleIdRef.current) coupleIdRef.current = await AsyncStorage.getItem('coupleId');
 
     const url = `${BASE_URL}${path}`;
     const headers: Record<string, string> = {
@@ -69,16 +58,12 @@ export default function GalleryTab() {
 
     const res = await fetch(url, { ...init, headers });
     const raw = await res.text();
-    console.log('[GET]', url, 'status=', res.status, 'raw=', raw.slice(0, 300));
+    console.log('[REQ]', init?.method || 'GET', url, 'status=', res.status, 'raw=', raw.slice(0, 200));
 
     if (res.status === 204 || raw.trim() === '') return null;
 
     let data: any;
-    try {
-      data = JSON.parse(raw);
-    } catch {
-      data = raw;
-    }
+    try { data = JSON.parse(raw); } catch { data = raw; }
 
     if (!res.ok) {
       const msg = (data && (data.message || data.error)) || `HTTP ${res.status}`;
@@ -87,109 +72,134 @@ export default function GalleryTab() {
     return data;
   }, []);
 
-  // 전체 목록 로드: GET /photo/{couple_id}/all  — 테스트로 couple_id=0 고정
-  const loadAll = useCallback(async () => {
+  // 전체 목록 로드: GET /photo/{couple_id}/all
+  // ===== loadAll 수정 =====
+    const loadAll = useCallback(async () => {
     setInitialLoading(true);
     try {
-      const data = (await authedFetch(`/photo/0/all`, { method: 'GET' })) ?? [];
-      const arr =
-        (Array.isArray(data) && data) ||
-        data.items ||
-        data.data ||
-        data.content ||
-        data.list ||
-        data.records ||
-        [];
-      const normalized = (arr as any[]).map(normalizePhoto).filter(Boolean) as Photo[];
-      setPhotos(normalized);
-    } catch (e: any) {
-      console.warn('loadAll error:', e?.message);
-      Alert.alert('로드 실패', e?.message || '사진 목록을 불러오지 못했어요.');
-      setPhotos([]);
-    } finally {
-      setInitialLoading(false);
-    }
-  }, [authedFetch]);
+        // 1) coupleId 확보 (없으면 임시 1로)
+        let coupleId = (await AsyncStorage.getItem('coupleId')) ?? '';
+        if (!coupleId || coupleId === 'null' || coupleId === 'undefined') {
+        console.warn('[Gallery] coupleId not set; using fallback 1 for test');
+        coupleId = '1';
+        }
 
-  useEffect(() => {
-    loadAll();
-  }, [loadAll]);
+        // 2) GET /photo/{couple_id}/all
+        const path = `/photo/${encodeURIComponent(coupleId)}/all`;
+        const data = await authedFetch(path, { method: 'GET' });
+
+        // 3) 배열/컨테이너 대응 + null 필터
+        const arr: any[] = Array.isArray(data)
+        ? data
+        : (data?.items || data?.data || data?.content || data?.list || data?.records || []);
+        const normalized = arr.map(normalizePhoto).filter(Boolean) as Photo[];
+
+        console.log('[Gallery] normalized length=', normalized.length);
+        setPhotos(normalized);
+    } catch (e: any) {
+        console.warn('loadAll error:', e?.message);
+        Alert.alert('로드 실패', e?.message || '사진 목록을 불러오지 못했어요.');
+        setPhotos([]);
+    } finally {
+        setInitialLoading(false);
+    }
+    }, [authedFetch]);
+
+  useEffect(() => { loadAll(); }, [loadAll]);
 
   // 당겨서 새로고침
   const onRefreshFn = useCallback(async () => {
     setRefreshing(true);
-    try {
-      await loadAll();
-    } finally {
-      setRefreshing(false);
-    }
+    try { await loadAll(); } finally { setRefreshing(false); }
   }, [loadAll]);
 
   // 저장(다운로드)
   const savePhoto = useCallback(async (p: Photo) => {
     if (!p?.url) return;
+
     try {
-      setSaving(true);
+        // // 0) 웹이면 바로 종료
+        // if (Platform.OS === 'web') {
+        // Alert.alert('안내', '웹 환경에서는 앨범 저장이 지원되지 않아요. iOS/Android에서 시도해 주세요.');
+        // return;
+        // }
 
-      const baseDir = FileSystem.documentDirectory as string;
-      const downloadDir = `${baseDir}downloads/`;
-      try {
-        await FileSystem.makeDirectoryAsync(downloadDir, { intermediates: true });
-      } catch {}
+        setSaving(true);
 
-      const filename = `photo_${p.id || Date.now()}.jpg`;
-      const target = `${downloadDir}${filename}`;
-      const { uri } = await FileSystem.downloadAsync(p.url, target);
+        // 1) 권한
+        const perm = await MediaLibrary.requestPermissionsAsync();
+        if (!perm.granted) {
+        Alert.alert('권한 필요', '사진을 앨범에 저장하려면 권한이 필요합니다.');
+        return;
+        }
 
-      await MediaLibrary.requestPermissionsAsync();
-      await MediaLibrary.saveToLibraryAsync(uri);
-      Alert.alert('저장 완료', '사진이 앨범에 저장되었어요.');
+        // 2) 저장할 임시 경로: cache → document 순서로 폴백
+        const base =
+        FileSystem.cacheDirectory ??
+        (FileSystem as any).documentDirectory ?? // 타입 경고 피하기 위함
+        null;
+
+        if (!base) {
+        Alert.alert(
+            '저장 불가',
+            '임시 폴더를 찾을 수 없어요. expo-file-system 설치/빌드 상태를 확인해 주세요.',
+        );
+        return;
+        }
+
+        const filename = `photo_${p.id || Date.now()}.jpg`;
+        const target = base + filename;
+
+        // 3) 다운로드 후 앨범 저장
+        const { uri: localUri } = await FileSystem.downloadAsync(p.url, target);
+        await MediaLibrary.saveToLibraryAsync(localUri);
+
+        Alert.alert('저장 완료', '사진이 앨범에 저장되었어요.');
     } catch (e: any) {
-      Alert.alert('저장 실패', e?.message || '사진을 저장하지 못했어요.');
+        console.error(e);
+        Alert.alert('저장 실패', e?.message || '사진을 저장하지 못했어요.');
     } finally {
-      setSaving(false);
+        setSaving(false);
     }
-  }, []);
+    }, []);
 
-  // 삭제: DELETE /delete/{couple_id}/{photo_id}  — 테스트로 couple_id=0
-  const deletePhoto = useCallback(
-    async (p: Photo) => {
-      if (!p?.id) return;
-      Alert.alert('삭제', '정말 삭제할까요?', [
-        { text: '취소', style: 'cancel' },
-        {
-          text: '삭제',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setDeleting(true);
-              await authedFetch(`/delete/0/${encodeURIComponent(p.id)}`, {
-                method: 'DELETE',
-              });
-              setPhotos((prev) => prev.filter((x) => x.id !== p.id));
-              setPreview(null);
-            } catch (e: any) {
-              Alert.alert('삭제 실패', e?.message || '사진을 삭제하지 못했어요.');
-            } finally {
-              setDeleting(false);
-            }
-          },
+  // 삭제: DELETE /delete/{couple_id}/{photo_id}
+  const deletePhoto = useCallback((p: Photo) => {
+    if (!p?.id) return;
+    Alert.alert('삭제', '정말 삭제할까요?', [
+      { text: '취소', style: 'cancel' },
+      {
+        text: '삭제',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            setDeleting(true);
+            const coupleId = (await AsyncStorage.getItem('coupleId')) ?? '';
+            if (coupleId) throw new Error('커플 ID가 없습니다.');
+
+            await authedFetch(`/delete/1/${encodeURIComponent(p.id)}`, {
+              method: 'DELETE',
+            });
+
+            setPhotos((prev) => prev.filter((x) => x.id !== p.id));
+            setPreview(null);
+          } catch (e: any) {
+            Alert.alert('삭제 실패', e?.message || '사진을 삭제하지 못했어요.');
+          } finally {
+            setDeleting(false);
+          }
         },
-      ]);
-    },
-    [authedFetch],
-  );
+      },
+    ]);
+  }, [authedFetch]);
 
-  // 렌더러/키/푸터
+  // 렌더러
   const numColumns = 3;
-  const renderItem = useCallback(({ item }: { item: Photo }) => {
-    const src = item.thumbUrl || item.url;
-    return (
-      <Pressable style={styles.cell} onPress={() => setPreview(item)}>
-        <Image source={{ uri: src }} style={styles.thumb} />
-      </Pressable>
-    );
-  }, []);
+  const renderItem = useCallback(({ item }: { item: Photo }) => (
+    <Pressable style={styles.cell} onPress={() => setPreview(item)}>
+      <Image source={{ uri: item.url }} style={styles.thumb} />
+    </Pressable>
+  ), []);
   const keyExtractor = useCallback((item: Photo) => item.id, []);
   const ListFooter = useMemo(() => null, []);
 
@@ -221,17 +231,16 @@ export default function GalleryTab() {
       <Modal visible={!!preview} transparent animationType="fade" onRequestClose={() => setPreview(null)}>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
-            {/* 상단 닫기 */}
             <View style={styles.modalTopBar}>
               <Pressable onPress={() => setPreview(null)} style={styles.iconBtn}>
                 <Ionicons name="close" size={22} color="#333" />
               </Pressable>
             </View>
 
-            {/* 이미지 */}
-            {preview && <Image source={{ uri: preview.url }} style={styles.previewImage} resizeMode="contain" />}
+            {preview && (
+              <Image source={{ uri: preview.url }} style={styles.previewImage} resizeMode="contain" />
+            )}
 
-            {/* 하단 액션 */}
             <View style={styles.actions}>
               <Pressable style={styles.actionBtn} onPress={() => preview && savePhoto(preview)} disabled={saving}>
                 <Ionicons name="download-outline" size={22} color="#3279FF" />
@@ -252,7 +261,6 @@ export default function GalleryTab() {
 
 const styles = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: '#FFF' },
-
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF' },
   loadingText: { marginTop: 8, color: '#666' },
 
