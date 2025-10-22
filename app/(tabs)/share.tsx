@@ -10,13 +10,13 @@ const BASE_URL = 'https://870dce98a8c7.ngrok-free.app';
 
 export default function ShareScreen() {
     // 카메라에서 넘어온 파라미터
-  const { uri, mission } = useLocalSearchParams<{ uri?: string, mission?: string }>();
-  const [saving, setSaving] = useState(false);
+  const { uri, mission } = useLocalSearchParams<{ uri?: string, mission?: string }>();
+  const [saving, setSaving] = useState(false);
     const [sending, setSending] = useState(false); // 전송 상태 추가
-  const photoUri = uri || '';
+  const photoUri = uri || '';
 
-  // 앨범 저장 로직 (수정 없음)
-  const saveToAlbum = async () => {
+  // 앨범 저장 로직 (수정 없음)
+  const saveToAlbum = async () => {
         try {
             setSaving(true);
             const libPerm = await MediaLibrary.requestPermissionsAsync();
@@ -32,10 +32,10 @@ export default function ShareScreen() {
         } finally {
             setSaving(false);
         }
-  };
+  };
 
     // ====== 사진 전송 ======
-  const sendToPartner = async () => {
+  const sendToPartner = async () => {
     if (!photoUri || sending) return;
     setSending(true);
 
@@ -55,7 +55,6 @@ export default function ShareScreen() {
         return;
       }
 
-      // ✅ 스웨거와 동일한 실제 엔드포인트
       const url = `${BASE_URL}/photo/1`;
       console.log('[UPLOAD] url =', url);
 
@@ -123,24 +122,24 @@ export default function ShareScreen() {
 }
 
 const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: '#FFFCF5', paddingHorizontal: 16, paddingTop: 24 },
-  title: { color: '#3279FF', fontSize: 12, marginTop:10,marginBottom: 12, textAlign: 'center' },
-  image: { width: '100%', aspectRatio: 3 / 4, borderRadius: 16, backgroundColor: '#e5e7eb' },
-  bottomActions: {
-    position: 'absolute', left: 0, right: 0, bottom: 28,
-    flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
-  },
-  sendBtn: {
-    width: 76, height: 76, borderRadius: 38,
-    backgroundColor: '#FF9191',
-    alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 8, elevation: 4,
-  },
-  saveBtn: {
-    position: 'absolute', right: 40, 
-    width: 50, height: 50, borderRadius: 25, 
-    backgroundColor: '#fdeaea',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  backBtn: { marginTop: 14, backgroundColor: '#2563eb', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8 },
+    wrap: { flex: 1, backgroundColor: '#FFFCF5', paddingHorizontal: 16, paddingTop: 24 },
+    title: { color: '#3279FF', fontSize: 12, marginTop:10,marginBottom: 12, textAlign: 'center' },
+    image: { width: '100%', aspectRatio: 3 / 4, borderRadius: 16, backgroundColor: '#e5e7eb' },
+    bottomActions: {
+      position: 'absolute', left: 0, right: 0, bottom: 28,
+      flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
+    },
+    sendBtn: {
+      width: 76, height: 76, borderRadius: 38,
+      backgroundColor: '#FF9191',
+      alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 8, elevation: 4,
+    },
+    saveBtn: {
+      position: 'absolute', right: 40, 
+      width: 50, height: 50, borderRadius: 25, 
+      backgroundColor: '#fdeaea',
+      alignItems: 'center', justifyContent: 'center',
+    },
+    center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    backBtn: { marginTop: 14, backgroundColor: '#2563eb', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8 },
 }); 

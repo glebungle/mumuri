@@ -36,6 +36,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       backgroundColor: '#ffffff',
     },
     edgeToEdgeEnabled: true,
+    softwareKeyboardLayoutMode: "resize",
     predictiveBackGestureEnabled: false,
     permissions: [
       'android.permission.CAMERA',
