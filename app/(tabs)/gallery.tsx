@@ -179,7 +179,7 @@ export default function GalleryTab() {
               //   throw new Error('커플 ID가 없습니다.');
               // }
 
-              await authedFetch(`/delete/${encodeURIComponent(coupleId)}/${encodeURIComponent(p.id)}`, {
+              await authedFetch(`/delete/1/${encodeURIComponent(p.id)}`, {
                 method: 'DELETE',
               });
 
