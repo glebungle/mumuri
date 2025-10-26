@@ -2,7 +2,6 @@
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { CameraCapturedPicture, CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImageManipulator from 'expo-image-manipulator';
-import * as MediaLibrary from 'expo-media-library';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -21,6 +20,7 @@ import AppText from '../../components/AppText';
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 
+
 type CropRect = { originX: number; originY: number; width: number; height: number };
 
 export default function CameraHome() {
@@ -28,14 +28,13 @@ export default function CameraHome() {
   const cameraRef = useRef<CameraView>(null);
   const insets = useSafeAreaInsets();
 
+  // 카메라 권한
   const [camPerm, requestCamPerm] = useCameraPermissions();
-  const [libPerm, requestLibPerm] = MediaLibrary.usePermissions();
 
   const [isReady, setIsReady] = useState(false);
   const [capturing, setCapturing] = useState(false);
   const [previewUri, setPreviewUri] = useState<string | null>(null);
 
-  // 뷰파인더 실제 렌더 크기
   const [viewW, setViewW] = useState(0);
   const [viewH, setViewH] = useState(0);
   const onCameraWrapLayout = (e: LayoutChangeEvent) => {
@@ -47,29 +46,23 @@ export default function CameraHome() {
   useEffect(() => {
     (async () => {
       if (!camPerm?.granted) await requestCamPerm();
-      if (!libPerm?.granted) await requestLibPerm();
     })();
   }, []);
 
-  if (!camPerm || !libPerm) return <View style={styles.loadingScreen} />;
+  if (!camPerm) return <View style={styles.loadingScreen} />;
 
-  if (!camPerm.granted || !libPerm.granted) {
+  if (!camPerm.granted) {
     return (
       <View style={styles.center}>
-        <Text style={styles.permissionTitle}>
-          {camPerm.granted ? '사진 저장 권한이 필요해요' : '카메라 권한이 필요해요'}
-        </Text>
-        <Pressable
-          style={styles.permBtn}
-          onPress={camPerm.granted ? requestLibPerm : requestCamPerm}
-        >
+        <Text style={styles.permissionTitle}>카메라 권한이 필요해요</Text>
+        <Pressable style={styles.permBtn} onPress={requestCamPerm}>
           <Text style={styles.permBtnText}>권한 허용하기</Text>
         </Pressable>
       </View>
     );
   }
 
-  // 촬영 → 화면 비율에 맞춰 중앙 크롭
+  // 촬영 
   const takePhoto = async () => {
     if (!cameraRef.current || capturing) return;
     setCapturing(true);
@@ -89,29 +82,22 @@ export default function CameraHome() {
         return;
       }
 
-      // 프리뷰 프레임의 종횡비(측정 값 없으면 3:4 가정)
       const targetAspect = viewW && viewH ? viewW / viewH : 3 / 4;
 
-      // 일부 기기에서 EXIF 회전(6/8)로 width/height가 뒤바뀌는 현상 보정
       let srcW = pic.width;
       let srcH = pic.height;
       const orientation = pic.exif?.Orientation;
       const isRotated = Platform.OS === 'android' && (orientation === 6 || orientation === 8);
-      if (isRotated) {
-        [srcW, srcH] = [srcH, srcW];
-      }
+      if (isRotated) [srcW, srcH] = [srcH, srcW];
 
       const srcAspect = srcW / srcH;
 
-      // 중앙 크롭 사각형 계산
       let crop: CropRect;
       if (srcAspect > targetAspect) {
-        // 가로가 더 넓음 → 좌우를 잘라냄
         const newW = Math.round(srcH * targetAspect);
         const originX = Math.max(0, Math.floor((srcW - newW) / 2));
         crop = { originX, originY: 0, width: newW, height: srcH };
       } else if (srcAspect < targetAspect) {
-        // 세로가 더 김 → 위아래를 잘라냄
         const newH = Math.round(srcW / targetAspect);
         const originY = Math.max(0, Math.floor((srcH - newH) / 2));
         crop = { originX: 0, originY, width: srcW, height: newH };
@@ -119,11 +105,10 @@ export default function CameraHome() {
         crop = { originX: 0, originY: 0, width: srcW, height: srcH };
       }
 
-      // 안전 클램프 (안드로이드 "x + width must be <= bitmap.width" 방지)
       crop.originX = Math.max(0, Math.min(crop.originX, srcW - 1));
       crop.originY = Math.max(0, Math.min(crop.originY, srcH - 1));
-      crop.width = Math.min(crop.width, srcW - crop.originX);
-      crop.height = Math.min(crop.height, srcH - crop.originY);
+      crop.width   = Math.min(crop.width,  srcW - crop.originX);
+      crop.height  = Math.min(crop.height, srcH - crop.originY);
 
       const manipulated = await ImageManipulator.manipulateAsync(
         pic.uri,
@@ -144,17 +129,17 @@ export default function CameraHome() {
 
   const retake = () => setPreviewUri(null);
 
+  // share이동
   const confirm = async () => {
     if (!previewUri) return;
     try {
-      if (libPerm.granted) await MediaLibrary.saveToLibraryAsync(previewUri);
       router.push({
         pathname: './share',
-        params: { uri: previewUri, mission: '상대방이 주말을 어떻게 보내고 있을지' },
+        params: { uri: previewUri }, //mission: '상대방이 주말을 어떻게 보내고 있을지'
       });
     } catch (e) {
-      console.error('사진 저장 및 공유 실패:', e);
-      Alert.alert('오류', '사진을 저장하거나 공유 화면으로 이동할 수 없습니다.');
+      console.error('공유 화면 이동 실패:', e);
+      Alert.alert('오류', '공유 화면으로 이동할 수 없습니다.');
     }
   };
 
@@ -174,8 +159,8 @@ export default function CameraHome() {
       {!previewUri && (
         <View style={styles.hintBubbleWrap}>
           <View style={styles.hintBubble}>
-            <AppText style={styles.hintText}>
-              상대방이 주말을 어떻게 보내고 있을지 찍어 보내주세요
+            <AppText style={styles.hintText}> //미션 연결 필요
+              상대방이 주말을 어떻게 보내고 있을지 찍어 보내주세요 
             </AppText>
           </View>
         </View>
@@ -185,13 +170,13 @@ export default function CameraHome() {
         <View style={styles.floatingTopButtonsGroupCamera}>
           <Pressable
             style={styles.floatBtn}
-            onPress={() => Alert.alert('준비중', '앨범은 다음 단계에서 연결할게요!')}
+            onPress={() => Alert.alert('준비중')}
           >
             <Feather name="book" size={20} color="#6198FF" />
           </Pressable>
           <Pressable
             style={styles.floatBtn}
-            onPress={() => Alert.alert('준비중', '지도는 다음 단계에서 연결할게요!')}
+            onPress={() => Alert.alert('준비중')}
           >
             <Feather name="map" size={20} color="#6198FF" />
           </Pressable>
@@ -204,6 +189,7 @@ export default function CameraHome() {
     <View style={styles.fullScreenContainer}>
       <View style={styles.backgroundDim} />
       <SafeAreaView style={[styles.uiOverlay, { paddingTop: insets.top }]}>
+
         {previewUri && (
           <View style={styles.topBarPreview}>
             <Pressable onPress={retake} style={styles.topIconBtnRetake}>
@@ -214,7 +200,7 @@ export default function CameraHome() {
 
         {cameraPreviewComponent}
 
-        {/* 하단 버튼: 탭바 숨김이므로 SafeArea bottom만 고려 */}
+        {/* 하단 버튼 */}
         <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 24 }]}>
           {previewUri ? (
             <Pressable onPress={confirm} style={styles.confirmBtn}>

@@ -29,7 +29,7 @@ type Handlers = {
 };
 
 type CreateArgs = {
-  wsUrl: string;                 // 예: https://<host>/ws-chat  (SockJS endpoint)
+  wsUrl: string;                 
   token?: string;
   roomId: string | number;
   handlers: Handlers;
@@ -43,9 +43,8 @@ export function createChatClient({
   handlers,
   connectTimeoutMs = 6000,
 }: CreateArgs) {
-  // 1) 우선 SockJS로 시도
+  // 1) SockJS로 시도
   const client = new Client({
-    // SockJS 사용 시 brokerURL은 비워두고, webSocketFactory를 제공
     webSocketFactory: () => {
       console.log('[STOMP/SockJS] Opening Web Socket...');
       return new SockJS(wsUrl);
@@ -61,7 +60,6 @@ export function createChatClient({
   let _connected = false;
   const _queue: Array<() => void> = [];
   const _safePublish = (destination: string, body: unknown) => {
-    // 전송 직전 로그 & JSON 헤더 명시
     console.log('[PUB]', destination, body);
     const job = () =>
       client.publish({
@@ -73,7 +71,6 @@ export function createChatClient({
     else _queue.push(job);
   };
 
-  // SockJS가 실패하면 일정 시간 뒤 순수 WS로 폴백
   let fallbackTimer: any = null;
   const startFallbackTimer = () => {
     clearTimeout(fallbackTimer);
@@ -81,7 +78,6 @@ export function createChatClient({
       if (_connected) return;
       console.log('[STOMP] SockJS connect timeout → fallback to pure WS');
       client.deactivate();
-      // 순수 WS 클라이언트로 재구성
       const wsClient = new Client({
         brokerURL: wsUrl.endsWith('/websocket')
           ? wsUrl.replace(/^http/, 'ws')
@@ -102,7 +98,6 @@ export function createChatClient({
       _connected = true;
       clearTimeout(fallbackTimer);
       console.log('[STOMP] connected');
-      // 구독
       c.subscribe(`/topic/messages/${roomId}`, (frame: IMessage) => {
         try {
           const data = JSON.parse(frame.body) as ChatIncoming;
@@ -120,7 +115,6 @@ export function createChatClient({
         }
       });
 
-      // 대기중 전송 flush
       while (_queue.length) {
         const fn = _queue.shift();
         try { fn?.(); } catch (e) { handlers.onError?.(e); }

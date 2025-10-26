@@ -14,9 +14,7 @@ import AppText from '../../components/AppText';
 const { width, height } = Dimensions.get('window');
 
 export default function StartScreen() {
-  // 카메라 테스트를 위해 바로 탭 화면으로 이동
   const handleSkipLogin = () => {
-    // 경고 없이 바로 메인 화면으로 
     router.replace('/(tabs)/camera');
   };
   return (
@@ -29,16 +27,13 @@ export default function StartScreen() {
         <View style={[s.bubble, { left: width * 0.45, top: height * 0.58, backgroundColor: '#FF9191' }]} />
       </View>
 
-      {/* 중앙 로고/타이틀 */}
       <View style={s.center}>
         <AppText style={s.title}>mumuri</AppText>
       </View>
-      {/* 로그인 없이 바로 카메라로 이동 */}
         <Pressable onPress={handleSkipLogin} style={s.skipButton}>
             <AppText type='regular' style={s.skipButtonText}>카메라/메인 테스트 (임시)</AppText>
         </Pressable>
 
-      {/* 하단 액션 영역 */}
       <View style={s.bottom}>
         <KakaoLoginButton />
         <Pressable onPress={() => router.push('/signup')} style={{ marginTop: 14 }}>

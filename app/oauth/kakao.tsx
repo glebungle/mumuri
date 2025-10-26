@@ -3,64 +3,47 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef } from 'react';
 import { ActivityIndicator, Alert, View } from 'react-native';
-
-const BASE_URL = 'https://870dce98a8c7.ngrok-free.app'; 
+import { authedFetch, normalizeMe } from '../lib/api';
+import { hydrateUserBasicsFromGetuser } from '../lib/userBasics';
 
 export default function KakaoDeepLinkHandler() {
-  const { token, nickname, status, couple_id, coupleId } = useLocalSearchParams<{
-    token?: string;
-    nickname?: string;
-    status?: string;
-    couple_id?: string;
-    coupleId?: string;
-  }>();
-
-  const doneRef = useRef(false);
+  const { token, nickname, status } = useLocalSearchParams<{ token?: string; nickname?: string; status?: string }>();
+  const once = useRef(false);
 
   useEffect(() => {
     (async () => {
-      if (doneRef.current) return;
+      if (once.current) return;
       if (!token) {
-        Alert.alert('로그인 오류', '필수 정보(token)를 받지 못했습니다.');
+        Alert.alert('로그인 오류', '토큰이 없습니다.');
         router.replace('/(auth)');
         return;
       }
-      doneRef.current = true;
+      once.current = true;
 
       try {
-        const name = nickname ? decodeURIComponent(String(nickname)) : undefined;
+        // 1) 토큰/닉네임 저장
         await AsyncStorage.setItem('token', String(token));
-        if (name) await AsyncStorage.setItem('name', name);
+        if (nickname) await AsyncStorage.setItem('name', String(nickname));
+        await hydrateUserBasicsFromGetuser(); //userId
+        
 
-        // 1) 쿼리에 couple_id가 있으면 저장
-        const cid = (couple_id ?? coupleId)?.toString();
-        if (cid && cid !== 'null' && cid !== 'undefined') {
-          await AsyncStorage.setItem('coupleId', cid);
-        } else {
-          // 2) 없으면 로그인 직후 me 조회로 확보(옵션 2)
-          try {
-            const res = await fetch(`${BASE_URL}/me`, {
-              headers: {
-                Authorization: `Bearer ${token}`,
-                Accept: 'application/json',
-                'ngrok-skip-browser-warning': 'true',
-              },
-            });
-            const raw = await res.text();
-            let data: any; try { data = JSON.parse(raw); } catch { data = {}; }
-            const found = data?.couple_id ?? data?.coupleId;
-            if (found != null) await AsyncStorage.setItem('coupleId', String(found));
-          } catch {}
-        }
+        // 2) /user/getuser 
+        const raw = await authedFetch('/user/getuser', { method: 'GET' });
+        const me = normalizeMe(raw);
+        const kv: [string,string][] = [];
+        if (me.userId != null)   kv.push(['userId', String(me.userId)]);
+        if (me.coupleId != null) kv.push(['coupleId', String(me.coupleId)]);
+        if (me.coupleCode)       kv.push(['coupleCode', me.coupleCode]);
+        if (me.name)             kv.push(['name', me.name]);
+        if (kv.length) await AsyncStorage.multiSet(kv);
 
-        Alert.alert('로그인 완료', `${name}님 환영합니다! `);
-        setTimeout(() => {
-          if (status === 'NEW' || status === 'NEED_INFO') router.replace('/signup');
-          else router.replace('/(tabs)/camera');
-        }, 300);
-      } catch (e) {
-        Alert.alert('오류', '로그인 처리 중 문제가 발생했습니다.');
-        router.replace('/(auth)');
+        // 3) 라우팅
+        if (status === 'NEW' || status === 'NEED_INFO') router.replace('/signup');
+        else router.replace('/(tabs)/camera');
+      } catch (e: any) {
+        console.warn('getuser failed:', e?.message);
+        // // 그래도 회원가입으로 안내
+        // router.replace('/signup');
       }
     })();
   }, [token, nickname, status]);

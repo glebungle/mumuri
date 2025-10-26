@@ -1,7 +1,7 @@
 // lib/photoApi.ts
 import * as ImageManipulator from 'expo-image-manipulator';
 
-const API_BASE = 'https://<your-ngrok-or-api>'; //수정
+const API_BASE = 'https://5fbe91913f6e.ngrok-free.app'; //수정
 
 export type Photo = {
   id: string;
@@ -11,9 +11,9 @@ export type Photo = {
   createdAt: string;
 };
 
-// 파일 업로드(리사이즈+압축 → multipart 전송)
+// 파일 업로드
 export async function uploadPhoto(localUri: string, token: string): Promise<Photo> {
-  // 1) 리사이즈(최대 1440px) + 압축
+  // 1) 리사이즈 + 압축
   const resized = await ImageManipulator.manipulateAsync(
     localUri,
     [{ resize: { width: 1440 } }],
@@ -32,8 +32,7 @@ export async function uploadPhoto(localUri: string, token: string): Promise<Phot
   const res = await fetch(`${API_BASE}/api/photos`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${token}`, // <- 백엔드 발급 앱 토큰
-      // ⚠️ Content-Type 직접 지정 금지 (fetch가 boundary 포함해 자동 설정)
+      Authorization: `Bearer ${token}`, 
     },
     body: form,
   });

@@ -3,23 +3,20 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Directory, File, Paths } from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
-import { Platform } from 'react-native';
-
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
   Image,
-  Modal,
-  Pressable,
+  Modal, Platform, Pressable,
   RefreshControl,
   StyleSheet,
-  View,
+  View
 } from 'react-native';
 import AppText from '../../components/AppText';
 
-const BASE_URL = 'https://870dce98a8c7.ngrok-free.app';
+const BASE_URL = 'https://5fbe91913f6e.ngrok-free.app';
 
 type Photo = { id: string; url: string; uploadedBy?: string };
 
@@ -41,12 +38,49 @@ export default function GalleryTab() {
   const [deleting, setDeleting] = useState(false);
 
   const tokenRef = useRef<string | null>(null);
-  const coupleIdRef = useRef<string | null>(null);
+  const coupleIdRef = useRef<number | null>(null);
 
-  // 공통 fetch
-  const authedFetch = useCallback(async (path: string, init?: RequestInit) => {
+  /** 토큰/커플ID 확보 (없으면 /user/getuser 로 보강) */
+  const ensureAuthBasics = useCallback(async () => {
     if (!tokenRef.current) tokenRef.current = await AsyncStorage.getItem('token');
-    if (!coupleIdRef.current) coupleIdRef.current = await AsyncStorage.getItem('coupleId');
+
+    if (!coupleIdRef.current) {
+      const cidStr = await AsyncStorage.getItem('coupleId');
+      const cidNum = cidStr != null ? Number(cidStr) : null;
+      if (cidNum != null && Number.isFinite(cidNum)) {
+        coupleIdRef.current = cidNum;
+      }
+    }
+
+    if (tokenRef.current && !coupleIdRef.current) {
+      try {
+        const res = await fetch(`${BASE_URL}/user/getuser`, {
+          method: 'GET',
+          headers: {
+            Accept: 'application/json',
+            Authorization: `Bearer ${tokenRef.current}`,
+            'ngrok-skip-browser-warning': 'true',
+          },
+        });
+        const raw = await res.text();
+        if (!res.ok) throw new Error(raw);
+
+        let data: any; try { data = JSON.parse(raw); } catch { data = {}; }
+        const found = data?.coupleId ?? data?.couple_id ?? null;
+        if (found != null && Number.isFinite(Number(found))) {
+          coupleIdRef.current = Number(found);
+          await AsyncStorage.setItem('coupleId', String(coupleIdRef.current));
+          console.log('[gallery] getuser → coupleId', coupleIdRef.current);
+        }
+      } catch (e) {
+        console.warn('[gallery] getuser 실패:', (e as Error)?.message);
+      }
+    }
+  }, []);
+
+  /** 공통 fetch (토큰 자동 헤더) */
+  const authedFetch = useCallback(async (path: string, init?: RequestInit) => {
+    await ensureAuthBasics();
 
     const url = `${BASE_URL}${path}`;
     const headers: Record<string, string> = {
@@ -63,56 +97,49 @@ export default function GalleryTab() {
     if (res.status === 204 || raw.trim() === '') return null;
 
     let data: any;
-    try {
-      data = JSON.parse(raw);
-    } catch {
-      data = raw;
-    }
+    try { data = JSON.parse(raw); } catch { data = raw; }
 
     if (!res.ok) {
       const msg = (data && (data.message || data.error)) || `HTTP ${res.status}`;
       throw new Error(msg);
     }
     return data;
-  }, []);
+  }, [ensureAuthBasics]);
 
-  // 전체 목록 로드: GET /photo/{couple_id}/all
+  /** 목록 로드: GET /photo/{coupleId}/all */
   const loadAll = useCallback(async () => {
     setInitialLoading(true);
     try {
-      // 1) coupleId
-      let coupleId = (await AsyncStorage.getItem('coupleId')) ?? '';
-      if (!coupleId || coupleId === 'null' || coupleId === 'undefined') {
-        console.warn('[Gallery] coupleId not set; using fallback 1 for test');
-        coupleId = '1'; // TODO: 운영 배포 시 제거
+      await ensureAuthBasics();
+      const cid = coupleIdRef.current;
+
+      if (!cid || !Number.isFinite(cid)) {
+        throw new Error('커플 ID를 찾을 수 없어요. 회원가입/연결을 먼저 완료해 주세요.');
       }
 
-      // 2) GET /photo/{couple_id}/all
-      const path = `/photo/${encodeURIComponent(coupleId)}/all`;
+      const path = `/photo/${encodeURIComponent(String(cid))}/all`;
       const data = await authedFetch(path, { method: 'GET' });
 
-      // 3) 배열/컨테이너 대응 + null 필터
       const arr: any[] = Array.isArray(data)
         ? data
         : (data?.items || data?.data || data?.content || data?.list || data?.records || []);
       const normalized = arr.map(normalizePhoto).filter(Boolean) as Photo[];
-
-      console.log('[Gallery] normalized length=', normalized.length);
       setPhotos(normalized);
+      console.log('[Gallery] normalized length=', normalized.length);
     } catch (e: any) {
-      console.warn('loadAll error:', e?.message);
+      console.warn('[gallery] loadAll error:', e?.message);
       Alert.alert('로드 실패', e?.message || '사진 목록을 불러오지 못했어요.');
       setPhotos([]);
     } finally {
       setInitialLoading(false);
     }
-  }, [authedFetch]);
+  }, [authedFetch, ensureAuthBasics]);
 
   useEffect(() => {
     loadAll();
   }, [loadAll]);
 
-  // 당겨서 새로고침
+  /** 당겨서 새로고침 */
   const onRefreshFn = useCallback(async () => {
     setRefreshing(true);
     try {
@@ -122,7 +149,7 @@ export default function GalleryTab() {
     }
   }, [loadAll]);
 
-  // 저장(다운로드) — SDK54 API(File/Directory/Paths)
+  /** 저장(다운로드) */
   const savePhoto = useCallback(async (p: Photo) => {
     if (!p?.url) return;
 
@@ -134,23 +161,16 @@ export default function GalleryTab() {
 
       setSaving(true);
 
-      // 갤러리 권한
       const perm = await MediaLibrary.requestPermissionsAsync();
       if (!perm.granted) {
         Alert.alert('권한 필요', '사진을 앨범에 저장하려면 권한이 필요합니다.');
         return;
       }
 
-      // 1) 캐시 하위에 다운로드 폴더 생성
-      const downloadsDir = new Directory(Paths.cache, 'downloads'); // e.g., {cache}/downloads/
-      await downloadsDir.create(); // 없으면 생성
+      const downloadsDir = new Directory(Paths.cache, 'downloads');
+      await downloadsDir.create();
 
-      // 2) 파일명 지정이 꼭 필요하면 File 객체를 목적지로 줄 수 있음
-      //    여기선 서버 파일명/헤더 기반 자동 이름 부여를 사용(Directory 목적지)
       const result = await File.downloadFileAsync(p.url, downloadsDir);
-      // result.uri: 실제 다운로드된 "파일"의 uri
-
-      // 3) 미디어 라이브러리로 복사(앨범 저장)
       await MediaLibrary.saveToLibraryAsync(result.uri);
 
       Alert.alert('저장 완료', '사진이 앨범에 저장되었어요.');
@@ -162,7 +182,7 @@ export default function GalleryTab() {
     }
   }, []);
 
-  // 삭제: DELETE /delete/{couple_id}/{photo_id}
+  /** 삭제: DELETE /delete/{coupleId}/{photoId} */
   const deletePhoto = useCallback(
     (p: Photo) => {
       if (!p?.id) return;
@@ -174,12 +194,14 @@ export default function GalleryTab() {
           onPress: async () => {
             try {
               setDeleting(true);
-              const coupleId = (await AsyncStorage.getItem('coupleId')) ?? '';
-              // if (!coupleId || coupleId === 'null' || coupleId === 'undefined') {
-              //   throw new Error('커플 ID가 없습니다.');
-              // }
+              await ensureAuthBasics();
 
-              await authedFetch(`/delete/1/${encodeURIComponent(p.id)}`, {
+              const cid = coupleIdRef.current;
+              if (!cid || !Number.isFinite(cid)) {
+                throw new Error('커플 ID가 없습니다.');
+              }
+
+              await authedFetch(`/delete/${encodeURIComponent(String(cid))}/${encodeURIComponent(p.id)}`, {
                 method: 'DELETE',
               });
 
@@ -194,7 +216,7 @@ export default function GalleryTab() {
         },
       ]);
     },
-    [authedFetch]
+    [authedFetch, ensureAuthBasics]
   );
 
   const numColumns = 3;
@@ -209,7 +231,6 @@ export default function GalleryTab() {
   const keyExtractor = useCallback((item: Photo) => item.id, []);
   const ListFooter = useMemo(() => null, []);
 
-  // 최초 로딩
   if (initialLoading) {
     return (
       <View style={styles.loadingWrap}>
@@ -219,7 +240,6 @@ export default function GalleryTab() {
     );
   }
 
-  // 본문
   return (
     <View style={styles.wrap}>
       <FlatList
@@ -233,7 +253,7 @@ export default function GalleryTab() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefreshFn} tintColor="#6198FF" />}
       />
 
-      {/* 모달 */}
+      {/* 미리보기 모달 */}
       <Modal visible={!!preview} transparent animationType="fade" onRequestClose={() => setPreview(null)}>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>

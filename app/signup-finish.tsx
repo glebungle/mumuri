@@ -106,7 +106,7 @@ export default function SignupFinish() {
 
       {/* 시작 버튼 */}
       <TouchableOpacity
-        onPress={() => router.replace('/(tabs)')}
+        onPress={() => router.replace('/(tabs)/camera')}
         style={{
           backgroundColor: '#3B82F6',
           borderRadius: 28,

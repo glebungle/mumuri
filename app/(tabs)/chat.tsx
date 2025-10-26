@@ -1,4 +1,3 @@
-// app/(tabs)/chat.tsx
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
@@ -23,11 +22,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppText from '../../components/AppText';
 import { ChatIncoming, ChatReadUpdate, createChatClient } from '../lib/chatSocket';
 
-// ====== 환경 ======
-const BASE_URL = 'https://870dce98a8c7.ngrok-free.app';
-const TEST_COUPLE_ID = 1;
-const SEND_URL = `${BASE_URL}/chat/${encodeURIComponent(String(TEST_COUPLE_ID))}`;
-const WS_URL = 'https://870dce98a8c7.ngrok-free.app/ws-chat';
+// ================== 환경 ==================
+const API_BASE = 'https://5fbe91913f6e.ngrok-free.app';
+const BASE_URL = API_BASE;
+const WS_URL   = `${API_BASE}/ws-chat`;
 
 const MAX_TEXT_LEN = 500;
 const ALLOWED_MIME = ['image/jpeg'];
@@ -36,25 +34,53 @@ const STICKER_SIZE = 128;
 const HEADER_HEIGHT = 56;
 
 const USE_STOMP = true;
-const USE_REST_UPLOAD = false;
+const USE_REST_UPLOAD = true;
 
-// ====== 타입 ======
+// ================== 내부 유틸(API) ==================
+async function authedFetch(path: string, init: RequestInit = {}) {
+  const token = await AsyncStorage.getItem('token');
+  const headers = {
+    Accept: 'application/json',
+    'ngrok-skip-browser-warning': 'true',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+    ...(init.headers || {}),
+  };
+  const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`${path} ${res.status}: ${text.slice(0, 160)}`);
+  try { return JSON.parse(text); } catch { return text; }
+}
+
+// /user/getuser 결과 보정: 숫자/숫자문자열/객체 모두 대응
+function normalizeGetUser(raw: any) {
+  if (typeof raw === 'number') return { userId: raw };
+  if (typeof raw === 'string' && /^[0-9]+$/.test(raw)) return { userId: Number(raw) };
+  if (raw && typeof raw === 'object') {
+    const userId = raw.userId ?? raw.id ?? raw.memberId ?? null;
+    const coupleId = raw.coupleId ?? raw.couple_id ?? null;
+    const coupleCode = raw.coupleCode ?? raw.couple_code ?? null;
+    return { userId, coupleId, coupleCode };
+  }
+  return { userId: null, coupleId: null, coupleCode: null };
+}
+
+// ================== 타입 ==================
 type SendStatus = 'sent' | 'sending' | 'failed' | undefined;
 type ChatMessage = {
   id: string;
   text?: string;
-  imageUri?: string;
-  imageUrl?: string;
+  imageUri?: string;  // 로컬/서버 URL
+  imageUrl?: string;  // 서버 URL
   mine: boolean;
   createdAt: number;
   type: 'text' | 'image';
   status?: SendStatus;
   clientMsgId?: string | null;
 };
-
 type DateMarker = { __type: 'date'; key: string; ts: number };
 
-// ====== 유틸 ======
+// ================== 유틸(날짜/문자열) ==================
 function sameYMD(a: number, b: number) {
   const da = new Date(a), db = new Date(b);
   return da.getFullYear() === db.getFullYear()
@@ -90,8 +116,6 @@ function uuid4() {
     return v.toString(16);
   });
 }
-
-// ====== 동일 콘텐츠 판별(서버가 clientMsgId 미포함 시 fallback 병합용) ======
 function isSameContent(local: ChatMessage, incoming: ChatIncoming) {
   const lt = (local.text ?? '').trim();
   const it = (incoming.message ?? '').trim();
@@ -100,19 +124,23 @@ function isSameContent(local: ChatMessage, incoming: ChatIncoming) {
   return lt === it && li === ii;
 }
 
+// ================== 화면 ==================
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const accessoryID = 'chat-input-accessory';
 
+  // 로그인/프로필 값
+  const [token, setToken] = useState<string | undefined>(undefined);
+  const [coupleId, setCoupleId] = useState<number | null>(null);
+  const [coupleCode, setCoupleCode] = useState<string | null>(null); // 코드 우선
+  const [userId, setUserId] = useState<number | null>(null);
+
+  // UI/메시지 상태
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [attaching, setAttaching] = useState(false);
   const [pendingImage, setPendingImage] = useState<string | null>(null);
-
-  // 서버 Long 매핑에 맞춰 숫자 유지
-  const ROOM_ID = 1;
-  const USER_ID = 1;
 
   // Android 키보드 가림 방지
   const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -121,6 +149,75 @@ export default function ChatScreen() {
   const listRef = useRef<FlatList<any>>(null);
   const chatRef = useRef<ReturnType<typeof createChatClient> | null>(null);
   const latestVisibleMsgId = useRef<string | null>(null);
+
+  // 1) 저장된 값 로딩 + 2) 부족하면 /user/getuser로 보강
+  useEffect(() => {
+    (async () => {
+      const entries = await AsyncStorage.multiGet(['token','userId','coupleId','coupleCode']);
+      const map = Object.fromEntries(entries);
+
+      const tokenStr   = map.token || undefined;
+      const userIdNum  = map.userId ? Number(map.userId) : null;
+      const coupleIdNum= map.coupleId ? Number(map.coupleId) : null;
+      const codeStr    = map.coupleCode || null;
+
+      setToken(tokenStr);
+      setUserId(userIdNum);
+      setCoupleId(coupleIdNum);
+      setCoupleCode(codeStr);
+
+      console.log('[chat init:storage]', { hasToken: !!tokenStr, userId: userIdNum, coupleId: coupleIdNum, coupleCode: codeStr });
+
+      // 보강: userId가 없거나, 방키(코드/아이디)가 둘 다 없으면 /user/getuser 호출
+      if (tokenStr && (!userIdNum || (!coupleIdNum && !codeStr))) {
+        try {
+          const raw = await authedFetch('/user/getuser', { method: 'GET' });
+          console.log('[getuser] raw:', raw);
+
+          const { userId: uid, coupleId: cid, coupleCode: ccode } = normalizeGetUser(raw);
+          const kv: [string, string][] = [];
+
+          if (uid != null && uid !== userIdNum) {
+            setUserId(uid);
+            kv.push(['userId', String(uid)]);
+          }
+          if (cid != null && cid !== coupleIdNum) {
+            setCoupleId(cid);
+            kv.push(['coupleId', String(cid)]);
+          }
+          if (ccode && ccode !== codeStr) {
+            setCoupleCode(ccode);
+            kv.push(['coupleCode', ccode]);
+          }
+          if (kv.length) await AsyncStorage.multiSet(kv);
+
+          console.log('[getuser] normalized:', { uid, cid, ccode });
+        } catch (e: any) {
+          console.warn('[getuser] failed:', e?.message);
+        }
+      }
+
+      // 최종 확인 로그
+      setTimeout(async () => {
+        const after = Object.fromEntries(await AsyncStorage.multiGet(['token','userId','coupleId','coupleCode']));
+        console.log('[chat final]', {
+          token: !!after.token,
+          userId: after.userId ?? null,
+          coupleId: after.coupleId ?? null,
+          coupleCode: after.coupleCode ?? null,
+        });
+      }, 300);
+    })();
+  }, []);
+
+  // 방 키(문자열): coupleId
+  const ROOM_KEY: string | null = (coupleId != null ? String(coupleId) : null);
+
+  // 업로드 URL
+  const SEND_URL = useMemo(
+    () => (ROOM_KEY ? `${BASE_URL}/chat/${encodeURIComponent(ROOM_KEY)}` : null),
+    [ROOM_KEY]
+  );
 
   // 키보드 리스너
   useEffect(() => {
@@ -171,10 +268,9 @@ export default function ChatScreen() {
     }
   }, []);
 
-  // ====== 공통: id/clientMsgId 중복 방지 추가 ======
+  // 공통: 중복 방지 append
   const appendLocal = useCallback((m: ChatMessage) => {
     setMessages(prev => {
-      // id 중복, clientMsgId 중복은 버림
       if (prev.find(x => x.id === m.id)) return prev;
       if (m.clientMsgId && prev.find(x => x.clientMsgId === m.clientMsgId)) return prev;
       const next = [...prev, m];
@@ -183,15 +279,11 @@ export default function ChatScreen() {
     });
   }, []);
 
-  // 서버 브로드캐스트 수신 → 낙관적 병합(+fallback) + **추가 중복 방지**
+  // 수신 → 낙관적 병합 + 중복방지
   const onIncoming = useCallback((p: ChatIncoming) => {
-    console.log('[INCOMING]', JSON.stringify(p)); // 수신 내용 확인 로그
-
     setMessages(prev => {
-      // 0) 이미 동일 id 가 있으면 무시
       if (p.id != null && prev.some(x => String(x.id) === String(p.id))) return prev;
 
-      // 1) clientMsgId 매칭 병합
       if (p.clientMsgId) {
         const ix = prev.findIndex(x => x.clientMsgId === p.clientMsgId);
         if (ix >= 0) {
@@ -209,8 +301,7 @@ export default function ChatScreen() {
         }
       }
 
-      // 2) 서버가 clientMsgId를 안 보내는 경우: 내가 보낸 메시지면 내용/시간 근사로 병합
-      const isMine = String(p.senderId) === String(USER_ID);
+      const isMine = String(p.senderId) === String(userId ?? '');
       if (isMine) {
         const revIdx = [...prev].reverse().findIndex(m =>
           m.mine && m.status === 'sending' &&
@@ -233,7 +324,6 @@ export default function ChatScreen() {
         }
       }
 
-      // 3) 여기까지 못 찾았으면 새로 추가 (중복 방지를 위해 마지막으로 한 번 더 검사)
       const add: ChatMessage = {
         id: String(p.id ?? `${Date.now()}`),
         text: p.message ?? undefined,
@@ -247,51 +337,50 @@ export default function ChatScreen() {
       if (prev.some(x => x.id === add.id)) return prev;
       return [...prev, add];
     });
-  }, [USER_ID]);
+  }, [userId]);
 
-  // STOMP 연결
+  // STOMP 연결 (필수 값 준비 후)
   useEffect(() => {
-    let disposed = false;
-    (async () => {
-      if (!USE_STOMP) return;
-      const token = (await AsyncStorage.getItem('token')) ?? undefined;
+    if (!USE_STOMP) return;
+    if (!token || !ROOM_KEY || !userId) {
+      console.log('[stomp guard]', { hasToken: !!token, ROOM_KEY, userId });
+      return;
+    }
 
-      const chat = createChatClient({
-        wsUrl: WS_URL,
-        token,
-        roomId: ROOM_ID,
-        handlers: {
-          onMessage: onIncoming,
-          onReadUpdate: (_u: ChatReadUpdate) => {},
-          onConnected: () => {
-            console.log('[CHAT] connected → markAsRead');
-            chatRef.current?.markAsRead(ROOM_ID, USER_ID, latestVisibleMsgId.current ?? undefined);
-          },
-          onError: (e: unknown) => console.warn('[STOMP ERROR]', e),
+    console.log('[stomp connect]', { ROOM_KEY, userId });
+    const chat = createChatClient({
+      wsUrl: WS_URL,
+      token,
+      roomId: ROOM_KEY, // 문자열 방 키
+      handlers: {
+        onMessage: onIncoming,
+        onReadUpdate: (_u: ChatReadUpdate) => {},
+        onConnected: () => {
+          chatRef.current?.markAsRead(ROOM_KEY, userId, latestVisibleMsgId.current ?? undefined);
         },
-        connectTimeoutMs: 6000,
-      });
+        onError: (e: unknown) => console.warn('[STOMP ERROR]', e),
+      },
+      connectTimeoutMs: 6000,
+    });
 
-      chatRef.current = chat;
-      chat.activate();
+    chatRef.current = chat;
+    chat.activate();
 
-      return () => {
-        if (disposed) return;
-        disposed = true;
-        chat.deactivate();
-        chatRef.current = null;
-      };
-    })();
-  }, [ROOM_ID, USER_ID, onIncoming]);
+    return () => {
+      chat.deactivate();
+      chatRef.current = null;
+    };
+  }, [token, ROOM_KEY, userId, onIncoming]);
 
   // 재전송
   const resendMessage = useCallback(async (msgId: string) => {
+    if (!ROOM_KEY || !userId) return;
     const msg = messages.find((m) => m.id === msgId);
     if (!msg) return;
-    setMessages(prev => prev.map(m => m.id === msgId ? { ...m, status: 'sending' } : m));
+    setMessages(prev => prev.map(m => m.id === msgId ? { ...m, status:'sending' } : m));
     try {
       const clientMsgId = msg.clientMsgId ?? uuid4();
-      chatRef.current?.sendMessage(ROOM_ID, USER_ID, {
+      chatRef.current?.sendMessage(ROOM_KEY, userId, {
         message: msg.text ?? null,
         imageUrl: msg.imageUrl ?? null,
         clientMsgId,
@@ -299,14 +388,19 @@ export default function ChatScreen() {
       });
       setMessages(prev => prev.map(m => m.id === msgId ? { ...m, clientMsgId } : m));
     } catch {
-      setMessages(prev => prev.map(m => m.id === msgId ? { ...m, status: 'failed' } : m));
-      Alert.alert('전송 실패', '재전송에 실패했어요.');
+      setMessages(prev => prev.map(m => m.id === msgId ? { ...m, status:'failed' } : m));
+      Alert.alert('전송 실패','재전송에 실패했어요.');
     }
-  }, [ROOM_ID, USER_ID, messages]);
+  }, [ROOM_KEY, userId, messages]);
 
   // 전송
   const sendMessage = useCallback(async () => {
+    if (!ROOM_KEY || !userId) {
+      Alert.alert('안내', '커플 정보가 아직 준비되지 않았어요.');
+      return;
+    }
     if (sending) return;
+
     const trimmed = text.trim();
     const hasText = trimmed.length > 0;
     const hasImage = !!pendingImage;
@@ -344,12 +438,16 @@ export default function ChatScreen() {
       let imageUrlToSend: string | null = null;
 
       if (hasImage && USE_REST_UPLOAD) {
-        const token = (await AsyncStorage.getItem('token')) ?? '';
+        if (!SEND_URL) throw new Error('SEND_URL not ready');
         const form = new FormData();
         form.append('file', { uri: localImageUri!, name: `img_${Date.now()}.jpg`, type: 'image/jpeg' } as any);
         const res = await fetch(SEND_URL, {
           method: 'POST',
-          headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), Accept: 'application/json', 'ngrok-skip-browser-warning': 'true' },
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            Accept: 'application/json',
+            'ngrok-skip-browser-warning': 'true',
+          },
           body: form,
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -358,7 +456,7 @@ export default function ChatScreen() {
       }
 
       if (USE_STOMP) {
-        chatRef.current?.sendMessage(ROOM_ID, USER_ID, {
+        chatRef.current?.sendMessage(ROOM_KEY, userId, {
           message: hasText ? trimmed : null,
           imageUrl: hasImage ? (imageUrlToSend ?? null) : null,
           clientMsgId,
@@ -368,12 +466,12 @@ export default function ChatScreen() {
         setMessages(prev => prev.map(m => m.id === tempId ? { ...m, status: 'sent' } : m));
       }
     } catch (e) {
-      setMessages(prev => prev.map(m => m.id === tempId ? { ...m, status: 'failed' } : m));
-      Alert.alert('전송 실패', '메시지 전송 중 오류가 발생했어요.');
+      setMessages(prev => prev.map(m => m.id === tempId ? { ...m, status:'failed' } : m));
+      Alert.alert('전송 실패','메시지 전송 중 오류가 발생했어요.');
     } finally {
       setSending(false);
     }
-  }, [text, pendingImage, sending, appendLocal]);
+  }, [text, pendingImage, sending, appendLocal, ROOM_KEY, userId, token, SEND_URL]);
 
   // 날짜 마커 삽입
   const listData = useMemo<(ChatMessage | DateMarker)[]>(() => {
@@ -412,7 +510,9 @@ export default function ChatScreen() {
     const last = visibleMsg[visibleMsg.length - 1];
     if (last?.id && last.id !== latestVisibleMsgId.current) {
       latestVisibleMsgId.current = last.id;
-      chatRef.current?.markAsRead(ROOM_ID, USER_ID, last.id);
+      if (ROOM_KEY && userId) {
+        chatRef.current?.markAsRead(ROOM_KEY, userId, last.id);
+      }
     }
   }).current;
 
@@ -568,11 +668,7 @@ const styles = StyleSheet.create({
 
   msgCol: { maxWidth: '80%' },
 
-  bubble: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 16,
-  },
+  bubble: { paddingHorizontal: 12, paddingVertical: 10, borderRadius: 16 },
   bubbleMine: { backgroundColor: '#8FB6FF' },
   bubbleOther: { backgroundColor: '#fff', borderWidth: StyleSheet.hairlineWidth, borderColor: '#e5e7eb' },
 
