@@ -3075,6 +3075,11 @@ expo-web-browser@~15.0.7, expo-web-browser@~15.0.8:
   resolved "https://registry.yarnpkg.com/expo-web-browser/-/expo-web-browser-15.0.8.tgz#9425ad225255a49b9163006db9ed9578f399585d"
   integrity sha512-gn+Y2ABQr6/EvFN/XSjTuzwsSPLU1vNVVV0wNe4xXkcSnYGdHxt9kHxs9uLfoCyPByoaGF4VxzAhHIMI7yDcSg==
 
+expo-widget@^3.0.3:
+  version "3.0.3"
+  resolved "https://registry.yarnpkg.com/expo-widget/-/expo-widget-3.0.3.tgz#a7435e444b2d77f57ffb4af332016d1f2b387f8d"
+  integrity sha512-xXnAFcd+hPL7wxv28X6gkEiGh75pCAh1R9PFAR6NWqhZja+G94ZFUkZy+wNyFR9LMj2DvEdFWOupPP+i7JWVEA==
+
 expo@~54.0.12:
   version "54.0.12"
   resolved "https://registry.yarnpkg.com/expo/-/expo-54.0.12.tgz#f64223fe8f83870cc4bd589674a95724c3161ef0"
