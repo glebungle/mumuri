@@ -17,6 +17,12 @@ export default function StartScreen() {
   const handleSkipLogin = () => {
     router.replace('/(tabs)/camera');
   };
+  const handleOnboarding = () => {
+    router.replace('/onboarding/intro');
+  };
+  const handleMypage = () => {
+    router.replace('/(tabs)/mypage');
+  };
   return (
     
     <SafeAreaView style={s.wrap}>
@@ -32,6 +38,12 @@ export default function StartScreen() {
       </View>
         <Pressable onPress={handleSkipLogin} style={s.skipButton}>
             <AppText type='regular' style={s.skipButtonText}>카메라/메인 테스트 (임시)</AppText>
+        </Pressable>
+        <Pressable onPress={handleOnboarding} style={s.onboardingButton}>
+            <AppText type='regular' style={s.skipButtonText}>온보딩 보기 (임시)</AppText>
+        </Pressable>
+        <Pressable onPress={handleMypage} style={s.mypageButton}>
+            <AppText type='regular' style={s.skipButtonText}>마이페이지 (임시)</AppText>
         </Pressable>
 
       <View style={s.bottom}>
@@ -80,6 +92,20 @@ const s = StyleSheet.create({
     skipButtonText: {
         color: '#FFFFFF',
         fontSize: 14,
+    },
+    onboardingButton: {
+        margin: 10,
+        paddingHorizontal: 8,
+        paddingVertical: 8,
+        borderRadius: 8,
+        backgroundColor: '#75787B',
+    },
+    mypageButton: {
+        margin: 10,
+        paddingHorizontal: 8,
+        paddingVertical: 8,
+        borderRadius: 8,
+        backgroundColor: '#75787B',
     },
   signupLink: { color: '#606060', fontSize: 10 , },
 });

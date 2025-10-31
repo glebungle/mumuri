@@ -322,10 +322,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#6198FF',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-    elevation: 4,
   },
 
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
