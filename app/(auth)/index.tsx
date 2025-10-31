@@ -28,7 +28,7 @@ export default function StartScreen() {
       </View>
 
       <View style={s.center}>
-        <AppText style={s.title}>mumuri</AppText>
+        <AppText style={s.title}>m</AppText>
       </View>
         <Pressable onPress={handleSkipLogin} style={s.skipButton}>
             <AppText type='regular' style={s.skipButtonText}>카메라/메인 테스트 (임시)</AppText>
@@ -81,5 +81,5 @@ const s = StyleSheet.create({
         color: '#FFFFFF',
         fontSize: 14,
     },
-  signupLink: { color: '#75787B', fontSize: 10 },
+  signupLink: { color: '#606060', fontSize: 10 , },
 });

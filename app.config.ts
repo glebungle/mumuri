@@ -1,23 +1,9 @@
 // app.config.ts
 import 'dotenv/config';
 import { ConfigContext, ExpoConfig } from 'expo/config';
-import type { WithAndroidWidgetsParams } from 'react-native-android-widget';
 
 const kakaoNativeAppKey = process.env.EXPO_PUBLIC_NATIVE_APP_KEY;
 
-// 1) 위젯 설정
-const widgetConfig: WithAndroidWidgetsParams = {
-  widgets: [
-    {
-      name: 'CoupleDDayWidget',          // JS에서 export default 로 쓸 이름
-      label: '무무리 디데이',             // 위젯 선택창에 보이는 이름
-      description: '우리 기념일 디데이',  // 선택창 설명
-      minWidth: '150dp',
-      minHeight: '80dp',
-      updatePeriodMillis: 1800000,       // 30분
-    },
-  ],
-};
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
@@ -26,14 +12,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   slug: 'mumuri',
   version: '1.0.0',
   orientation: 'portrait',
-  icon: './assets/images/icon.png',
+  icon: './assets/images/logo.png',
   scheme: 'mumuri',
   userInterfaceStyle: 'automatic',
   newArchEnabled: true,
   splash: {
     image: './assets/images/splash-icon.png',
     resizeMode: 'contain',
-    backgroundColor: '#ffffff',
+    backgroundColor: '#FFFCF5',
   },
   ios: {
     supportsTablet: true,
@@ -45,8 +31,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   android: {
     package: 'mumuri.test',
     adaptiveIcon: {
-      foregroundImage: './assets/images/adaptive-icon.png',
-      backgroundColor: '#ffffff',
+      foregroundImage: './assets/images/logo.png',
+      backgroundColor: '#FFFCF5',
     },
     edgeToEdgeEnabled: true,
     softwareKeyboardLayoutMode: 'resize',
@@ -85,7 +71,17 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       },
     ],
     // 🔥 여기 위젯 플러그인
-    ['react-native-android-widget', widgetConfig],
+    ['react-native-android-widget', {
+      widgets: [
+        {
+          name: 'CoupleDDayWidget',
+          label: '무무리 디데이',
+          renderWidget: './widgets/CoupleDDayWidget.tsx',
+          minWidth: '150dp',
+          minHeight: '80dp',
+        },
+      ],
+    }]
   ],
   experiments: {
     typedRoutes: true,

@@ -85,7 +85,7 @@ export default function OnboardingIntro() {
           disabled={!isDone}
           style={[styles.btn, !isDone && { opacity: 0.5 }]}
         >
-          <AppText style={styles.btnText}>네!</AppText>
+          <AppText type='bold' style={styles.btnText}>네!</AppText>
         </Pressable>
       </Animated.View>
     </View>
@@ -113,7 +113,6 @@ const styles = StyleSheet.create({
   },
   currentLine: {
     color: '#111',
-    fontWeight: '700',
   },
   btnWrap: {
     width: '100%',
@@ -129,7 +128,6 @@ const styles = StyleSheet.create({
   },
   btnText: {
     color: '#fff',
-    fontWeight: '700',
     fontSize: 16,
   },
 });
