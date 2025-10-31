@@ -75,9 +75,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       widgets: [
         {
           name: 'CoupleDDayWidget',
-          label: '무무리 디데이',
-          renderWidget: './widgets/CoupleDDayWidget.tsx',
-          minWidth: '150dp',
+          label: '무무리 디데이!',
+          renderWidget: 'widgets/CoupleDDayWidget.tsx',
+          minWidth: '80dp',
           minHeight: '80dp',
         },
       ],
