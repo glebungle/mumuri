@@ -10,7 +10,7 @@ export default function Gate() {
   useEffect(() => {
     (async () => {
       const token = await AsyncStorage.getItem('token');
-      if (!token) router.replace('./(auth)');//router.replace('./(tabs)/camera');
+      if (token) router.replace('./(auth)');//router.replace('./(tabs)/camera');
       else router.replace('./onboarding/intro');
     })();
   }, [router]);

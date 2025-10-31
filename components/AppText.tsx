@@ -12,28 +12,28 @@ const AppText: React.FC<AppTextProps> = ({ type = 'bold', style, children, ...re
 
     switch (type) {
         case 'bold':
-            fontFamilyName = 'Pretendard-Bold';
+            fontFamilyName = 'Paperlogy-7Bold';
             break;
         case 'medium':
-            fontFamilyName = 'Pretendard-Medium';
+            fontFamilyName = 'Paperlogy-5Medium';
             break;
         case 'regular':
-            fontFamilyName = 'Pretendard-Regular';
+            fontFamilyName = 'Paperlogy-4Regular';
             break;
         case 'semibold':
-            fontFamilyName = 'Pretendard-SemiBold';
+            fontFamilyName = 'Paperlogy-6SemiBold';
             break;
         case 'extrabold':
-            fontFamilyName = 'Pretendard-ExtraBold';
+            fontFamilyName = 'Paperlogy-8ExtraBold';
             break;
         case 'light':
-            fontFamilyName = 'Pretendard-Light';
+            fontFamilyName = 'Paperlogy-3Light';
             break;
         case 'extralight':
-            fontFamilyName = 'Pretendard-ExtraLight';
+            fontFamilyName = 'Paperlogy-2ExtraLight';
             break;
         case 'thin':
-            fontFamilyName = 'Pretendard-Thin';
+            fontFamilyName = 'Paperlogy-1Thin';
             break;
         // default 케이스는 'bold'가 default 값으로 설정되었으므로 사실상 불필요하지만, 
         // 방어를 위해 'bold'로 지정할 수 있습니다. (여기서는 제거)

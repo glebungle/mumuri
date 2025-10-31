@@ -24,6 +24,7 @@ const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 type CropRect = { originX: number; originY: number; width: number; height: number };
 
 export default function CameraHome() {
+  
   const router = useRouter();
   const cameraRef = useRef<CameraView>(null);
   const insets = useSafeAreaInsets();
