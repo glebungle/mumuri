@@ -1,186 +1,163 @@
-// app/onboarding/detail.tsx
-import { useRouter } from 'expo-router';
-import React, { useRef, useState } from 'react';
+// app/onboarding/detail2.tsx
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useRef } from 'react';
 import { Animated, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppText from '../../components/AppText';
 
+const AnimatedAppText = Animated.createAnimatedComponent(AppText);
+
 export default function OnboardingDetail2() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { prevProgress } = useLocalSearchParams<{ prevProgress?: string }>();
 
-  const [overlayVisible, setOverlayVisible] = useState(true);
-  const [isPage3, setIsPage3] = useState(false);
+  const startPct = prevProgress ? Number(prevProgress) : 0.35;
+  const endPct = 0.4;
+  const topBar = useRef(new Animated.Value(startPct)).current;
 
-  const step = useRef(new Animated.Value(0)).current;
-  const overlay = useRef(new Animated.Value(1)).current;
-
-  const hideOverlay = () => {
-    Animated.timing(overlay, {
-      toValue: 0,
-      duration: 300,
-      useNativeDriver: true,
-    }).start(() => setOverlayVisible(false));
-  };
-
-  const goToPage3 = () => {
-    setIsPage3(true);
-    Animated.spring(step, {
-      toValue: 1,
-      useNativeDriver: true,
-      speed: 14,
-      bounciness: 9,
+  useEffect(() => {
+    Animated.timing(topBar, {
+      toValue: endPct,
+      duration: 450,
+      useNativeDriver: false,
     }).start();
+  }, [topBar, endPct]);
+
+  const progressWidth = topBar.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '100%'],
+  });
+
+  const prog = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      Animated.spring(prog, {
+        toValue: 1,
+        useNativeDriver: false,
+        speed: 14,
+        bounciness: 6,
+      }).start();
+    }, 500);
+    return () => clearTimeout(t);
+  }, [prog]);
+
+  const cardBg = prog.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#BFBFBF', '#5F92FF'],
+  });
+  const cardRotate = prog.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '-11deg'],
+  });
+  const cardScale = prog.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.8, 1],
+  });
+
+  const titleShootColor = prog.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#C8C8C8', '#FF7777'],
+  });
+  const titleSendColor = prog.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#C8C8C8', '#3BCF8F'],
+  });
+  const titleRememberColor = prog.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#C8C8C8', '#5F92FF'],
+  });
+
+  const descColor = prog.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#CFCFCF', '#000'],
+  });
+
+  const btnBg = prog.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#CFCFCF', '#5F92FF'],
+  });
+  const btnTextColor = prog.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#fff', '#fff'],
+  });
+
+  const goNext = () => {
+    router.push('./detail3');
   };
-
-  const goNextScreen = () => {
-    router.push('../(auth)'); // ← 여기로 이동
-  };
-
-  const characterTranslateY = step.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -30],
-  });
-
-  const bubbleOpacity = step.interpolate({
-    inputRange: [0, 0.4, 1],
-    outputRange: [1, 1, 0],
-  });
-
-  const bottomBoxOpacity = step.interpolate({
-    inputRange: [0, 0.4, 1],
-    outputRange: [0, 0, 1],
-  });
-
-  const confettiOpacity = step.interpolate({
-    inputRange: [0, 0.2, 1],
-    outputRange: [0, 0, 1],
-  });
-
-  const normalCharOpacity = step.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 0],
-  });
-  const winkCharOpacity = step.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 1],
-  });
-
-  const shotBtnOpacity = step.interpolate({
-    inputRange: [0, 0.4, 1],
-    outputRange: [1, 1, 0],
-  });
-  const nextBtnOpacity = step.interpolate({
-    inputRange: [0, 0.4, 1],
-    outputRange: [0, 0, 1],
-  });
 
   return (
     <View style={styles.wrap}>
+      {/* 상단 바 */}
       <View style={styles.progressBarBg}>
-        <View style={styles.progressBarFill} />
+        <Animated.View style={[styles.progressBarFill, { width: progressWidth }]} />
       </View>
 
+      {/* 가운데 카드 */}
       <Animated.View
-        pointerEvents="none"
         style={[
-          styles.characterWrap,
-          { transform: [{ translateY: characterTranslateY }] },
+          styles.card,
+          {
+            backgroundColor: cardBg,
+            transform: [{ rotate: cardRotate }, { scale: cardScale }],
+          },
         ]}
-      >
-        <Animated.Image
-          source={require('../../assets/images/onboarding.png')}
-          style={[styles.characterImg, { opacity: normalCharOpacity }]}
-          resizeMode="contain"
-        />
-        <Animated.Image
-          source={require('../../assets/images/onboarding_wink.png')}
-          style={[
-            styles.characterImg,
-            styles.characterAbsolute,
-            { opacity: winkCharOpacity },
-          ]}
-          resizeMode="contain"
-        />
-      </Animated.View>
+      />
 
-      <Animated.View
-        pointerEvents="none"
-        style={[styles.bubble, { opacity: bubbleOpacity }]}
-      >
-        <AppText style={styles.bubbleText}>지금 보여주고 싶은 표정은?</AppText>
-      </Animated.View>
-
-      <Animated.View
-        pointerEvents="none"
-        style={[styles.bottomBox, { opacity: bottomBoxOpacity }]}
-      >
-        <AppText style={styles.title}>
-          우리의 <AppText style={{ color: '#4C86FF' }}>오늘</AppText>을 담아보세요
+      {/* 텍스트 영역 */}
+      <View style={styles.textBox}>
+        <AppText style={styles.titleLine}>
+          <Animated.Text style={[styles.bold20, { color: titleShootColor }]}>
+            찍고,
+          </Animated.Text>{' '}
+          <Animated.Text style={[styles.bold20, { color: titleSendColor }]}>
+            보내고,
+          </Animated.Text>{' '}
+          <Animated.Text style={[styles.bold20, { color: titleRememberColor }]}>
+            기억해요
+          </Animated.Text>
         </AppText>
-        <AppText style={styles.desc}>매일 새로운 질문이 도착해요</AppText>
-        <AppText style={styles.desc}>
-          질문에 맞는 순간을 <AppText style={{ fontWeight: '700' }}>카메라</AppText>로 찍어보세요
-        </AppText>
-      </Animated.View>
 
-      <Animated.View
-        pointerEvents="none"
-        style={[styles.confettiLayer, { opacity: confettiOpacity }]}
-      >
-        <View style={[styles.dot, { top: 40, left: 40 }]} />
-        <View style={[styles.dot, { top: 80, right: 50 }]} />
-        <View style={[styles.dot, { top: 160, left: 120 }]} />
-      </Animated.View>
+        <AnimatedAppText
+          type="light"
+          style={[styles.desc, { color: descColor }]}
+        >
+          촬영한 사진을{' '}
+          <AppText type="bold">사랑하는 사람에게 전달</AppText>
+          해보세요
+        </AnimatedAppText>
 
-      {/* 2페이지 버튼 */}
+        <AnimatedAppText
+          type="light"
+          style={[styles.desc, { color: descColor }]}
+        >
+          무무리는 서로의 하루가 됩니다
+        </AnimatedAppText>
+      </View>
+
+      {/* 버튼 */}
       <Pressable
-        onPress={goToPage3}
-        style={[styles.bottomPressable, { bottom: insets.bottom + 12 }]}
-        pointerEvents={isPage3 ? 'none' : 'auto'}
+        onPress={goNext}
+        style={[styles.btnWrap, { bottom: insets.bottom + 32 }]}
       >
-        <Animated.View style={[styles.shotBtn, { opacity: shotBtnOpacity }]}>
-          <AppText type="bold" style={{ color: '#fff' }}>
-            찰칵!
-          </AppText>
-        </Animated.View>
-      </Pressable>
-
-      {/* 3페이지 버튼 */}
-      <Pressable
-        onPress={goNextScreen}
-        style={[styles.bottomPressable, { bottom: insets.bottom + 12 }]}
-        pointerEvents={isPage3 ? 'auto' : 'none'}
-      >
-        <Animated.View style={[styles.nextBtn, { opacity: nextBtnOpacity }]}>
-          <AppText type="bold" style={{ color: '#fff' }}>
+        <Animated.View style={[styles.btn, { backgroundColor: btnBg }]}>
+          <Animated.Text style={[styles.btnText, { color: btnTextColor }]}>
             다음
-          </AppText>
+          </Animated.Text>
         </Animated.View>
       </Pressable>
-
-      {overlayVisible && (
-        <Animated.View style={[styles.overlay, { opacity: overlay }]}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={hideOverlay} />
-          <View style={styles.overlayContent}>
-            <AppText style={styles.ovTitle}>
-              <AppText style={{ color: '#6198FF', fontSize: 48 }}>질문</AppText>에 맞춰{'\n'}
-              <AppText style={{ color: '#49DC95', fontSize: 48 }}>사진</AppText>을{' '}
-              <AppText style={{ color: '#FF9191', fontSize: 48 }}>찰칵</AppText>,{'\n'}
-              따라해보세요!
-            </AppText>
-            <AppText style={styles.ovDesc}>*아무 곳이나 탭하면 시작합니다</AppText>
-          </View>
-        </Animated.View>
-      )}
     </View>
   );
 }
+
+const CARD_SIZE = 210;
 
 const styles = StyleSheet.create({
   wrap: {
     flex: 1,
     backgroundColor: '#FFFCF5',
+    alignItems: 'center',
   },
   progressBarBg: {
     height: 4,
@@ -188,109 +165,50 @@ const styles = StyleSheet.create({
     backgroundColor: '#E3E7EB',
     borderRadius: 999,
     marginTop: 54,
-    alignSelf: 'center',
   },
   progressBarFill: {
     height: 4,
-    width: '35%',
-    backgroundColor: '#6198FF',
+    backgroundColor: '#5F92FF',
     borderRadius: 999,
   },
-  characterWrap: {
-    marginTop: 28,
-    width: '100%',
-    alignItems: 'flex-start',
-  },
-  characterImg: {
-    width: 420,
-    height: 700,
-    marginLeft: -80,
-  },
-  characterAbsolute: {
-    position: 'absolute',
-    left: 0,
-  },
-  bubble: {
-    position: 'absolute',
-    top: 330,
-    left: '50%',
-    transform: [{ translateX: -110 }],
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    backgroundColor: '#000',
-    borderRadius: 22,
-    zIndex: 20,
-  },
-  bubbleText: {
-    color: '#fff',
-  },
-  bottomBox: {
-    position: 'absolute',
-    bottom: 140,
-    width: '100%',
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: 20,
-    color: '#333',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  desc: {
-    fontSize: 13,
-    color: '#888',
-    textAlign: 'center',
-  },
-  confettiLayer: {
-    position: 'absolute',
-    top: 120,
-    width: '100%',
-    height: 240,
-  },
-  dot: {
-    position: 'absolute',
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: '#49DC95',
-  },
-  bottomPressable: {
-    position: 'absolute',
-    width: '100%',
-    alignItems: 'center',
-    zIndex: 9999,
-  },
-  shotBtn: {
-    backgroundColor: '#000',
-    paddingHorizontal: 40,
-    paddingVertical: 14,
-    borderRadius: 999,
-  },
-  nextBtn: {
-    backgroundColor: '#6198FF',
-    paddingHorizontal: 50,
-    paddingVertical: 14,
-    borderRadius: 999,
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255,255,255,0.85)',
+  card: {
+    width: CARD_SIZE,
+    height: CARD_SIZE,
+    marginTop: 80,
+    borderRadius: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 10000,
   },
-  overlayContent: {
+  textBox: {
+    marginTop: 320,
     alignItems: 'center',
-    paddingHorizontal: 32,
+    paddingHorizontal: 20,
   },
-  ovTitle: {
-    fontSize: 48,
+  titleLine: {
     textAlign: 'center',
-    color: '#333',
   },
-  ovDesc: {
-    marginTop: 14,
-    fontSize: 12,
-    color: '#777',
+  bold20: {
+    fontSize: 20,
+  },
+  desc: {
+    marginTop: 6,
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  btnWrap: {
+    position: 'absolute',
+    width: '100%',
+    alignItems: 'center',
+  },
+  btn: {
+    width: 140,
+    height: 56,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnText: {
+    fontWeight: '700',
+    fontSize: 17,
   },
 });
