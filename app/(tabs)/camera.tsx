@@ -1,5 +1,6 @@
 // app/(tabs)/camera.tsx
 import { Feather, Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CameraCapturedPicture, CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { useRouter } from 'expo-router';
@@ -20,16 +21,32 @@ import AppText from '../../components/AppText';
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 
+const BASE_URL = 'https://mumuri.shop';
 
 type CropRect = { originX: number; originY: number; width: number; height: number };
 
+type MissionProgress = {
+  userId: number;
+  status: string;
+  photoUrl: string | null;
+};
+
+type TodayMission = {
+  missionId: number;
+  title: string;
+  description: string;
+  difficulty: string;
+  reward: number;
+  status: string;
+  missionDate: string;
+  progresses: MissionProgress[];
+};
+
 export default function CameraHome() {
-  
   const router = useRouter();
   const cameraRef = useRef<CameraView>(null);
   const insets = useSafeAreaInsets();
 
-  // 카메라 권한
   const [camPerm, requestCamPerm] = useCameraPermissions();
 
   const [isReady, setIsReady] = useState(false);
@@ -38,16 +55,80 @@ export default function CameraHome() {
 
   const [viewW, setViewW] = useState(0);
   const [viewH, setViewH] = useState(0);
+
+  // D-Day
+  const [dday, setDday] = useState<number>(0);
+
+  // 오늘의 미션
+  const [todayMission, setTodayMission] = useState<TodayMission | null>(null);
+
   const onCameraWrapLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
     setViewW(width);
     setViewH(height);
   };
 
+  // 카메라 권한
   useEffect(() => {
     (async () => {
       if (!camPerm?.granted) await requestCamPerm();
     })();
+  }, []);
+
+  // D-Day 가져오기
+  useEffect(() => {
+    const fetchDday = async () => {
+      try {
+        const token = await AsyncStorage.getItem('token');
+        if (!token) return;
+
+        const res = await fetch(`${BASE_URL}/user/main`, {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: 'application/json',
+          },
+        });
+        if (!res.ok) {
+          console.warn('dday api error', res.status);
+          return;
+        }
+        const json = await res.json();
+        if (typeof json.dday === 'number') setDday(json.dday);
+      } catch (e) {
+        console.error('dday fetch error', e);
+      }
+    };
+    fetchDday();
+  }, []);
+
+  // 오늘의 미션 가져오기
+  useEffect(() => {
+    const fetchTodayMission = async () => {
+      try {
+        const token = await AsyncStorage.getItem('token');
+        if (!token) return;
+
+        const res = await fetch(`${BASE_URL}/api/couples/mission/today`, {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: 'application/json',
+          },
+        });
+        if (!res.ok) {
+          console.warn('today mission api error', res.status);
+          return;
+        }
+        const json = await res.json();
+        if (Array.isArray(json) && json.length > 0) {
+          setTodayMission(json[0]);
+        }
+      } catch (e) {
+        console.error('today mission fetch error', e);
+      }
+    };
+    fetchTodayMission();
   }, []);
 
   if (!camPerm) return <View style={styles.loadingScreen} />;
@@ -63,7 +144,7 @@ export default function CameraHome() {
     );
   }
 
-  // 촬영 
+  // 촬영
   const takePhoto = async () => {
     if (!cameraRef.current || capturing) return;
     setCapturing(true);
@@ -92,8 +173,8 @@ export default function CameraHome() {
       if (isRotated) [srcW, srcH] = [srcH, srcW];
 
       const srcAspect = srcW / srcH;
-
       let crop: CropRect;
+
       if (srcAspect > targetAspect) {
         const newW = Math.round(srcH * targetAspect);
         const originX = Math.max(0, Math.floor((srcW - newW) / 2));
@@ -108,8 +189,8 @@ export default function CameraHome() {
 
       crop.originX = Math.max(0, Math.min(crop.originX, srcW - 1));
       crop.originY = Math.max(0, Math.min(crop.originY, srcH - 1));
-      crop.width   = Math.min(crop.width,  srcW - crop.originX);
-      crop.height  = Math.min(crop.height, srcH - crop.originY);
+      crop.width = Math.min(crop.width, srcW - crop.originX);
+      crop.height = Math.min(crop.height, srcH - crop.originY);
 
       const manipulated = await ImageManipulator.manipulateAsync(
         pic.uri,
@@ -130,13 +211,18 @@ export default function CameraHome() {
 
   const retake = () => setPreviewUri(null);
 
-  // share이동
+  // share 이동
   const confirm = async () => {
     if (!previewUri) return;
     try {
       router.push({
         pathname: './share',
-        params: { uri: previewUri }, //mission: '상대방이 주말을 어떻게 보내고 있을지'
+        params: {
+          uri: previewUri,
+          missionId: todayMission ? String(todayMission.missionId) : '',
+          missionTitle: todayMission?.title ?? '',
+          missionDescription: todayMission?.description ?? '',
+        },
       });
     } catch (e) {
       console.error('공유 화면 이동 실패:', e);
@@ -157,11 +243,20 @@ export default function CameraHome() {
         />
       )}
 
+      {/* D-Day */}
+      <View style={styles.ddayBadge}>
+        <Ionicons name="heart-outline" size={18} color="#fff" />
+        <AppText style={styles.ddayText}>{dday}</AppText>
+      </View>
+
+      {/* 오늘의 미션 문구 */}
       {!previewUri && (
         <View style={styles.hintBubbleWrap}>
           <View style={styles.hintBubble}>
-            <AppText style={styles.hintText}> //미션 연결 필요
-              상대방이 주말을 어떻게 보내고 있을지 찍어 보내주세요 
+            <AppText style={styles.hintText}>
+              {todayMission?.description ||
+                todayMission?.title ||
+                '오늘의 미션을 찍어 보내주세요'}
             </AppText>
           </View>
         </View>
@@ -169,16 +264,10 @@ export default function CameraHome() {
 
       {!previewUri && (
         <View style={styles.floatingTopButtonsGroupCamera}>
-          <Pressable
-            style={styles.floatBtn}
-            onPress={() => Alert.alert('준비중')}
-          >
+          <Pressable style={styles.floatBtn} onPress={() => Alert.alert('준비중')}>
             <Feather name="book" size={20} color="#6198FF" />
           </Pressable>
-          <Pressable
-            style={styles.floatBtn}
-            onPress={() => Alert.alert('준비중')}
-          >
+          <Pressable style={styles.floatBtn} onPress={() => Alert.alert('준비중')}>
             <Feather name="map" size={20} color="#6198FF" />
           </Pressable>
         </View>
@@ -190,7 +279,6 @@ export default function CameraHome() {
     <View style={styles.fullScreenContainer}>
       <View style={styles.backgroundDim} />
       <SafeAreaView style={[styles.uiOverlay, { paddingTop: insets.top }]}>
-
         {previewUri && (
           <View style={styles.topBarPreview}>
             <Pressable onPress={retake} style={styles.topIconBtnRetake}>
@@ -201,7 +289,6 @@ export default function CameraHome() {
 
         {cameraPreviewComponent}
 
-        {/* 하단 버튼 */}
         <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 24 }]}>
           {previewUri ? (
             <Pressable onPress={confirm} style={styles.confirmBtn}>
@@ -244,6 +331,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 0,
     zIndex: 1,
+  },
+
+  ddayBadge: {
+    position: 'absolute',
+    top: 14,
+    left: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  ddayText: {
+    marginLeft: 6,
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
 
   floatingTopButtonsGroupCamera: {

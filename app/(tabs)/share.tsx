@@ -1,4 +1,4 @@
-// app/(tabs)/share.tsx  (파일 경로는 네 프로젝트 구조에 맞춰 사용)
+// app/(tabs)/share.tsx
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as MediaLibrary from 'expo-media-library';
@@ -10,17 +10,26 @@ import AppText from '../../components/AppText';
 const BASE_URL = 'https://mumuri.shop';
 
 export default function ShareScreen() {
-  // 카메라에서 넘어온 파라미터
-  const { uri, mission } = useLocalSearchParams<{ uri?: string; mission?: string }>();
+  const { uri, missionId, missionTitle, missionDescription } =
+    useLocalSearchParams<{
+      uri?: string;
+      missionId?: string;
+      missionTitle?: string;
+      missionDescription?: string;
+    }>();
+
   const photoUri = uri || '';
 
-  // 상태
+  const missionLabel =
+    missionDescription ||
+    missionTitle ||
+    '상대방이 주말을 어떻게 보내고 있을지 찍어 보내주세요';
+
   const [token, setToken] = useState<string | null>(null);
   const [coupleId, setCoupleId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
 
-  // ---- 공통: /user/getuser 로 보강해서 coupleId 확보 ----
   const fetchMeAndStore = useCallback(async () => {
     const t = await AsyncStorage.getItem('token');
     if (!t) return;
@@ -34,7 +43,6 @@ export default function ShareScreen() {
         },
       });
       const text = await res.text();
-      // 실패해도 조용히 패스
       if (!res.ok) return;
 
       let data: any;
@@ -50,7 +58,6 @@ export default function ShareScreen() {
     } catch (_) {}
   }, []);
 
-  // ---- 첫 마운트/포커스될 때마다 토큰 & 커플ID 로딩 ----
   const hydrate = useCallback(async () => {
     const t = await AsyncStorage.getItem('token');
     const cidStr = await AsyncStorage.getItem('coupleId');
@@ -58,7 +65,6 @@ export default function ShareScreen() {
     const cidNum = cidStr != null ? Number(cidStr) : null;
     setCoupleId(Number.isFinite(cidNum as number) ? (cidNum as number) : null);
 
-    // 없으면 보강 호출
     if (t && (cidNum == null || !Number.isFinite(cidNum))) {
       await fetchMeAndStore();
     }
@@ -68,7 +74,6 @@ export default function ShareScreen() {
     hydrate();
   }, [hydrate]);
 
-  // 다른 탭/화면에서 커플아이디가 저장된 후 돌아왔을 때 갱신되게
   useFocusEffect(
     useCallback(() => {
       let active = true;
@@ -80,7 +85,6 @@ export default function ShareScreen() {
     }, [hydrate])
   );
 
-  // ===== 앨범 저장 =====
   const saveToAlbum = async () => {
     if (!photoUri || saving) return;
     try {
@@ -100,11 +104,9 @@ export default function ShareScreen() {
     }
   };
 
-  // ===== 사진 전송 =====
   const sendToPartner = async () => {
     if (!photoUri || sending) return;
 
-    //토큰/커플ID 준비 
     if (!token) {
       Alert.alert('오류', '로그인 정보가 없습니다. 다시 로그인해 주세요.');
       return;
@@ -116,8 +118,9 @@ export default function ShareScreen() {
 
     setSending(true);
     try {
-      const url = `${BASE_URL}/photo/${encodeURIComponent(String(coupleId))}`;
-      console.log('[UPLOAD] url =', url);
+      // 1) 사진 업로드
+      const uploadUrl = `${BASE_URL}/photo/${encodeURIComponent(String(coupleId))}`;
+      console.log('[UPLOAD] url =', uploadUrl);
 
       const form = new FormData();
       form.append('file', {
@@ -125,9 +128,8 @@ export default function ShareScreen() {
         name: `photo_${Date.now()}.jpg`,
         type: 'image/jpeg',
       } as any);
-      if (mission) form.append('mission', String(mission));
 
-      const res = await fetch(url, {
+      const res = await fetch(uploadUrl, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -139,12 +141,52 @@ export default function ShareScreen() {
 
       const text = await res.text();
       console.log('[UPLOAD] status =', res.status, 'body =', text.slice(0, 200));
-
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-      Alert.alert('업로드 완료', '상대에게 전송했어요!');
-      // 필요하면 전송 후 이동/리셋
-      // router.replace('/(tabs)/gallery') 등
+      let uploadJson: any = null;
+      try { uploadJson = JSON.parse(text); } catch { uploadJson = null; }
+
+      const photoUrl: string | null =
+        uploadJson?.photoUrl ??
+        uploadJson?.url ??
+        uploadJson?.imageUrl ??
+        (typeof uploadJson === 'string' ? uploadJson : null);
+
+      // 2) 미션 완료 처리
+      if (missionId) {
+        try {
+          const midNum = Number(missionId);
+          if (Number.isFinite(midNum)) {
+            const completeUrl = `${BASE_URL}/api/couples/missions/${encodeURIComponent(
+              String(midNum),
+            )}/complete`;
+
+            console.log('[MISSION COMPLETE] url =', completeUrl, 'file =', photoUrl);
+
+            await fetch(completeUrl, {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${token}`,
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ file: photoUrl || '' }),
+            });
+          }
+        } catch (e) {
+          console.warn('[MISSION COMPLETE] error:', (e as any)?.message);
+        }
+      }
+
+      Alert.alert('업로드 완료', '상대에게 전송했어요!', [
+        {
+          text: '확인',
+          onPress: () => {
+            // 채팅방으로 이동 (경로는 실제 구조에 맞게 수정)
+            router.replace('/(tabs)/chat');
+          },
+        },
+      ]);
     } catch (e: any) {
       console.warn('[UPLOAD] error:', e?.message);
       Alert.alert('전송 실패', e?.message || '서버 전송 중 오류가 발생했어요.');
@@ -166,14 +208,16 @@ export default function ShareScreen() {
 
   return (
     <View style={styles.wrap}>
-      <AppText style={styles.title}>
-        {mission || '상대방이 주말을 어떻게 보내고 있을지 찍어 보내주세요'}
-      </AppText>
+      <AppText style={styles.title}>{missionLabel}</AppText>
 
       <Image source={{ uri: photoUri }} style={styles.image} resizeMode="cover" />
 
       <View style={styles.bottomActions}>
-        <Pressable style={styles.sendBtn} onPress={sendToPartner} disabled={sending || !token || !coupleId}>
+        <Pressable
+          style={styles.sendBtn}
+          onPress={sendToPartner}
+          disabled={sending || !token || !coupleId}
+        >
           <Ionicons name="paper-plane" size={32} color={sending ? '#999' : '#fff'} />
         </Pressable>
         <Pressable style={styles.saveBtn} onPress={saveToAlbum} disabled={saving || sending}>
@@ -220,5 +264,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  backBtn: { marginTop: 14, backgroundColor: '#2563eb', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8 },
+  backBtn: {
+    marginTop: 14,
+    backgroundColor: '#2563eb',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
 });

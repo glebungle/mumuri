@@ -1,3 +1,4 @@
+// app/(tabs)/chat.tsx
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
@@ -52,7 +53,6 @@ async function authedFetch(path: string, init: RequestInit = {}) {
   try { return JSON.parse(text); } catch { return text; }
 }
 
-// /user/getuser 결과 보정: 숫자/숫자문자열/객체 모두 대응
 function normalizeGetUser(raw: any) {
   if (typeof raw === 'number') return { userId: raw };
   if (typeof raw === 'string' && /^[0-9]+$/.test(raw)) return { userId: Number(raw) };
@@ -67,18 +67,37 @@ function normalizeGetUser(raw: any) {
 
 // ================== 타입 ==================
 type SendStatus = 'sent' | 'sending' | 'failed' | undefined;
+
+type MissionMeta = {
+  missionId: number;
+  owner: 'me' | 'partner';
+  shouldBlur: boolean;
+};
+
 type ChatMessage = {
   id: string;
   text?: string;
-  imageUri?: string;  // 로컬/서버 URL
-  imageUrl?: string;  // 서버 URL
+  imageUri?: string;
+  imageUrl?: string;
   mine: boolean;
   createdAt: number;
-  type: 'text' | 'image';
+  type: 'text' | 'image' | 'mission';
   status?: SendStatus;
   clientMsgId?: string | null;
+  missionMeta?: MissionMeta;
 };
+
 type DateMarker = { __type: 'date'; key: string; ts: number };
+
+type MissionState = {
+  missionId: number;
+  text: string;
+  myStatus: string;
+  partnerStatus: string;
+  myPhotoUrl?: string | null;
+  partnerPhotoUrl?: string | null;
+  missionDateTs: number;
+};
 
 // ================== 유틸(날짜/문자열) ==================
 function sameYMD(a: number, b: number) {
@@ -124,33 +143,39 @@ function isSameContent(local: ChatMessage, incoming: ChatIncoming) {
   return lt === it && li === ii;
 }
 
+// 미션 완료 여부 판별 (half_done / done / NOT_DONE 등 다 커버)
+function isDoneLike(status?: string | null) {
+  if (!status) return false;
+  const s = String(status).toUpperCase();
+  if (s.includes('NOT')) return false;
+  return s.includes('DONE') || s === 'COMPLETE';
+}
+
 // ================== 화면 ==================
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const accessoryID = 'chat-input-accessory';
 
-  // 로그인/프로필 값
   const [token, setToken] = useState<string | undefined>(undefined);
   const [coupleId, setCoupleId] = useState<number | null>(null);
-  const [coupleCode, setCoupleCode] = useState<string | null>(null); // 코드 우선
+  const [coupleCode, setCoupleCode] = useState<string | null>(null);
   const [userId, setUserId] = useState<number | null>(null);
 
-  // UI/메시지 상태
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [attaching, setAttaching] = useState(false);
   const [pendingImage, setPendingImage] = useState<string | null>(null);
 
-  // Android 키보드 가림 방지
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [inputBarHeight, setInputBarHeight] = useState(56);
+
+  const [missionState, setMissionState] = useState<MissionState | null>(null);
 
   const listRef = useRef<FlatList<any>>(null);
   const chatRef = useRef<ReturnType<typeof createChatClient> | null>(null);
   const latestVisibleMsgId = useRef<string | null>(null);
 
-  // 1) 저장된 값 로딩 + 2) 부족하면 /user/getuser로 보강
   useEffect(() => {
     (async () => {
       const entries = await AsyncStorage.multiGet(['token','userId','coupleId','coupleCode']);
@@ -166,9 +191,6 @@ export default function ChatScreen() {
       setCoupleId(coupleIdNum);
       setCoupleCode(codeStr);
 
-      console.log('[chat init:storage]', { hasToken: !!tokenStr, userId: userIdNum, coupleId: coupleIdNum, coupleCode: codeStr });
-
-      // 보강: userId가 없거나, 방키(코드/아이디)가 둘 다 없으면 /user/getuser 호출
       if (tokenStr && (!userIdNum || (!coupleIdNum && !codeStr))) {
         try {
           const raw = await authedFetch('/user/getuser', { method: 'GET' });
@@ -197,7 +219,6 @@ export default function ChatScreen() {
         }
       }
 
-      // 최종 확인 로그
       setTimeout(async () => {
         const after = Object.fromEntries(await AsyncStorage.multiGet(['token','userId','coupleId','coupleCode']));
         console.log('[chat final]', {
@@ -210,16 +231,14 @@ export default function ChatScreen() {
     })();
   }, []);
 
-  // 방 키(문자열): coupleId
   const ROOM_KEY: string | null = (coupleId != null ? String(coupleId) : null);
 
-  // 업로드 URL
   const SEND_URL = useMemo(
     () => (ROOM_KEY ? `${BASE_URL}/chat/${encodeURIComponent(ROOM_KEY)}` : null),
     [ROOM_KEY]
   );
 
-  // 키보드 리스너
+  // 키보드
   useEffect(() => {
     const show = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hide = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
@@ -234,7 +253,7 @@ export default function ChatScreen() {
     return () => { s1.remove(); s2.remove(); };
   }, []);
 
-  // 갤러리 선택
+  // 갤러리
   const pickFromGallery = useCallback(async () => {
     try {
       setAttaching(true);
@@ -268,7 +287,6 @@ export default function ChatScreen() {
     }
   }, []);
 
-  // 공통: 중복 방지 append
   const appendLocal = useCallback((m: ChatMessage) => {
     setMessages(prev => {
       if (prev.find(x => x.id === m.id)) return prev;
@@ -279,7 +297,6 @@ export default function ChatScreen() {
     });
   }, []);
 
-  // 수신 → 낙관적 병합 + 중복방지
   const onIncoming = useCallback((p: ChatIncoming) => {
     setMessages(prev => {
       if (p.id != null && prev.some(x => String(x.id) === String(p.id))) return prev;
@@ -339,7 +356,7 @@ export default function ChatScreen() {
     });
   }, [userId]);
 
-  // STOMP 연결 (필수 값 준비 후)
+  // STOMP 연결
   useEffect(() => {
     if (!USE_STOMP) return;
     if (!token || !ROOM_KEY || !userId) {
@@ -351,7 +368,7 @@ export default function ChatScreen() {
     const chat = createChatClient({
       wsUrl: WS_URL,
       token,
-      roomId: ROOM_KEY, // 문자열 방 키
+      roomId: ROOM_KEY,
       handlers: {
         onMessage: onIncoming,
         onReadUpdate: (_u: ChatReadUpdate) => {},
@@ -371,6 +388,50 @@ export default function ChatScreen() {
       chatRef.current = null;
     };
   }, [token, ROOM_KEY, userId, onIncoming]);
+
+  // 오늘의 미션 상태 가져오기 (블러/미션 말풍선 용)
+  useEffect(() => {
+    if (!token || !userId) return;
+    (async () => {
+      try {
+        const raw = await authedFetch('/api/couples/mission/today', { method: 'GET' });
+        if (!Array.isArray(raw) || raw.length === 0) {
+          setMissionState(null);
+          return;
+        }
+        const m = raw[0];
+        const progresses = Array.isArray(m.progresses) ? m.progresses : [];
+        const me = progresses.find((p: any) => String(p.userId) === String(userId));
+        const partner = progresses.find((p: any) => String(p.userId) !== String(userId));
+
+        const missionText = m.description || m.title || '';
+        const missionId = m.missionId ?? m.id ?? 0;
+        const myStatus = me?.status ?? 'NOT_DONE';
+        const partnerStatus = partner?.status ?? 'NOT_DONE';
+        const myPhotoUrl = me?.photoUrl ?? null;
+        const partnerPhotoUrl = partner?.photoUrl ?? null;
+
+        let missionDateTs = Date.now();
+        if (m.missionDate) {
+          const ts = new Date(m.missionDate).getTime();
+          if (!Number.isNaN(ts)) missionDateTs = ts;
+        }
+
+        setMissionState({
+          missionId,
+          text: missionText,
+          myStatus,
+          partnerStatus,
+          myPhotoUrl,
+          partnerPhotoUrl,
+          missionDateTs,
+        });
+      } catch (e: any) {
+        console.warn('[mission today] failed:', e?.message);
+        setMissionState(null);
+      }
+    })();
+  }, [token, userId]);
 
   // 재전송
   const resendMessage = useCallback(async (msgId: string) => {
@@ -393,7 +454,7 @@ export default function ChatScreen() {
     }
   }, [ROOM_KEY, userId, messages]);
 
-  // 전송
+  // 일반 전송
   const sendMessage = useCallback(async () => {
     if (!ROOM_KEY || !userId) {
       Alert.alert('안내', '커플 정보가 아직 준비되지 않았어요.');
@@ -473,12 +534,13 @@ export default function ChatScreen() {
     }
   }, [text, pendingImage, sending, appendLocal, ROOM_KEY, userId, token, SEND_URL]);
 
-  // 날짜 마커 삽입
+  // 날짜 마커 + 미션 말풍선 합성
   const listData = useMemo<(ChatMessage | DateMarker)[]>(() => {
-    if (messages.length === 0) return [];
+    if (messages.length === 0 && !missionState) return [];
     const out: (ChatMessage | DateMarker)[] = [];
     const sorted = [...messages].sort((a, b) => a.createdAt - b.createdAt);
     let lastTs: number | null = null;
+
     for (const m of sorted) {
       if (lastTs == null || !sameYMD(lastTs, m.createdAt)) {
         out.push({ __type: 'date', key: `date_${m.createdAt}`, ts: m.createdAt });
@@ -486,8 +548,70 @@ export default function ChatScreen() {
       out.push(m);
       lastTs = m.createdAt;
     }
+
+    // 오늘의 미션을 "채팅 메시지처럼" 마지막에 붙여줌
+    if (missionState) {
+      const {
+        missionId,
+        text,
+        myStatus,
+        partnerStatus,
+        myPhotoUrl,
+        partnerPhotoUrl,
+        missionDateTs,
+      } = missionState;
+
+      const myDone = isDoneLike(myStatus);
+      const partnerDone = isDoneLike(partnerStatus);
+
+      const baseTs = lastTs != null ? Math.max(lastTs + 1, missionDateTs) : missionDateTs;
+
+      // 상대방 미션 메시지
+      if (partnerPhotoUrl) {
+        const blurPartner = partnerDone && !myDone;
+        const partnerMsg: ChatMessage = {
+          id: `mission_partner_${missionId}`,
+          text,
+          imageUri: partnerPhotoUrl,
+          imageUrl: partnerPhotoUrl,
+          mine: false,
+          createdAt: baseTs,
+          type: 'mission',
+          status: 'sent',
+          clientMsgId: null,
+          missionMeta: {
+            missionId,
+            owner: 'partner',
+            shouldBlur: blurPartner,
+          },
+        };
+        out.push(partnerMsg);
+      }
+
+      // 내 미션 메시지
+      if (myPhotoUrl) {
+        const myMsg: ChatMessage = {
+          id: `mission_me_${missionId}`,
+          text,
+          imageUri: myPhotoUrl,
+          imageUrl: myPhotoUrl,
+          mine: true,
+          createdAt: baseTs + 1,
+          type: 'mission',
+          status: 'sent',
+          clientMsgId: null,
+          missionMeta: {
+            missionId,
+            owner: 'me',
+            shouldBlur: false,
+          },
+        };
+        out.push(myMsg);
+      }
+    }
+
     return out;
-  }, [messages]);
+  }, [messages, missionState]);
 
   const shouldShowTime = useCallback((idx: number) => {
     const cur = listData[idx] as ChatMessage;
@@ -499,7 +623,6 @@ export default function ChatScreen() {
     return !(next.mine === cur.mine && sameMinute(next.createdAt, cur.createdAt));
   }, [listData]);
 
-  // 읽음 보고
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: Array<ViewToken> }) => {
     if (!viewableItems?.length) return;
     const visibleMsg = viewableItems
@@ -529,21 +652,49 @@ export default function ChatScreen() {
       const m = item as ChatMessage;
       const mine = m.mine;
       const showTime = shouldShowTime(index);
+      const isMission = m.type === 'mission';
+      const blurAmount = m.missionMeta?.shouldBlur ? 18 : 0;
+
+      const bubbleStyle = isMission
+        ? (mine ? styles.bubbleMissionMine : styles.bubbleMissionOther)
+        : (mine ? styles.bubbleMine : styles.bubbleOther);
 
       return (
         <View style={[styles.row, mine ? styles.rowMine : styles.rowOther]}>
           <View style={styles.msgCol}>
-            <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleOther]}>
+            <View style={[styles.bubble, bubbleStyle]}>
+              {isMission && (
+                <AppText style={styles.missionLabel}>오늘의 미션</AppText>
+              )}
+
               {m.imageUri ? (
                 <Image
                   source={{ uri: m.imageUri }}
-                  style={{ width: STICKER_SIZE, height: STICKER_SIZE, borderRadius: 16, marginBottom: m.text ? 6 : 0 }}
+                  style={{
+                    width: STICKER_SIZE,
+                    height: STICKER_SIZE,
+                    borderRadius: 16,
+                    marginBottom: m.text ? 6 : 0,
+                  }}
                   resizeMode="cover"
+                  blurRadius={blurAmount}
                 />
               ) : null}
-              {m.text ? <AppText style={[styles.msgText, mine ? styles.msgTextMine : styles.msgTextOther]}>{m.text}</AppText> : null}
+
+              {m.text ? (
+                <AppText
+                  style={[
+                    styles.msgText,
+                    mine ? styles.msgTextMine : styles.msgTextOther,
+                  ]}
+                >
+                  {m.text}
+                </AppText>
+              ) : null}
             </View>
-            {showTime && <AppText style={styles.timeTextLeft}>{formatTime(m.createdAt)}</AppText>}
+            {showTime && (
+              <AppText style={styles.timeTextLeft}>{formatTime(m.createdAt)}</AppText>
+            )}
           </View>
 
           <View style={styles.metaWrapRight}>
@@ -575,7 +726,6 @@ export default function ChatScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + HEADER_HEIGHT : 0}
     >
-      {/* 헤더 */}
       <View style={[styles.header, { paddingTop: insets.top }]}>
         <Pressable style={{ paddingHorizontal: 8 }} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={24} color="#111" />
@@ -586,7 +736,6 @@ export default function ChatScreen() {
         </Pressable>
       </View>
 
-      {/* 목록 */}
       <FlatList
         ref={listRef}
         contentContainerStyle={{ paddingHorizontal: 12, paddingTop: 8, paddingBottom: listBottomPadding }}
@@ -599,7 +748,6 @@ export default function ChatScreen() {
         viewabilityConfig={{ itemVisiblePercentThreshold: 50 }}
       />
 
-      {/* 입력바 */}
       {Platform.OS === 'ios' ? (
         <InputAccessoryView nativeID={accessoryID}>
           <View
@@ -624,7 +772,10 @@ export default function ChatScreen() {
         </InputAccessoryView>
       ) : (
         <View
-          style={[styles.inputBar, { position: 'absolute', left: 0, right: 0, bottom: 8 + insets.bottom + keyboardHeight }]}
+          style={[
+            styles.inputBar,
+            { position: 'absolute', left: 0, right: 0, bottom: 8 + insets.bottom + keyboardHeight },
+          ]}
           onLayout={(e) => setInputBarHeight(e.nativeEvent.layout.height)}
         >
           {pendingImage ? (
@@ -671,6 +822,19 @@ const styles = StyleSheet.create({
   bubble: { paddingHorizontal: 12, paddingVertical: 10, borderRadius: 16 },
   bubbleMine: { backgroundColor: '#8FB6FF' },
   bubbleOther: { backgroundColor: '#fff', borderWidth: StyleSheet.hairlineWidth, borderColor: '#e5e7eb' },
+
+  // 미션 전용 말풍선 색상
+  bubbleMissionMine: { backgroundColor: '#FFCFA0' },
+  bubbleMissionOther: {
+    backgroundColor: '#FFF1D6',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#FBC98F',
+  },
+  missionLabel: {
+    fontSize: 11,
+    color: '#A15C00',
+    marginBottom: 4,
+  },
 
   msgText: { fontSize: 14, lineHeight: 20 },
   msgTextMine: { color: '#fff' },
