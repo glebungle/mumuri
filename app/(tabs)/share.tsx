@@ -7,7 +7,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, Image, Pressable, StyleSheet, View } from 'react-native';
 import AppText from '../../components/AppText';
 
-const BASE_URL = 'https://5fbe91913f6e.ngrok-free.app';
+const BASE_URL = 'https://mumuri.shop';
 
 export default function ShareScreen() {
   // 카메라에서 넘어온 파라미터

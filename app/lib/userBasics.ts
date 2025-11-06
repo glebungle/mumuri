@@ -1,7 +1,7 @@
 // app/lib/userBasics.ts
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BASE = 'https://5fbe91913f6e.ngrok-free.app';
+const BASE = 'https://mumuri.shop';
 
 export async function hydrateUserBasicsFromGetuser() {
   const token = await AsyncStorage.getItem('token');

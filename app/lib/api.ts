@@ -1,7 +1,7 @@
 // app/lib/api.ts
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export const API_BASE = 'https://5fbe91913f6e.ngrok-free.app';
+export const API_BASE = 'https://mumuri.shop';
 
 export async function authedFetch(path: string, init: RequestInit = {}) {
   const token = await AsyncStorage.getItem('token');

@@ -8,7 +8,7 @@ import { WebView } from 'react-native-webview';
 
 // ===== Kakao OAuth =====
 const REST_API_KEY = process.env.EXPO_PUBLIC_KAKAO_REST_KEY || '';
-const BACKEND_CALLBACK_URL = 'https://5fbe91913f6e.ngrok-free.app/api/auth/kakao/callback';
+const BACKEND_CALLBACK_URL = 'https://mumuri.shop/api/auth/kakao/callback';
 const REDIRECT_URI = BACKEND_CALLBACK_URL;
 
 const KAKAO_AUTH_URL =
@@ -18,7 +18,7 @@ const KAKAO_AUTH_URL =
   + `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
 
 // ===== Backend API base =====
-const API_BASE = 'https://5fbe91913f6e.ngrok-free.app';
+const API_BASE = 'https://mumuri.shop';
 
 // 공통 헤더
 async function withHeaders() {

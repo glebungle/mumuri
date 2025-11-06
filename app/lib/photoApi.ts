@@ -1,7 +1,7 @@
 // lib/photoApi.ts
 import * as ImageManipulator from 'expo-image-manipulator';
 
-const API_BASE = 'https://5fbe91913f6e.ngrok-free.app'; //수정
+const API_BASE = 'https://mumuri.shop'; //수정
 
 export type Photo = {
   id: string;

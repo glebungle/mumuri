@@ -144,9 +144,10 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   textBox: {
-    marginTop: 620,
+    marginTop: 520,
     alignItems: 'center',
     paddingHorizontal: 20,
+    marginBottom: 8,
   },
   titleLine: {
     textAlign: 'center',

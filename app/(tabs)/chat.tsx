@@ -23,7 +23,7 @@ import AppText from '../../components/AppText';
 import { ChatIncoming, ChatReadUpdate, createChatClient } from '../lib/chatSocket';
 
 // ================== 환경 ==================
-const API_BASE = 'https://5fbe91913f6e.ngrok-free.app';
+const API_BASE = 'https://mumuri.shop';
 const BASE_URL = API_BASE;
 const WS_URL   = `${API_BASE}/ws-chat`;
 

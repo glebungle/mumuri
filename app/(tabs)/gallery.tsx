@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import AppText from '../../components/AppText';
 
-const BASE_URL = 'https://5fbe91913f6e.ngrok-free.app';
+const BASE_URL = 'https://mumuri.shop';
 
 type Photo = { id: string; url: string; uploadedBy?: string };
 

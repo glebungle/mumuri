@@ -16,7 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import AppText from '../components/AppText';
 
 // ===================== API 공통 =====================
-const BASE = 'https://5fbe91913f6e.ngrok-free.app';
+const BASE = 'https://mumuri.shop';
 
 async function authedFetch(path: string, init: RequestInit = {}) {
   const token = (await AsyncStorage.getItem('token')) || '';
@@ -139,7 +139,7 @@ export default function Signup() {
       case 'name':        return values.name.trim().length >= 1;
       case 'birthday':    return isDate(values.birthday);
       case 'anniversary': return isDate(values.anniversary);
-      case 'partnerCode': return true; // 임시: 코드 없어도 완료 가능
+      case 'partnerCode': return true; 
     }
   }, [current.key, values]);
 

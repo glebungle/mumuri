@@ -180,9 +180,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   textBox: {
-    marginTop: 320,
+    marginTop: 250,
     alignItems: 'center',
     paddingHorizontal: 20,
+    marginBottom: 8,
   },
   titleLine: {
     textAlign: 'center',
@@ -192,7 +193,7 @@ const styles = StyleSheet.create({
   },
   desc: {
     marginTop: 6,
-    fontSize: 16,
+    fontSize: 13,
     textAlign: 'center',
   },
   btnWrap: {

@@ -12,7 +12,7 @@ export default function MyPage() {
     <SafeAreaView style={styles.wrap}>
       {/* 상단 */}
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()}>
+        <Pressable onPress={() => router.replace('/(auth)')}>
           <AppText style={styles.back}>&lt;</AppText>
         </Pressable>
         <AppText style={styles.title}>마이페이지</AppText>
@@ -75,7 +75,7 @@ const styles = StyleSheet.create({
     borderRadius: 60,
     borderWidth: 2,
     borderColor: '#444',
-    backgroundColor: 'transparent',
+    backgroundColor: '#444',
   },
   infoBlock: {
     paddingHorizontal: 32,
