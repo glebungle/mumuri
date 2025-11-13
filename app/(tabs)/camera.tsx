@@ -20,7 +20,6 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import AppText from '../../components/AppText';
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
-
 const BASE_URL = 'https://mumuri.shop';
 
 type CropRect = { originX: number; originY: number; width: number; height: number };
@@ -57,10 +56,22 @@ export default function CameraHome() {
   const [viewH, setViewH] = useState(0);
 
   // D-Day
-  const [dday, setDday] = useState<number>(0);
+  const [dday, setDday] = useState<number>(100);
 
-  // 오늘의 미션
-  const [todayMission, setTodayMission] = useState<TodayMission | null>(null);
+  // 오늘의 미션 (여러 개 캐러셀 선택)
+  const [missions, setMissions] = useState<TodayMission[]>([]);
+  const [sel, setSel] = useState(0);
+  const [touchX, setTouchX] = useState<number | null>(null);
+
+  const nextMission = React.useCallback(() => {
+    if (!missions.length) return;
+    setSel((i) => (i + 1) % missions.length);
+  }, [missions.length]);
+
+  const prevMission = React.useCallback(() => {
+    if (!missions.length) return;
+    setSel((i) => (i - 1 + missions.length) % missions.length);
+  }, [missions.length]);
 
   const onCameraWrapLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
@@ -84,20 +95,12 @@ export default function CameraHome() {
 
         const res = await fetch(`${BASE_URL}/user/main`, {
           method: 'GET',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: 'application/json',
-          },
+          headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
         });
-        if (!res.ok) {
-          console.warn('dday api error', res.status);
-          return;
-        }
+        if (!res.ok) return;
         const json = await res.json();
         if (typeof json.dday === 'number') setDday(json.dday);
-      } catch (e) {
-        console.error('dday fetch error', e);
-      }
+      } catch {}
     };
     fetchDday();
   }, []);
@@ -109,24 +112,20 @@ export default function CameraHome() {
         const token = await AsyncStorage.getItem('token');
         if (!token) return;
 
-        const res = await fetch(`${BASE_URL}/api/couples/mission/today`, {
+        const res = await fetch(`${BASE_URL}/api/couples/missions/today`, {
           method: 'GET',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: 'application/json',
-          },
+          headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
         });
-        if (!res.ok) {
-          console.warn('today mission api error', res.status);
-          return;
-        }
+        if (!res.ok) return;
         const json = await res.json();
         if (Array.isArray(json) && json.length > 0) {
-          setTodayMission(json[0]);
+          setMissions(json);
+          setSel(0);
+        } else {
+          setMissions([]);
+          setSel(0);
         }
-      } catch (e) {
-        console.error('today mission fetch error', e);
-      }
+      } catch {}
     };
     fetchTodayMission();
   }, []);
@@ -200,7 +199,6 @@ export default function CameraHome() {
 
       finalUri = manipulated.uri;
     } catch (e) {
-      console.error('크롭 실패 오류:', e);
       Alert.alert('크롭 실패', '사진 비율 조정에 실패했습니다. 원본으로 진행합니다.');
       if (pic?.uri) finalUri = pic.uri;
     } finally {
@@ -211,21 +209,22 @@ export default function CameraHome() {
 
   const retake = () => setPreviewUri(null);
 
-  // share 이동
+  // share 이동 (선택된 미션으로)
   const confirm = async () => {
     if (!previewUri) return;
+    const picked = missions[sel];
+
     try {
       router.push({
         pathname: './share',
         params: {
           uri: previewUri,
-          missionId: todayMission ? String(todayMission.missionId) : '',
-          missionTitle: todayMission?.title ?? '',
-          missionDescription: todayMission?.description ?? '',
+          missionId: picked ? String(picked.missionId) : '',
+          missionTitle: picked?.title ?? '',
+          missionDescription: picked?.description ?? '',
         },
       });
     } catch (e) {
-      console.error('공유 화면 이동 실패:', e);
       Alert.alert('오류', '공유 화면으로 이동할 수 없습니다.');
     }
   };
@@ -243,35 +242,81 @@ export default function CameraHome() {
         />
       )}
 
-      {/* D-Day */}
-      <View style={styles.ddayBadge}>
-        <Ionicons name="heart-outline" size={18} color="#fff" />
-        <AppText style={styles.ddayText}>{dday}</AppText>
-      </View>
-
-      {/* 오늘의 미션 문구 */}
+      {/* 상단 디데이 (가운데 정렬) - 미리보기 화면에서는 숨김 */}
       {!previewUri && (
-        <View style={styles.hintBubbleWrap}>
-          <View style={styles.hintBubble}>
-            <AppText style={styles.hintText}>
-              {todayMission?.description ||
-                todayMission?.title ||
-                '오늘의 미션을 찍어 보내주세요'}
-            </AppText>
+        <View style={styles.ddayBadge}>
+          <Ionicons name="heart-outline" size={18} color="#fff" />
+          <AppText style={styles.ddayText}>{dday}</AppText>
+        </View>
+      )}
+
+      {/* 오늘의 미션 캐러셀 (스와이프/화살표) */}
+      {!previewUri && (
+        <View
+          style={styles.hintBubbleWrap}
+          onTouchStart={(e) => setTouchX(e.nativeEvent.pageX)}
+          onTouchEnd={(e) => {
+            if (touchX == null) return;
+            const dx = e.nativeEvent.pageX - touchX;
+            setTouchX(null);
+            if (Math.abs(dx) < 40) return;
+            if (dx < 0) nextMission();
+            else prevMission();
+          }}
+        >
+          <View style={styles.missionDotsRow}>
+            {missions.map((_, i) => (
+              <View
+                key={i}
+                style={[styles.missionDot, i === sel && styles.missionDotActive]}
+              />
+            ))}
+          </View>
+
+          <View style={styles.hintRow}>
+            <Pressable style={styles.arrowBtn} onPress={prevMission} disabled={!missions.length}>
+              <Ionicons name="chevron-back" size={18} color="#3279FF" />
+            </Pressable>
+
+            <View style={styles.hintBubble}>
+              <AppText style={styles.hintText}>
+                {missions[sel]?.description || missions[sel]?.title || '오늘의 미션을 찍어 보내주세요'}
+              </AppText>
+              <Ionicons name="play" size={18} color="#FFFFFF" />
+            </View>
+
+            <Pressable style={styles.arrowBtn} onPress={nextMission} disabled={!missions.length}>
+              <Ionicons name="chevron-forward" size={18} color="#3279FF" />
+            </Pressable>
           </View>
         </View>
       )}
 
+      {/* 오른쪽 상단 버튼 그룹 */}
       {!previewUri && (
         <View style={styles.floatingTopButtonsGroupCamera}>
           <Pressable style={styles.floatBtn} onPress={() => Alert.alert('준비중')}>
             <Feather name="book" size={20} color="#6198FF" />
           </Pressable>
-          <Pressable style={styles.floatBtn} onPress={() => Alert.alert('준비중')}>
-            <Feather name="map" size={20} color="#6198FF" />
-          </Pressable>
         </View>
       )}
+
+      {/* 하단 촬영 / 확인 버튼 */}
+      <View style={[styles.bottomOverlay, { paddingBottom: 24 + insets.bottom }]}>
+        {previewUri ? (
+          <Pressable onPress={confirm} style={styles.confirmBtn}>
+            <Ionicons name="checkmark-sharp" size={36} color="#fff" />
+          </Pressable>
+        ) : (
+          <Pressable
+            onPress={takePhoto}
+            disabled={!isReady || capturing}
+            style={[styles.shutterOuter, (!isReady || capturing) && { opacity: 0.5 }]}
+          >
+            <View style={styles.shutterInner} />
+          </Pressable>
+        )}
+      </View>
     </View>
   );
 
@@ -289,74 +334,53 @@ export default function CameraHome() {
 
         {cameraPreviewComponent}
 
-        <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 24 }]}>
-          {previewUri ? (
-            <Pressable onPress={confirm} style={styles.confirmBtn}>
-              <Ionicons name="checkmark-sharp" size={36} color="#fff" />
-            </Pressable>
-          ) : (
-            <Pressable
-              onPress={takePhoto}
-              disabled={!isReady || capturing}
-              style={[styles.shutterOuter, (!isReady || capturing) && { opacity: 0.5 }]}
-            >
-              <View style={styles.shutterInner} />
-            </Pressable>
-          )}
-        </View>
+        <View style={{ height: screenHeight * 0.1, backgroundColor: '#FFFCF5' }} />
       </SafeAreaView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  loadingScreen: { flex: 1, backgroundColor: '#fff' },
-  fullScreenContainer: { flex: 1, backgroundColor: '#ffffffff' },
-  backgroundDim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255, 255, 255, 0.4)' },
+  loadingScreen: { flex: 1, backgroundColor: '#FFFCF5' },
+  fullScreenContainer: { flex: 1, backgroundColor: '#FFFCF5' },
+  backgroundDim: { ...StyleSheet.absoluteFillObject },
 
   cameraFrame: {
-    width: screenWidth * 0.9,
-    height: screenHeight * 0.75,
-    borderRadius: 24,
+    width: screenWidth,
+    height: screenHeight * 0.8,
+    borderRadius: 0,
     overflow: 'hidden',
-    marginTop: screenHeight * 0.02,
+    marginTop: 0,
     position: 'relative',
-    marginBottom: 8,
   },
   previewFrameImage: { ...StyleSheet.absoluteFillObject },
 
   uiOverlay: {
     flex: 1,
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     alignItems: 'center',
     paddingHorizontal: 0,
     zIndex: 1,
   },
 
+  // D-DAY
   ddayBadge: {
     position: 'absolute',
-    top: 14,
-    left: 14,
+    top: 18,
+    alignSelf: 'center',
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.4)',
   },
-  ddayText: {
-    marginLeft: 6,
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
+  ddayText: { marginLeft: 6, color: '#fff', fontSize: 14 },
 
+  // 상단 오른쪽 버튼
   floatingTopButtonsGroupCamera: {
     position: 'absolute',
-    top: 14,
-    right: 14,
+    top: 18,
+    right: 18,
     flexDirection: 'row',
-    gap: 12,
     zIndex: 2,
   },
   floatBtn: {
@@ -372,65 +396,74 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
 
+  // 미션 말풍선 영역
   hintBubbleWrap: {
     position: 'absolute',
-    top: screenHeight * 0.15,
+    top: screenHeight * 0.1,
     width: '100%',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
   },
+  missionDotsRow: { flexDirection: 'row', marginBottom: 8 },
+  missionDot: {
+    width: 6, height: 6, borderRadius: 3, marginHorizontal: 3,
+    backgroundColor: 'rgba(255,255,255,0.7)',
+  },
+  missionDotActive: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#3279FF' },
+
+  hintRow: { flexDirection: 'row', alignItems: 'center' },
+  arrowBtn: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.7)',
+    alignItems: 'center', justifyContent: 'center',
+    marginHorizontal: 6,
+  },
+
   hintBubble: {
-    paddingHorizontal: 30,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 24,
     paddingVertical: 10,
     backgroundColor: 'rgba(255,255,255,0.7)',
-    borderRadius: 80,
+    borderRadius: 12,
   },
-  hintText: { color: '#6198FF', fontSize: 13, textAlign: 'center' },
+  hintText: { color: '#3279FF', fontSize: 13, textAlign: 'center', marginRight: 10 },
 
-  bottomBar: { alignItems: 'center', width: '100%', paddingTop: 30 },
-
+  // 하단 버튼 영역
+  bottomOverlay: {
+    position: 'absolute',
+    left: 0, right: 0, bottom: -40,
+    alignItems: 'center', justifyContent: 'center',
+  },
   shutterOuter: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 4,
-    borderColor: '#6198FF',
+    width: 86, height: 86, borderRadius: 43, backgroundColor: '#fff',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 4, borderColor: '#FF9191',
   },
-  shutterInner: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#6198FF' },
+  shutterInner: { width: 66, height: 66, borderRadius: 33, backgroundColor: '#FF9191' },
 
   topBarPreview: {
     position: 'absolute',
     top: Platform.select({ ios: 0, android: 10 }),
-    left: 0,
-    right: 0,
+    left: 0, right: 0,
     flexDirection: 'row',
     justifyContent: 'flex-start',
     paddingHorizontal: 14,
     zIndex: 10,
   },
   topIconBtnRetake: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 40, height: 40, borderRadius: 20,
     backgroundColor: 'rgba(0,0,0,0.4)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center',
   },
-
   confirmBtn: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#6198FF',
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 80, height: 80, borderRadius: 40,
+    backgroundColor: '#FF9191',
+    alignItems: 'center', justifyContent: 'center',
   },
 
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
   permissionTitle: { fontSize: 18, marginBottom: 16, fontWeight: 'bold' },
   permBtn: { paddingHorizontal: 20, paddingVertical: 12, backgroundColor: '#6198FF', borderRadius: 12 },
-  permBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  permBtnText: { color: '#fff', fontWeight: '700' },
 });

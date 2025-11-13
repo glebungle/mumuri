@@ -2,7 +2,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react-native';
 import {
@@ -36,6 +36,25 @@ const HEADER_HEIGHT = 56;
 
 const USE_STOMP = true;
 const USE_REST_UPLOAD = true;
+
+async function presignIfNeeded(rawUrl?: string | null) {
+  if (!rawUrl) return null;
+  // 이미 presigned면 그대로 사용
+  if (/\bX-Amz-Algorithm=/.test(rawUrl)) return rawUrl;
+
+  // 서버에 presign 요청 (백엔드가 둘 중 하나라도 제공하면 동작)
+  try {
+    const r1 = await authedFetch(`/api/couples/missions/presign?url=${encodeURIComponent(rawUrl)}`, { method: 'GET' });
+    if (r1?.url) return r1.url;
+  } catch {}
+  try {
+    const r2 = await authedFetch(`/photo/presign?url=${encodeURIComponent(rawUrl)}`, { method: 'GET' });
+    if (r2?.url) return r2.url;
+  } catch {}
+
+  // 최후엔 원본 반환(표시는 안 될 수 있음)
+  return rawUrl;
+}
 
 // ================== 내부 유틸(API) ==================
 async function authedFetch(path: string, init: RequestInit = {}) {
@@ -97,6 +116,9 @@ type MissionState = {
   myPhotoUrl?: string | null;
   partnerPhotoUrl?: string | null;
   missionDateTs: number;
+
+  myCompletedTs?: number | null;
+  partnerCompletedTs?: number | null;
 };
 
 // ================== 유틸(날짜/문자열) ==================
@@ -143,6 +165,18 @@ function isSameContent(local: ChatMessage, incoming: ChatIncoming) {
   return lt === it && li === ii;
 }
 
+function parseTSLocal(s?: string | null): number | null {
+  if (!s) return null;
+  // "YYYY-MM-DD" 패턴이면 로컬 자정으로 만든다
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (m) {
+    const y = Number(m[1]), mo = Number(m[2]) - 1, d = Number(m[3]);
+    return new Date(y, mo, d, 0, 0, 0, 0).getTime(); // 로컬 00:00
+  }
+  const t = new Date(s).getTime();
+  return Number.isNaN(t) ? null : t;
+}
+
 // 미션 완료 여부 판별 (half_done / done / NOT_DONE 등 다 커버)
 function isDoneLike(status?: string | null) {
   if (!status) return false;
@@ -155,6 +189,17 @@ function isDoneLike(status?: string | null) {
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const accessoryID = 'chat-input-accessory';
+
+  // ✅ share.tsx에서 넘어오는 낙관적 표시 파라미터
+  const {
+    justCompletedMissionId,
+    justCompletedMissionText,
+    justCompletedPhotoUrl,
+  } = useLocalSearchParams<{
+    justCompletedMissionId?: string;
+    justCompletedMissionText?: string;
+    justCompletedPhotoUrl?: string;
+  }>();
 
   const [token, setToken] = useState<string | undefined>(undefined);
   const [coupleId, setCoupleId] = useState<number | null>(null);
@@ -394,12 +439,31 @@ export default function ChatScreen() {
     if (!token || !userId) return;
     (async () => {
       try {
-        const raw = await authedFetch('/api/couples/mission/today', { method: 'GET' });
+        // (useEffect 내부 try 블록 맨 위 근처에 추가)
+        const pickUrl = (p: any): string | null => {
+          if (!p) return null;
+          // 평평한 구조
+          if (typeof p.photoUrl === 'string') return p.photoUrl;
+          if (typeof p.imageUrl === 'string') return p.imageUrl;
+          if (typeof p.fileUrl  === 'string') return p.fileUrl;
+          if (typeof p.url      === 'string') return p.url;
+
+          // 중첩 객체(photo/file/image ...)
+          const cand =
+            p.photo?.presignedUrl ?? p.photo?.url ?? p.photo?.imageUrl ??
+            p.file?.presignedUrl  ?? p.file?.url  ?? p.file?.imageUrl ??
+            p.image?.presignedUrl ?? p.image?.url ?? p.image?.imageUrl;
+
+          return typeof cand === 'string' ? cand : null;
+        };
+
+        const raw = await authedFetch('/api/couples/missions/today', { method: 'GET' });
         if (!Array.isArray(raw) || raw.length === 0) {
           setMissionState(null);
           return;
         }
-        const m = raw[0];
+        // 가장 의미있는 항목(사진/상태 포함) 우선
+        const m = raw.find((x: any) => Array.isArray(x?.progresses)) ?? raw[0];
         const progresses = Array.isArray(m.progresses) ? m.progresses : [];
         const me = progresses.find((p: any) => String(p.userId) === String(userId));
         const partner = progresses.find((p: any) => String(p.userId) !== String(userId));
@@ -408,13 +472,23 @@ export default function ChatScreen() {
         const missionId = m.missionId ?? m.id ?? 0;
         const myStatus = me?.status ?? 'NOT_DONE';
         const partnerStatus = partner?.status ?? 'NOT_DONE';
-        const myPhotoUrl = me?.photoUrl ?? null;
-        const partnerPhotoUrl = partner?.photoUrl ?? null;
+        const myPhotoUrlRaw = me?.photoUrl ?? null;
+        const partnerPhotoUrlRaw = partner?.photoUrl ?? null;
 
+        // presign
+        const [myPhotoUrl, partnerPhotoUrl] = await Promise.all([
+          presignIfNeeded(myPhotoUrlRaw),
+          presignIfNeeded(partnerPhotoUrlRaw),
+        ]);
+
+        // 기존 parseTS 대신
+        const parseTS = (s?: string) => parseTSLocal(s);
+
+        // missionDateTs도 로컬로
         let missionDateTs = Date.now();
         if (m.missionDate) {
-          const ts = new Date(m.missionDate).getTime();
-          if (!Number.isNaN(ts)) missionDateTs = ts;
+          const ts = parseTSLocal(m.missionDate);
+          if (ts != null) missionDateTs = ts;
         }
 
         setMissionState({
@@ -425,13 +499,49 @@ export default function ChatScreen() {
           myPhotoUrl,
           partnerPhotoUrl,
           missionDateTs,
+          // 완료/갱신 시각도 date-only 가능성 → 로컬 파싱
+          myCompletedTs:       parseTSLocal(me?.completedAt)       ?? parseTSLocal(me?.updatedAt)       ?? missionDateTs,
+          partnerCompletedTs:  parseTSLocal(partner?.completedAt)  ?? parseTSLocal(partner?.updatedAt)  ?? missionDateTs,
         });
+
+        console.log('[mission today raw]', raw);
+        console.log('[mission today userId]', userId);
+        console.log('[mission progresses]', JSON.stringify(progresses, null, 2));
+        console.log('[mission me/partner]', me, partner, { myPhotoUrl, partnerPhotoUrl });
       } catch (e: any) {
         console.warn('[mission today] failed:', e?.message);
         setMissionState(null);
       }
     })();
   }, [token, userId]);
+
+  // ✅ share에서 막 넘어온 미션을 낙관적으로 즉시 붙이기
+  const appendedOnceRef = useRef(false);
+  useEffect(() => {
+    if (appendedOnceRef.current) return;
+    if (!justCompletedMissionId) return;
+
+    const now = Date.now();
+    const missionText = (justCompletedMissionText || '').trim();
+    const img = (justCompletedPhotoUrl || '').trim() || undefined;
+
+    const optimistic: ChatMessage = {
+      id: `mission_me_opt_${justCompletedMissionId}_${now}`,
+      text: missionText || '오늘의 미션',
+      imageUri: img,
+      imageUrl: img,
+      mine: true,
+      createdAt: now, // ✅ 지금 시간
+      type: 'mission',
+      status: 'sent',
+      clientMsgId: null,
+      missionMeta: { missionId: Number(justCompletedMissionId), owner: 'me', shouldBlur: false },
+    };
+    appendLocal(optimistic);
+    appendedOnceRef.current = true;
+
+    requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
+  }, [justCompletedMissionId, justCompletedMissionText, justCompletedPhotoUrl, appendLocal]);
 
   // 재전송
   const resendMessage = useCallback(async (msgId: string) => {
@@ -536,67 +646,46 @@ export default function ChatScreen() {
 
   // 날짜 마커 + 미션 말풍선 합성
   const listData = useMemo<(ChatMessage | DateMarker)[]>(() => {
-    if (messages.length === 0 && !missionState) return [];
-    const out: (ChatMessage | DateMarker)[] = [];
-    const sorted = [...messages].sort((a, b) => a.createdAt - b.createdAt);
-    let lastTs: number | null = null;
+  // 1) 채팅 메시지를 시간순 정렬
+  const baseMsgs = [...messages].sort((a, b) => a.createdAt - b.createdAt);
 
-    for (const m of sorted) {
-      if (lastTs == null || !sameYMD(lastTs, m.createdAt)) {
-        out.push({ __type: 'date', key: `date_${m.createdAt}`, ts: m.createdAt });
-      }
-      out.push(m);
-      lastTs = m.createdAt;
-    }
-
-    // 오늘의 미션을 "채팅 메시지처럼" 마지막에 붙여줌
+  // 2) 미션을 ChatMessage로 변환 (시간은 상태에 고정된 completedTs 사용)
+  const missionMsgs: ChatMessage[] = [];
     if (missionState) {
       const {
-        missionId,
-        text,
-        myStatus,
-        partnerStatus,
-        myPhotoUrl,
-        partnerPhotoUrl,
-        missionDateTs,
+        missionId, text, myStatus, partnerStatus,
+        myPhotoUrl, partnerPhotoUrl, myCompletedTs, partnerCompletedTs,
       } = missionState;
 
-      const myDone = isDoneLike(myStatus);
-      const partnerDone = isDoneLike(partnerStatus);
+      const isDone = (s?: string | null) => s && !String(s).toUpperCase().includes('NOT') && String(s).toUpperCase().includes('DONE');
 
-      const baseTs = lastTs != null ? Math.max(lastTs + 1, missionDateTs) : missionDateTs;
-
-      // 상대방 미션 메시지
-      if (partnerPhotoUrl) {
-        const blurPartner = partnerDone && !myDone;
-        const partnerMsg: ChatMessage = {
+      if (partnerPhotoUrl || isDone(partnerStatus)) {
+        missionMsgs.push({
           id: `mission_partner_${missionId}`,
           text,
-          imageUri: partnerPhotoUrl,
-          imageUrl: partnerPhotoUrl,
+          imageUrl: partnerPhotoUrl ?? undefined,
+          imageUri: partnerPhotoUrl ?? undefined,
           mine: false,
-          createdAt: baseTs,
+          createdAt: partnerCompletedTs ?? missionState.missionDateTs, // ✅ 고정된 시간
           type: 'mission',
           status: 'sent',
           clientMsgId: null,
-          missionMeta: {
-            missionId,
-            owner: 'partner',
-            shouldBlur: blurPartner,
-          },
-        };
-        out.push(partnerMsg);
+          // missionMeta: {
+          //   missionId,
+          //   owner: 'partner',
+          //   // shouldBlur: isDone(partnerStatus) && !isDone(myStatus),
+          // },
+        });
       }
 
-      // 내 미션 메시지
-      if (myPhotoUrl) {
-        const myMsg: ChatMessage = {
+      if (myPhotoUrl || isDone(myStatus)) {
+        missionMsgs.push({
           id: `mission_me_${missionId}`,
           text,
-          imageUri: myPhotoUrl,
-          imageUrl: myPhotoUrl,
+          imageUrl: myPhotoUrl ?? undefined,
+          imageUri: myPhotoUrl ?? undefined,
           mine: true,
-          createdAt: baseTs + 1,
+          createdAt: myCompletedTs ?? missionState.missionDateTs, // ✅ 고정된 시간
           type: 'mission',
           status: 'sent',
           clientMsgId: null,
@@ -605,11 +694,23 @@ export default function ChatScreen() {
             owner: 'me',
             shouldBlur: false,
           },
-        };
-        out.push(myMsg);
+        });
       }
     }
 
+    // 3) 채팅 + 미션을 합쳐서 createdAt 기준 정렬
+    const merged = [...baseMsgs, ...missionMsgs].sort((a, b) => a.createdAt - b.createdAt);
+
+    // 4) 날짜 마커 삽입
+    const out: (ChatMessage | DateMarker)[] = [];
+    let lastTs: number | null = null;
+    for (const m of merged) {
+      if (lastTs == null || !sameYMD(lastTs, m.createdAt)) {
+        out.push({ __type: 'date', key: `date_${m.createdAt}`, ts: m.createdAt });
+      }
+      out.push(m);
+      lastTs = m.createdAt;
+    }
     return out;
   }, [messages, missionState]);
 
@@ -667,9 +768,9 @@ export default function ChatScreen() {
                 <AppText style={styles.missionLabel}>오늘의 미션</AppText>
               )}
 
-              {m.imageUri ? (
+              {(m.imageUrl || m.imageUri)  ? (
                 <Image
-                  source={{ uri: m.imageUri }}
+                  source={{ uri: m.imageUrl || m.imageUri! }}
                   style={{
                     width: STICKER_SIZE,
                     height: STICKER_SIZE,
@@ -820,19 +921,19 @@ const styles = StyleSheet.create({
   msgCol: { maxWidth: '80%' },
 
   bubble: { paddingHorizontal: 12, paddingVertical: 10, borderRadius: 16 },
-  bubbleMine: { backgroundColor: '#8FB6FF' },
+  bubbleMine: { backgroundColor: '#6198FF' },
   bubbleOther: { backgroundColor: '#fff', borderWidth: StyleSheet.hairlineWidth, borderColor: '#e5e7eb' },
 
-  // 미션 전용 말풍선 색상
-  bubbleMissionMine: { backgroundColor: '#FFCFA0' },
+  // 미션 전용 말풍선 색상(요청 반영)
+  bubbleMissionMine: { backgroundColor: '#6198FF' },
   bubbleMissionOther: {
-    backgroundColor: '#FFF1D6',
+    backgroundColor: '#FFE8D2',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#FBC98F',
+    borderColor: '#F7CBA7',
   },
   missionLabel: {
     fontSize: 11,
-    color: '#A15C00',
+    color: '#7A4E2A',
     marginBottom: 4,
   },
 

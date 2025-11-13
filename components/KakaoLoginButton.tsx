@@ -1,4 +1,3 @@
-// app/components/KakaoLoginButton.tsx (경로는 프로젝트 구조에 맞게)
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Linking from 'expo-linking';
 import { router } from 'expo-router';
@@ -30,6 +29,60 @@ async function withHeaders() {
   } as const;
 }
 
+// 🔹 로그인 직후 서버에서 유저/커플 정보 다시 받아서 스토리지 최신화
+async function fetchAndSyncUserInfo() {
+  try {
+    const token = await AsyncStorage.getItem('token');
+    if (!token) return;
+
+    const res = await fetch(`${API_BASE}/user/getuser`, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${token}`,
+        'ngrok-skip-browser-warning': 'true',
+      },
+    });
+
+    const raw = await res.text();
+    if (!res.ok) {
+      console.warn('[login] /user/getuser failed:', raw);
+      return;
+    }
+
+    let data: any;
+    try { data = JSON.parse(raw); } catch { data = {}; }
+
+    const userId =
+      data.userId ??
+      data.id ??
+      data.memberId ??
+      null;
+
+    const coupleId =
+      data.coupleId ??
+      data.couple_id ??
+      null;
+
+    const coupleCode =
+      data.coupleCode ??
+      data.couple_code ??
+      null;
+
+    const kv: [string, string][] = [];
+    if (userId != null) kv.push(['userId', String(userId)]);
+    if (coupleId != null) kv.push(['coupleId', String(coupleId)]);
+    if (coupleCode) kv.push(['coupleCode', String(coupleCode)]);
+
+    if (kv.length) {
+      await AsyncStorage.multiSet(kv);
+      console.log('[login] synced user info from /user/getuser:', { userId, coupleId, coupleCode });
+    }
+  } catch (e: any) {
+    console.warn('[login] fetchAndSyncUserInfo error:', e?.message);
+  }
+}
+
 // 커플 상태 확인 
 async function checkCoupleAlready(): Promise<string> {
   const res = await fetch(`${API_BASE}/user/couple/already`, {
@@ -53,7 +106,6 @@ function parseDeepLink(url: string) {
   return { token, userId, coupleId, coupleCode, isNew };
 }
 
-
 export default function KakaoLoginButton() {
   const [webViewVisible, setWebViewVisible] = useState(false);
   const deepLinkHandled = useRef(false);
@@ -70,14 +122,17 @@ export default function KakaoLoginButton() {
         const { token, userId, coupleId, coupleCode, isNew } = parseDeepLink(url);
         if (!token) throw new Error('로그인 토큰이 없습니다.');
 
-        // 저장
+        // 1) 딥링크로 넘어온 값 우선 저장
         const kv: [string, string][] = [['token', token]];
         if (userId) kv.push(['userId', userId]);
         if (coupleId) kv.push(['coupleId', coupleId]);
         if (coupleCode) kv.push(['coupleCode', coupleCode]);
         await AsyncStorage.multiSet(kv);
 
+        // 2) 🔹 서버 /user/getuser 다시 호출해서 userId/coupleId/coupleCode 최신화
+        await fetchAndSyncUserInfo();
 
+        // 3) 커플 상태 확인
         let status = '';
         try {
           status = await checkCoupleAlready(); 
@@ -113,6 +168,9 @@ export default function KakaoLoginButton() {
           if (coupleId) kv.push(['coupleId', coupleId]);
           if (coupleCode) kv.push(['coupleCode', coupleCode]);
           await AsyncStorage.multiSet(kv);
+
+          // 🔹 초기 URL 케이스에서도 마찬가지로 서버 값으로 동기화
+          await fetchAndSyncUserInfo();
 
           if (isNew) {
             router.replace('/signup');

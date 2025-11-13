@@ -1,11 +1,16 @@
 // app/onboarding/detail2.tsx
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef } from 'react';
-import { Animated, Pressable, StyleSheet, View } from 'react-native';
+import {
+  Animated,
+  Pressable,
+  StyleSheet,
+  View
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppText from '../../components/AppText';
 
-// 🔥 AppText를 애니메이션 가능하게
+// AppText를 애니메이션 가능하게
 const AnimatedAppText = Animated.createAnimatedComponent(AppText);
 
 export default function OnboardingDetail2() {
@@ -69,6 +74,35 @@ export default function OnboardingDetail2() {
     outputRange: ['#CFCFCF', '#5F92FF'],
   });
 
+  // ------- 버블 페이드인 애니메이션 --------
+  const bubble1Opacity = useRef(new Animated.Value(0)).current;
+  const bubble2Opacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    // 1초 뒤 bubble1 등장
+    const t1 = setTimeout(() => {
+      Animated.timing(bubble1Opacity, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }).start();
+    }, 1000);
+
+    // 그로부터 2초 뒤(총 3초 경과) bubble2 등장
+    const t2 = setTimeout(() => {
+      Animated.timing(bubble2Opacity, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }).start();
+    }, 3000);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [bubble1Opacity, bubble2Opacity]);
+
   const goNext = () => {
     router.push('./finish');
   };
@@ -80,6 +114,23 @@ export default function OnboardingDetail2() {
         <Animated.View style={[styles.progressBarFill, { width: progressWidth }]} />
       </View>
 
+      {/* 버블 이미지 영역 */}
+      <View style={styles.bubblesArea}>
+        {/* 첫 번째 버블 */}
+        <Animated.Image
+          source={require('../../assets/images/bubble1.png')}
+          style={[styles.bubble1, { opacity: bubble1Opacity }]}
+          resizeMode="contain"
+        />
+
+        {/* 두 번째 버블 */}
+        <Animated.Image
+          source={require('../../assets/images/bubble2.png')}
+          style={[styles.bubble2, { opacity: bubble2Opacity }]}
+          resizeMode="contain"
+        />
+      </View>
+
       {/* 텍스트 영역 */}
       <View style={styles.textBox}>
         <AppText style={styles.titleLine}>
@@ -88,7 +139,7 @@ export default function OnboardingDetail2() {
           </Animated.Text>{' '}
           <Animated.Text style={[styles.bold20, { color: titleSendColor }]}>
             마음
-          </Animated.Text>{' '}
+          </Animated.Text>{''}
           <Animated.Text style={[styles.bold20, { color: titleRememberColor }]}>
             을 전해요
           </Animated.Text>
@@ -142,6 +193,25 @@ const styles = StyleSheet.create({
     backgroundColor: '#5F92FF',
     borderRadius: 999,
   },
+
+  // 버블 위치
+  bubblesArea: {
+    position: 'absolute',
+    top: 130,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  bubble1: {
+    width: 200,
+    height: 200,
+  },
+  bubble2: {
+    width: 230,
+    height: 230,
+    marginTop: 50,
+  },
+
   textBox: {
     marginTop: 520,
     alignItems: 'center',
