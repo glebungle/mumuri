@@ -21,6 +21,7 @@ import AppText from '../../components/AppText';
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 const BASE_URL = 'https://mumuri.shop';
+const SWIPE_THRESHOLD = 40; // 스와이프로 인식할 최소 이동 거리
 
 type CropRect = { originX: number; originY: number; width: number; height: number };
 
@@ -61,7 +62,8 @@ export default function CameraHome() {
   // 오늘의 미션 (여러 개 캐러셀 선택)
   const [missions, setMissions] = useState<TodayMission[]>([]);
   const [sel, setSel] = useState(0);
-  const [touchX, setTouchX] = useState<number | null>(null);
+  // 스와이프 처리를 위한 상태
+  const [startX, setStartX] = useState<number | null>(null);
 
   const nextMission = React.useCallback(() => {
     if (!missions.length) return;
@@ -77,6 +79,30 @@ export default function CameraHome() {
     const { width, height } = e.nativeEvent.layout;
     setViewW(width);
     setViewH(height);
+  };
+
+  // 스와이프 핸들러
+  const handleTouchStart = (e: any) => {
+    // 터치 시작 X 좌표 저장
+    setStartX(e.nativeEvent.pageX);
+    return true; // Responder로 지정
+  };
+
+  const handleTouchEnd = (e: any) => {
+    if (startX == null) return;
+    const endX = e.nativeEvent.pageX;
+    const dx = endX - startX;
+    setStartX(null); // 초기화
+
+    if (Math.abs(dx) < SWIPE_THRESHOLD) return; // 임계값 미만은 무시
+
+    if (dx < 0) {
+      // 왼쪽으로 스와이프 (다음 미션)
+      nextMission();
+    } else {
+      // 오른쪽으로 스와이프 (이전 미션)
+      prevMission();
+    }
   };
 
   // 카메라 권한
@@ -254,15 +280,10 @@ export default function CameraHome() {
       {!previewUri && (
         <View
           style={styles.hintBubbleWrap}
-          onTouchStart={(e) => setTouchX(e.nativeEvent.pageX)}
-          onTouchEnd={(e) => {
-            if (touchX == null) return;
-            const dx = e.nativeEvent.pageX - touchX;
-            setTouchX(null);
-            if (Math.abs(dx) < 40) return;
-            if (dx < 0) nextMission();
-            else prevMission();
-          }}
+          // 스와이프 처리를 위해 View를 Responder로 설정
+          onMoveShouldSetResponder={() => true}
+          onResponderGrant={handleTouchStart}
+          onResponderRelease={handleTouchEnd}
         >
           <View style={styles.missionDotsRow}>
             {missions.map((_, i) => (
@@ -282,7 +303,7 @@ export default function CameraHome() {
               <AppText style={styles.hintText}>
                 {missions[sel]?.description || missions[sel]?.title || '오늘의 미션을 찍어 보내주세요'}
               </AppText>
-              <Ionicons name="play" size={18} color="#FFFFFF" />
+              {/* <Ionicons name="play" size={18} color="#FFFFFF" /> <- 사용하지 않는 아이콘 제거 */}
             </View>
 
             <Pressable style={styles.arrowBtn} onPress={nextMission} disabled={!missions.length}>

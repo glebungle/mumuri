@@ -39,6 +39,7 @@ export default function GalleryTab() {
 
   const tokenRef = useRef<string | null>(null);
   const coupleIdRef = useRef<number | null>(null);
+  
 
   /** 토큰/커플ID 확보  */
   const ensureAuthBasics = useCallback(async () => {
