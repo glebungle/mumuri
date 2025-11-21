@@ -1,47 +1,119 @@
-// app/(tabs)/gallery.tsx
+// app/(tabs)/gallery.tsx  (파일명은 사용 중인 경로에 맞게)
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Directory, File, Paths } from 'expo-file-system';
+import { format, parseISO } from 'date-fns';
+import * as FileSystem from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
   FlatList,
   Image,
-  Modal, Platform, Pressable,
+  Platform,
+  Pressable,
   RefreshControl,
   StyleSheet,
-  View
+  View,
 } from 'react-native';
+import { Calendar, DateData } from 'react-native-calendars';
 import AppText from '../../components/AppText';
 
 const BASE_URL = 'https://mumuri.shop';
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-type Photo = { id: string; url: string; uploadedBy?: string };
+/** ========= FileSystem 타입 불일치 안전 우회 ========= */
+const FS: {
+  documentDirectory?: string;
+  cacheDirectory?: string;
+  temporaryDirectory?: string;
+} = FileSystem as any;
 
+function getWritableDir(): string {
+  const base =
+    FS.documentDirectory ??
+    FS.cacheDirectory ??
+    FS.temporaryDirectory ??
+    '';
+  if (!base) throw new Error('저장 가능한 디렉토리를 찾을 수 없어요.');
+  return base.endsWith('/') ? base : base + '/';
+}
+/** ================================================== */
+
+/** 서버에서 내려주는 사진 + (옵션) 미션 메타 확장 타입 */
+type Photo = {
+  id: string;
+  url: string;                // presigned 또는 직접 접근 가능한 URL
+  uploadedBy?: string;
+  createdAt: string;          // ISO8601(UTC 권장: Z 포함)
+  missionId?: number | null;  // 없으면 일반 사진
+  missionTitle?: string | null;
+  missionDate?: string | null; // 'YYYY-MM-DD' 권장
+};
+
+type PhotosByDate = Record<string, Photo[]>;
+
+/** 서버 응답 → 클라이언트 표준화 */
 function normalizePhoto(raw: any): Photo | null {
   if (!raw || typeof raw !== 'object') return null;
+
   const id = raw.id ?? raw.photo_id ?? raw.photoId ?? raw.uuid;
-  const url = raw.presignedUrl ?? raw.url;
-  if (id == null || !url) return null;
-  return { id: String(id), url: String(url), uploadedBy: raw.uploadedBy != null ? String(raw.uploadedBy) : undefined };
+  const url = raw.presignedUrl ?? raw.url; // 서버가 presigned를 주면 그대로 사용
+  const createdAt = raw.createdAt ?? raw.created_at;
+
+  if (id == null || !url || !createdAt) return null;
+
+  return {
+    id: String(id),
+    url: String(url),
+    uploadedBy: raw.uploadedBy != null ? String(raw.uploadedBy) : undefined,
+    createdAt: String(createdAt),
+
+    // 👉 서버가 아래 필드를 내려주면 미션 UI가 자동으로 살아남
+    missionId: raw.missionId != null ? Number(raw.missionId) : null,
+    missionTitle: raw.missionTitle ?? null,
+    missionDate: raw.missionDate ?? null,
+  };
 }
 
+/** 날짜별 그룹핑(로컬 표시 기준) */
+const groupPhotosByDate = (photos: Photo[]): PhotosByDate => {
+  const grouped: PhotosByDate = {};
+  photos.forEach((photo) => {
+    try {
+      // createdAt은 ISO8601 이어야 정확 (서버에 'Z' 붙이는 걸 권장)
+      const date = format(parseISO(photo.createdAt), 'yyyy-MM-dd');
+      if (!grouped[date]) grouped[date] = [];
+      grouped[date].push(photo);
+    } catch (e) {
+      console.warn('날짜 파싱 실패:', photo.createdAt, e);
+    }
+  });
+  return grouped;
+};
+
 export default function GalleryTab() {
-  const [photos, setPhotos] = useState<Photo[]>([]);
+  const [allPhotos, setAllPhotos] = useState<Photo[]>([]);
+  const [photosByDate, setPhotosByDate] = useState<PhotosByDate>({});
+
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const selectedPhotos = useMemo(() => {
+    return selectedDate ? (photosByDate[selectedDate] || []) : [];
+  }, [selectedDate, photosByDate]);
+
+  const [preview, setPreview] = useState<Photo | null>(null);
+
   const [initialLoading, setInitialLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const [preview, setPreview] = useState<Photo | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   const tokenRef = useRef<string | null>(null);
   const coupleIdRef = useRef<number | null>(null);
-  
 
-  /** 토큰/커플ID 확보  */
+  /** 토큰/커플ID 확보 */
   const ensureAuthBasics = useCallback(async () => {
     if (!tokenRef.current) tokenRef.current = await AsyncStorage.getItem('token');
 
@@ -66,7 +138,9 @@ export default function GalleryTab() {
         const raw = await res.text();
         if (!res.ok) throw new Error(raw);
 
-        let data: any; try { data = JSON.parse(raw); } catch { data = {}; }
+        let data: any = {};
+        try { data = JSON.parse(raw); } catch {}
+
         const found = data?.coupleId ?? data?.couple_id ?? null;
         if (found != null && Number.isFinite(Number(found))) {
           coupleIdRef.current = Number(found);
@@ -80,74 +154,90 @@ export default function GalleryTab() {
   }, []);
 
   /** 공통 fetch (토큰 자동 헤더) */
-  const authedFetch = useCallback(async (path: string, init?: RequestInit) => {
-    await ensureAuthBasics();
+  const authedFetch = useCallback(
+    async (path: string, init?: RequestInit) => {
+      await ensureAuthBasics();
 
-    const url = `${BASE_URL}${path}`;
-    const headers: Record<string, string> = {
-      Accept: 'application/json',
-      ...(init?.headers as any),
-      ...(tokenRef.current ? { Authorization: `Bearer ${tokenRef.current}` } : {}),
-      'ngrok-skip-browser-warning': 'true',
-    };
+      const url = `${BASE_URL}${path}`;
+      const headers: Record<string, string> = {
+        Accept: 'application/json',
+        ...(init?.headers as any),
+        ...(tokenRef.current ? { Authorization: `Bearer ${tokenRef.current}` } : {}),
+        'ngrok-skip-browser-warning': 'true',
+      };
 
-    const res = await fetch(url, { ...init, headers });
-    const raw = await res.text();
-    console.log('[REQ]', init?.method || 'GET', url, 'status=', res.status, 'raw=', raw.slice(0, 200));
+      const res = await fetch(url, { ...init, headers });
+      const raw = await res.text();
+      console.log('[REQ]', init?.method || 'GET', url, 'status=', res.status, 'raw=', raw.slice(0, 200));
 
-    if (res.status === 204 || raw.trim() === '') return null;
+      if (res.status === 204 || raw.trim() === '') return null;
 
-    let data: any;
-    try { data = JSON.parse(raw); } catch { data = raw; }
+      let data: any;
+      try { data = JSON.parse(raw); } catch { data = raw; }
 
-    if (!res.ok) {
-      const msg = (data && (data.message || data.error)) || `HTTP ${res.status}`;
-      throw new Error(msg);
-    }
-    return data;
-  }, [ensureAuthBasics]);
+      if (!res.ok) {
+        const msg = (data && (data.message || data.error)) || `HTTP ${res.status}`;
+        throw new Error(msg);
+      }
+      return data;
+    },
+    [ensureAuthBasics]
+  );
 
   /** 목록 로드: GET /photo/{coupleId}/all */
-  const loadAll = useCallback(async () => {
-    setInitialLoading(true);
-    try {
-      await ensureAuthBasics();
-      const cid = coupleIdRef.current;
+  const loadAll = useCallback(
+    async (showSpinner: boolean = true) => {
+      if (showSpinner) setInitialLoading(true);
+      try {
+        await ensureAuthBasics();
+        const cid = coupleIdRef.current;
 
-      if (!cid || !Number.isFinite(cid)) {
-        throw new Error('커플 ID를 찾을 수 없어요. 회원가입/연결을 먼저 완료해 주세요.');
+        if (!cid || !Number.isFinite(cid)) {
+          throw new Error('커플 ID를 찾을 수 없어요. 회원가입/연결을 먼저 완료해 주세요.');
+        }
+
+        const path = `/photo/${encodeURIComponent(String(cid))}/all`;
+        const data = await authedFetch(path, { method: 'GET' });
+
+        const arr: any[] = Array.isArray(data)
+          ? data
+          : (data?.items || data?.data || data?.content || data?.list || data?.records || []);
+        const normalized = arr.map(normalizePhoto).filter(Boolean) as Photo[];
+
+        const grouped = groupPhotosByDate(normalized);
+
+        setAllPhotos(normalized);
+        setPhotosByDate(grouped);
+
+        const dates = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+        if (dates.length > 0) {
+          const latest = dates[0];
+          setSelectedDate(latest);
+          setPreview(grouped[latest][0] || null);
+        } else {
+          setSelectedDate(null);
+          setPreview(null);
+        }
+      } catch (e: any) {
+        console.warn('[gallery] loadAll error:', e?.message);
+        Alert.alert('로드 실패', e?.message || '사진 목록을 불러오지 못했어요.');
+        setAllPhotos([]);
+        setPhotosByDate({});
+        setSelectedDate(null);
+        setPreview(null);
+      } finally {
+        if (showSpinner) setInitialLoading(false);
       }
+    },
+    [authedFetch, ensureAuthBasics]
+  );
 
-      const path = `/photo/${encodeURIComponent(String(cid))}/all`;
-      const data = await authedFetch(path, { method: 'GET' });
-
-      const arr: any[] = Array.isArray(data)
-        ? data
-        : (data?.items || data?.data || data?.content || data?.list || data?.records || []);
-      const normalized = arr.map(normalizePhoto).filter(Boolean) as Photo[];
-      setPhotos(normalized);
-      console.log('[Gallery] normalized length=', normalized.length);
-    } catch (e: any) {
-      console.warn('[gallery] loadAll error:', e?.message);
-      Alert.alert('로드 실패', e?.message || '사진 목록을 불러오지 못했어요.');
-      setPhotos([]);
-    } finally {
-      setInitialLoading(false);
-    }
-  }, [authedFetch, ensureAuthBasics]);
-
-  useEffect(() => {
-    loadAll();
-  }, [loadAll]);
+  useEffect(() => { loadAll(true); }, [loadAll]);
 
   /** 당겨서 새로고침 */
   const onRefreshFn = useCallback(async () => {
     setRefreshing(true);
-    try {
-      await loadAll();
-    } finally {
-      setRefreshing(false);
-    }
+    try { await loadAll(false); } finally { setRefreshing(false); }
   }, [loadAll]);
 
   /** 저장(다운로드) */
@@ -159,7 +249,6 @@ export default function GalleryTab() {
         Alert.alert('안내', '웹 환경에서는 앨범 저장이 지원되지 않아요. iOS/Android에서 시도해 주세요.');
         return;
       }
-
       setSaving(true);
 
       const perm = await MediaLibrary.requestPermissionsAsync();
@@ -168,15 +257,24 @@ export default function GalleryTab() {
         return;
       }
 
-      const downloadsDir = new Directory(Paths.cache, 'downloads');
-      await downloadsDir.create();
+      const baseDir = getWritableDir();
+      const filenameRaw = p.url.split('/').pop() || `${p.id}.jpg`;
+      const filename = filenameRaw.split('?')[0];
+      const downloadDirUri = `${baseDir}downloads/`;
+      const fileUri = `${downloadDirUri}${filename}`;
 
-      const result = await File.downloadFileAsync(p.url, downloadsDir);
+      const dirInfo = await FileSystem.getInfoAsync(downloadDirUri);
+      if (!dirInfo.exists) {
+        await FileSystem.makeDirectoryAsync(downloadDirUri, { intermediates: true });
+      }
+
+      const result = await (FileSystem as any).downloadAsync(p.url, fileUri);
+      if (result.status !== 200) throw new Error(`다운로드 실패: HTTP ${result.status}`);
+
       await MediaLibrary.saveToLibraryAsync(result.uri);
-
       Alert.alert('저장 완료', '사진이 앨범에 저장되었어요.');
     } catch (e: any) {
-      console.error(e);
+      console.error('Save error:', e);
       Alert.alert('저장 실패', e?.message || '사진을 저장하지 못했어요.');
     } finally {
       setSaving(false);
@@ -184,53 +282,109 @@ export default function GalleryTab() {
   }, []);
 
   /** 삭제: DELETE /delete/{coupleId}/{photoId} */
-  const deletePhoto = useCallback(
-    (p: Photo) => {
-      if (!p?.id) return;
-      Alert.alert('삭제', '정말 삭제할까요?', [
-        { text: '취소', style: 'cancel' },
-        {
-          text: '삭제',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setDeleting(true);
-              await ensureAuthBasics();
+  const deletePhoto = useCallback((p: Photo) => {
+    if (!p?.id) return;
+    Alert.alert('삭제', '정말 삭제할까요?', [
+      { text: '취소', style: 'cancel' },
+      {
+        text: '삭제',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            setDeleting(true);
+            await ensureAuthBasics();
 
-              const cid = coupleIdRef.current;
-              if (!cid || !Number.isFinite(cid)) {
-                throw new Error('커플 ID가 없습니다.');
+            const cid = coupleIdRef.current;
+            if (!cid || !Number.isFinite(cid)) throw new Error('커플 ID가 없습니다.');
+
+            await authedFetch(`/delete/${encodeURIComponent(String(cid))}/${encodeURIComponent(p.id)}`, {
+              method: 'DELETE',
+            });
+
+            setAllPhotos((prevAll) => {
+              const nextAll = prevAll.filter((x) => x.id !== p.id);
+              const nextGrouped = groupPhotosByDate(nextAll);
+              setPhotosByDate(nextGrouped);
+
+              let nextSelected: string | null = selectedDate;
+              if (!nextSelected || !nextGrouped[nextSelected]) {
+                const dates = Object.keys(nextGrouped).sort((a, b) => b.localeCompare(a));
+                nextSelected = dates[0] || null;
               }
+              setSelectedDate(nextSelected);
+              setPreview(nextSelected ? (nextGrouped[nextSelected][0] || null) : null);
 
-              await authedFetch(`/delete/${encodeURIComponent(String(cid))}/${encodeURIComponent(p.id)}`, {
-                method: 'DELETE',
-              });
-
-              setPhotos((prev) => prev.filter((x) => x.id !== p.id));
-              setPreview(null);
-            } catch (e: any) {
-              Alert.alert('삭제 실패', e?.message || '사진을 삭제하지 못했어요.');
-            } finally {
-              setDeleting(false);
-            }
-          },
+              return nextAll;
+            });
+          } catch (e: any) {
+            Alert.alert('삭제 실패', e?.message || '사진을 삭제하지 못했어요.');
+          } finally {
+            setDeleting(false);
+          }
         },
-      ]);
-    },
-    [authedFetch, ensureAuthBasics]
-  );
+      },
+    ]);
+  }, [authedFetch, ensureAuthBasics, selectedDate]);
 
-  const numColumns = 3;
-  const renderItem = useCallback(
-    ({ item }: { item: Photo }) => (
-      <Pressable style={styles.cell} onPress={() => setPreview(item)}>
-        <Image source={{ uri: item.url }} style={styles.thumb} />
-      </Pressable>
-    ),
-    []
+  // 날짜 클릭
+  const onDayPress = useCallback((day: DateData) => {
+    const dateString = day.dateString; // YYYY-MM-DD
+    setSelectedDate(dateString);
+    const photos = photosByDate[dateString];
+    setPreview(photos && photos.length > 0 ? photos[0] : null);
+  }, [photosByDate]);
+
+  // 날짜 셀
+  const DayCell = React.useMemo(
+    () =>
+      function DayCellComp(props: any) {
+        const { date, state } = props as { date?: DateData; state?: string; marking?: any };
+        if (!date) return <View style={styles.emptyDayCell} />;
+
+        const dayText = String(date.day);
+        const dateString = date.dateString;
+        const photos = photosByDate[dateString] || [];
+        const hasPhoto = photos.length > 0;
+        const isSelected = dateString === selectedDate;
+
+        const thumbUri = hasPhoto ? photos[0].url : undefined;
+
+        const dayOfWeek = new Date(date.timestamp).getDay(); // 0=일
+        const isSunday = dayOfWeek === 0;
+
+        const textStyle = [
+          styles.dayText,
+          state === 'disabled' && styles.dayTextDisabled,
+          isSunday && styles.dayTextWeekend, // 일요일 빨간색
+          isSelected && styles.dayTextSelected,
+        ];
+
+        return (
+          <Pressable
+            style={styles.dayPressable}
+            onPress={() => onDayPress(date)}
+            disabled={state === 'disabled'}
+          >
+            {thumbUri ? (
+              <Image source={{ uri: thumbUri }} style={[styles.thumbInCalendar, isSelected && { opacity: 0.85 }]} />
+            ) : (
+              <View style={styles.emptyDayCellPlaceholder}>
+                <AppText style={textStyle}>{dayText}</AppText>
+              </View>
+            )}
+
+            {thumbUri && (
+              <View style={[styles.dayTextOverlay, isSelected && { backgroundColor: 'rgba(0,0,0,0.3)' }]}>
+                <AppText style={[styles.dayText, styles.dayTextOverlayText, isSunday && { color: '#FFF' }]}>
+                  {dayText}
+                </AppText>
+              </View>
+            )}
+          </Pressable>
+        );
+      },
+    [photosByDate, selectedDate, onDayPress]
   );
-  const keyExtractor = useCallback((item: Photo) => item.id, []);
-  const ListFooter = useMemo(() => null, []);
 
   if (initialLoading) {
     return (
@@ -241,45 +395,133 @@ export default function GalleryTab() {
     );
   }
 
-  return (
-    <View style={styles.wrap}>
-      <FlatList
-        data={photos}
-        keyExtractor={keyExtractor}
-        numColumns={numColumns}
-        renderItem={renderItem}
-        contentContainerStyle={photos.length === 0 ? styles.emptyWrap : undefined}
-        ListEmptyComponent={<AppText style={styles.emptyText}>아직 업로드된 사진이 없어요.</AppText>}
-        ListFooterComponent={ListFooter}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefreshFn} tintColor="#6198FF" />}
-      />
+  // 선택된 날짜가 없으면 오늘 날짜로
+  const initialMonth = selectedDate || format(new Date(), 'yyyy-MM-dd');
 
-      {/* 미리보기 모달 */}
-      <Modal visible={!!preview} transparent animationType="fade" onRequestClose={() => setPreview(null)}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalTopBar}>
-              <Pressable onPress={() => setPreview(null)} style={styles.iconBtn}>
-                <Ionicons name="close" size={22} color="#333" />
-              </Pressable>
-            </View>
+  const renderThumbItem = useCallback(
+    ({ item }: { item: Photo }) => (
+      <Pressable
+        style={[styles.thumbCell, preview?.id === item.id && styles.thumbCellSelected]}
+        onPress={() => setPreview(item)}
+      >
+        <Image source={{ uri: item.url }} style={styles.thumbImage} />
+      </Pressable>
+    ),
+    [preview]
+  );
+  const keyExtractor = useCallback((item: Photo) => item.id, []);
 
-            {preview && <Image source={{ uri: preview.url }} style={styles.previewImage} resizeMode="contain" />}
+  const PreviewComponent = () => {
+    if (!preview) {
+      return (
+        <View style={styles.emptyPreview}>
+          <AppText style={styles.emptyText}>선택된 날짜에 사진이 없어요.</AppText>
+        </View>
+      );
+    }
 
-            <View style={styles.actions}>
-              <Pressable style={styles.actionBtn} onPress={() => preview && savePhoto(preview)} disabled={saving}>
-                <Ionicons name="download-outline" size={22} color="#3279FF" />
-                <AppText style={styles.actionText}>{saving ? '저장 중…' : '저장'}</AppText>
-              </Pressable>
+    const uploadedDate = format(parseISO(preview.createdAt), 'yyyy. MM. dd.');
 
-              <Pressable style={styles.actionBtn} onPress={() => preview && deletePhoto(preview)} disabled={deleting}>
-                <Ionicons name="trash-outline" size={22} color="#FF4D4F" />
-                <AppText style={[styles.actionText, { color: '#FF4D4F' }]}>{deleting ? '삭제 중…' : '삭제'}</AppText>
-              </Pressable>
+    return (
+      <View style={styles.previewContainer}>
+        <View style={styles.previewHeader}>
+          <View style={styles.profileContainer}>
+            <Ionicons name="person-circle" size={30} color="#666" style={styles.profileIcon} />
+            <View>
+              <AppText style={styles.uploaderText}>애인</AppText>
+              <AppText style={styles.dateText}>📅 {uploadedDate}</AppText>
             </View>
           </View>
+
+          <View style={styles.actions}>
+            <Pressable style={styles.actionBtn} onPress={() => savePhoto(preview)} disabled={saving}>
+              <Ionicons name="download-outline" size={22} color="#3279FF" />
+              <AppText style={styles.actionText}>{saving ? '저장 중' : '저장'}</AppText>
+            </Pressable>
+
+            <Pressable style={styles.actionBtn} onPress={() => deletePhoto(preview)} disabled={deleting}>
+              <Ionicons name="trash-outline" size={22} color="#FF4D4F" />
+              <AppText style={[styles.actionText, { color: '#FF4D4F' }]}>{deleting ? '삭제 중' : '삭제'}</AppText>
+            </Pressable>
+          </View>
         </View>
-      </Modal>
+
+        <Image source={{ uri: preview.url }} style={styles.previewImage} resizeMode="cover" />
+
+        {/* 미션 사진이면 라벨 표시 */}
+        {preview.missionId ? (
+          <View style={styles.missionBox}>
+            <Ionicons name="checkmark-circle" size={20} color="#6198FF" />
+            <AppText style={styles.missionText}>
+              {preview.missionTitle || '미션 사진'}
+              {preview.missionDate ? ` · ${preview.missionDate}` : ''}
+            </AppText>
+          </View>
+        ) : null}
+
+        {selectedPhotos.length > 1 && (
+          <View style={styles.thumbnailsListContainer}>
+            <FlatList
+              data={selectedPhotos}
+              renderItem={renderThumbItem}
+              keyExtractor={keyExtractor}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.thumbnailsList}
+            />
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  return (
+    <View style={styles.wrap}>
+      <Calendar
+        style={{ minHeight: 340 }}
+        renderArrow={(direction) => (
+          <Ionicons
+            name={direction === 'left' ? 'chevron-back-outline' : 'chevron-forward-outline'}
+            size={24}
+            color="#333"
+          />
+        )}
+        monthFormat={'yyyy년 M월'}
+        headerStyle={styles.calendarHeader}
+        initialDate={initialMonth}
+        dayComponent={DayCell as any}
+        enableSwipeMonths
+        hideExtraDays={false}
+        theme={{
+          backgroundColor: '#ffffff',
+          calendarBackground: '#ffffff',
+          textSectionTitleColor: '#666',
+          selectedDayBackgroundColor: '#6198FF',
+          selectedDayTextColor: '#ffffff',
+          todayTextColor: '#6198FF',
+          dayTextColor: '#333',
+          textDisabledColor: '#ccc',
+          dotColor: '#6198FF',
+          selectedDotColor: '#ffffff',
+          arrowColor: '#333',
+          monthTextColor: '#333',
+          textMonthFontWeight: 'bold',
+          textDayHeaderFontWeight: 'bold',
+          textDayHeaderFontSize: 14,
+          textMonthFontSize: 20,
+        }}
+      />
+
+      <View style={styles.separator} />
+
+      <FlatList
+        data={[]}
+        renderItem={() => null}
+        keyExtractor={() => 'key'}
+        ListEmptyComponent={<PreviewComponent />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefreshFn} tintColor="#6198FF" />}
+        contentContainerStyle={styles.previewScrollContainer}
+      />
     </View>
   );
 }
@@ -289,27 +531,93 @@ const styles = StyleSheet.create({
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF' },
   loadingText: { marginTop: 8, color: '#666' },
 
-  emptyWrap: { flexGrow: 1, alignItems: 'center', justifyContent: 'center' },
-  emptyText: { color: '#777' },
+  emptyPreview: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
+  emptyText: { color: '#777', fontSize: 16 },
+  separator: { height: 1, backgroundColor: '#eee', marginVertical: 8 },
 
-  cell: { width: '33.333%', aspectRatio: 1, padding: 1.5 },
-  thumb: { flex: 1, borderRadius: 6, backgroundColor: '#eee' },
+  // --- 캘린더 스타일 ---
+  calendarHeader: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 6 },
 
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
-  modalCard: { width: '90%', maxHeight: '85%', backgroundColor: '#FFF', borderRadius: 16, overflow: 'hidden' },
-  modalTopBar: { padding: 8, alignItems: 'flex-end' },
-  iconBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 18, backgroundColor: '#f2f2f2' },
+  // 날짜 셀: 부모 셀 영역 100% 사용 (aspectRatio 제거)
+  dayPressable: { flex: 1, width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' },
+  emptyDayCell: { flex: 1, width: '100%', height: '100%' },
+  emptyDayCellPlaceholder: { flex: 1, justifyContent: 'center', alignItems: 'center', width: '100%' },
 
-  previewImage: { width: '100%', height: 300, backgroundColor: '#000' },
+  dayText: { fontSize: 13, textAlign: 'center' },
+  dayTextDisabled: { color: '#ccc' },
+  dayTextWeekend: { color: 'red' }, // 일요일 빨간색
+  dayTextSelected: { color: '#FFF' },
 
-  actions: {
-    flexDirection: 'row',
-    justifyContent: 'space-evenly',
-    alignItems: 'center',
-    paddingVertical: 14,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#eee',
+  thumbInCalendar: {
+    position: 'absolute',
+    top: 2, bottom: 2, left: 2, right: 2,
+    borderRadius: 8,
+    backgroundColor: '#eee',
   },
-  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 10 },
-  actionText: { color: '#3279FF', fontWeight: '600' },
+  dayTextOverlay: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    justifyContent: 'flex-start',
+    alignItems: 'flex-start',
+    padding: 4,
+    borderRadius: 8,
+  },
+  dayTextOverlayText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 14,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+  },
+
+  // --- 미리보기/상세 ---
+  previewScrollContainer: { flexGrow: 1, padding: 10, backgroundColor: '#f9f9f9' },
+  previewContainer: {
+    padding: 8,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+
+  previewHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 12 },
+  profileContainer: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  profileIcon: { color: '#6198FF' },
+  uploaderText: { fontWeight: 'bold', fontSize: 16, color: '#333' },
+  dateText: { fontSize: 12, color: '#777' },
+
+  previewImage: { width: '100%', height: SCREEN_WIDTH * 0.7, borderRadius: 10, backgroundColor: '#ccc', marginVertical: 8 },
+
+  missionBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    backgroundColor: '#e7f0ff',
+    borderRadius: 8,
+    gap: 8,
+    marginBottom: 10,
+  },
+  missionText: { fontSize: 14, color: '#333' },
+
+  actions: { flexDirection: 'row', gap: 10 },
+  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 },
+  actionText: { color: '#3279FF', fontWeight: '600', fontSize: 14 },
+
+  thumbnailsListContainer: { paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#eee' },
+  thumbnailsList: { paddingRight: 16 },
+  thumbCell: {
+    width: 60,
+    height: 60,
+    marginRight: 8,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    overflow: 'hidden',
+  },
+  thumbCellSelected: { borderColor: '#6198FF' },
+  thumbImage: { flex: 1, backgroundColor: '#eee' },
 });

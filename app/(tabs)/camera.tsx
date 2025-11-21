@@ -295,20 +295,12 @@ export default function CameraHome() {
           </View>
 
           <View style={styles.hintRow}>
-            <Pressable style={styles.arrowBtn} onPress={prevMission} disabled={!missions.length}>
-              <Ionicons name="chevron-back" size={18} color="#3279FF" />
-            </Pressable>
-
             <View style={styles.hintBubble}>
               <AppText style={styles.hintText}>
                 {missions[sel]?.description || missions[sel]?.title || '오늘의 미션을 찍어 보내주세요'}
               </AppText>
-              {/* <Ionicons name="play" size={18} color="#FFFFFF" /> <- 사용하지 않는 아이콘 제거 */}
+              <Ionicons name="play" size={18} color="#FFFFFF" /> 
             </View>
-
-            <Pressable style={styles.arrowBtn} onPress={nextMission} disabled={!missions.length}>
-              <Ionicons name="chevron-forward" size={18} color="#3279FF" />
-            </Pressable>
           </View>
         </View>
       )}
