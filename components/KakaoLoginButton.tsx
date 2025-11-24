@@ -10,13 +10,14 @@ const REST_API_KEY = process.env.EXPO_PUBLIC_KAKAO_REST_KEY || '';
 const BACKEND_CALLBACK_URL = 'https://mumuri.shop/api/auth/kakao/callback';
 const REDIRECT_URI = BACKEND_CALLBACK_URL;
 
+// Kakao authorize URL
 const KAKAO_AUTH_URL =
   'https://kauth.kakao.com/oauth/authorize'
   + `?response_type=code`
   + `&client_id=${encodeURIComponent(REST_API_KEY)}`
   + `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
 
-// ===== Backend API base =====
+// 서버 API
 const API_BASE = 'https://mumuri.shop';
 
 // 공통 헤더
@@ -26,10 +27,10 @@ async function withHeaders() {
     Accept: 'application/json',
     'ngrok-skip-browser-warning': 'true',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  } as const;
+  };
 }
 
-// 🔹 로그인 직후 서버에서 유저/커플 정보 다시 받아서 스토리지 최신화
+// 🔹 로그인 직후 /user/getuser 로 데이터를 동기화
 async function fetchAndSyncUserInfo() {
   try {
     const token = await AsyncStorage.getItem('token');
@@ -46,12 +47,13 @@ async function fetchAndSyncUserInfo() {
 
     const raw = await res.text();
     if (!res.ok) {
-      console.warn('[login] /user/getuser failed:', raw);
+      console.warn('[login] /user/getuser error', raw);
       return;
     }
 
-    let data: any;
-    try { data = JSON.parse(raw); } catch { data = {}; }
+    // 🔽 여기만 이렇게 수정
+    let data: any = {};
+    try { data = JSON.parse(raw); } catch {}
 
     const userId =
       data.userId ??
@@ -76,127 +78,104 @@ async function fetchAndSyncUserInfo() {
 
     if (kv.length) {
       await AsyncStorage.multiSet(kv);
-      console.log('[login] synced user info from /user/getuser:', { userId, coupleId, coupleCode });
+      console.log('[login] synced user info:', { userId, coupleId, coupleCode });
     }
-  } catch (e: any) {
-    console.warn('[login] fetchAndSyncUserInfo error:', e?.message);
+  } catch (err) {
+    console.warn('[login] user sync failed:', err);
   }
 }
 
-// 커플 상태 확인 
+
+// 커플 상태 확인
 async function checkCoupleAlready(): Promise<string> {
   const res = await fetch(`${API_BASE}/user/couple/already`, {
     method: 'GET',
     headers: await withHeaders(),
   });
+
   const text = await res.text();
   if (!res.ok) throw new Error(text);
-  return text; 
+
+  return text;
 }
 
-// 딥링크 쿼리 
+// 딥링크 파싱
 function parseDeepLink(url: string) {
   const parsed = Linking.parse(url);
   const q = parsed.queryParams ?? {};
-  const token = (typeof q.token === 'string' && q.token) || '';
-  const userId = (typeof q.userId === 'string' && q.userId) || '';
-  const coupleId = (typeof q.coupleId === 'string' && q.coupleId) || '';
-  const coupleCode = (typeof q.coupleCode === 'string' && q.coupleCode) || '';
-  const isNew = String(q.isNew ?? '').toLowerCase() === 'true';
-  return { token, userId, coupleId, coupleCode, isNew };
+
+  return {
+    token: typeof q.token === 'string' ? q.token : '',
+    userId: typeof q.userId === 'string' ? q.userId : '',
+    coupleId: typeof q.coupleId === 'string' ? q.coupleId : '',
+    coupleCode: typeof q.coupleCode === 'string' ? q.coupleCode : '',
+    isNew: String(q.isNew ?? '').toLowerCase() === 'true',
+  };
 }
 
 export default function KakaoLoginButton() {
   const [webViewVisible, setWebViewVisible] = useState(false);
-  const deepLinkHandled = useRef(false);
+  const isHandlingRef = useRef(false);
 
+  // 🔥 딥링크 이벤트는 여기서만 처리함 (중복 금지‼)
   useEffect(() => {
-    const sub = Linking.addEventListener('url', async ({ url }) => {
-      if (deepLinkHandled.current) return;
+    const onLink = async ({ url }: { url: string }) => {
       if (!url.startsWith('mumuri://auth')) return;
 
-      deepLinkHandled.current = true;
+      // 중복 실행 방지
+      if (isHandlingRef.current) return;
+      isHandlingRef.current = true;
+
       setWebViewVisible(false);
 
       try {
         const { token, userId, coupleId, coupleCode, isNew } = parseDeepLink(url);
         if (!token) throw new Error('로그인 토큰이 없습니다.');
 
-        // 1) 딥링크로 넘어온 값 우선 저장
+        // ① 기본 저장
         const kv: [string, string][] = [['token', token]];
         if (userId) kv.push(['userId', userId]);
         if (coupleId) kv.push(['coupleId', coupleId]);
         if (coupleCode) kv.push(['coupleCode', coupleCode]);
         await AsyncStorage.multiSet(kv);
 
-        // 2) 🔹 서버 /user/getuser 다시 호출해서 userId/coupleId/coupleCode 최신화
+        // ② 서버 값 다시 받아 최신화
         await fetchAndSyncUserInfo();
 
-        // 3) 커플 상태 확인
+        // ③ 신규 회원이면 signup으로
+        if (isNew) {
+          router.replace('/signup');
+          return;
+        }
+
+        // ④ 커플 여부 확인
         let status = '';
         try {
-          status = await checkCoupleAlready(); 
-        } catch (e) {
+          status = await checkCoupleAlready();
+        } catch {
           router.replace('/signup');
           return;
         }
 
         if (/COUPLED|OK|DONE/i.test(status)) {
-          router.replace('/(tabs)');
+          router.replace('/(tabs)/camera');
         } else {
           router.replace('/signup');
         }
-      } catch (e: any) {
-        console.warn('DeepLink handle error:', e?.message);
-        Alert.alert('로그인 실패', e?.message ?? '다시 시도해주세요.');
+      } catch (err: any) {
+        Alert.alert('로그인 실패', err?.message ?? '다시 시도해주세요.');
       } finally {
-        setTimeout(() => { deepLinkHandled.current = false; }, 500);
+        setTimeout(() => {
+          isHandlingRef.current = false;
+        }, 700);
       }
-    });
+    };
 
-    (async () => {
-      const initialUrl = await Linking.getInitialURL();
-      if (initialUrl && initialUrl.startsWith('mumuri://auth') && !deepLinkHandled.current) {
-        deepLinkHandled.current = true;
-        setWebViewVisible(false);
-        try {
-          const { token, userId, coupleId, coupleCode, isNew } = parseDeepLink(initialUrl);
-          if (!token) throw new Error('로그인 토큰이 없습니다.');
+    const sub = Linking.addEventListener('url', onLink);
 
-          const kv: [string, string][] = [['token', token]];
-          if (userId) kv.push(['userId', userId]);
-          if (coupleId) kv.push(['coupleId', coupleId]);
-          if (coupleCode) kv.push(['coupleCode', coupleCode]);
-          await AsyncStorage.multiSet(kv);
-
-          // 🔹 초기 URL 케이스에서도 마찬가지로 서버 값으로 동기화
-          await fetchAndSyncUserInfo();
-
-          if (isNew) {
-            router.replace('/signup');
-            return;
-          }
-          let status = '';
-          try {
-            status = await checkCoupleAlready();
-          } catch {
-            router.replace('/signup');
-            return;
-          }
-          if (/COUPLED|OK|DONE/i.test(status)) {
-            router.replace('/(tabs)');
-          } else {
-            router.replace('/signup');
-          }
-        } catch (e: any) {
-          console.warn('InitialURL handle error:', e?.message);
-        } finally {
-          setTimeout(() => { deepLinkHandled.current = false; }, 500);
-        }
-      }
-    })();
-
-    return () => sub.remove();
+    return () => {
+      sub.remove();
+    };
   }, []);
 
   const startLogin = () => {
@@ -210,10 +189,17 @@ export default function KakaoLoginButton() {
   return (
     <>
       <Pressable onPress={startLogin}>
-        <Image source={require('../assets/images/kakao_login.png')} style={styles.buttonImage} />
+        <Image
+          source={require('../assets/images/kakao_login.png')}
+          style={styles.buttonImage}
+        />
       </Pressable>
 
-      <Modal visible={webViewVisible} animationType="slide" onRequestClose={() => setWebViewVisible(false)}>
+      <Modal
+        visible={webViewVisible}
+        animationType="slide"
+        onRequestClose={() => setWebViewVisible(false)}
+      >
         <View style={styles.webViewContainer}>
           <WebView
             style={styles.webView}
@@ -238,7 +224,16 @@ export default function KakaoLoginButton() {
 }
 
 const styles = StyleSheet.create({
-  buttonImage: { width: 300, resizeMode: 'contain' },
-  webViewContainer: { flex: 1, paddingTop: 40, backgroundColor: 'white' },
-  webView: { flex: 1 },
+  buttonImage: {
+    width: 300,
+    resizeMode: 'contain',
+  },
+  webViewContainer: {
+    flex: 1,
+    paddingTop: 40,
+    backgroundColor: 'white',
+  },
+  webView: {
+    flex: 1,
+  },
 });
