@@ -1,4 +1,4 @@
-// app/(tabs)/gallery.tsx  (파일명은 사용 중인 경로에 맞게)
+// app/(tabs)/gallery.tsx
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { format, parseISO } from 'date-fns';
@@ -42,7 +42,7 @@ function getWritableDir(): string {
 /** ================================================== */
 
 /** 서버에서 내려주는 사진 + (옵션) 미션 메타 확장 타입 */
-type Photo = {
+export type Photo = {
   id: string;
   url: string;                // presigned 또는 직접 접근 가능한 URL
   uploadedBy?: string;
@@ -57,20 +57,15 @@ type PhotosByDate = Record<string, Photo[]>;
 /** 서버 응답 → 클라이언트 표준화 */
 function normalizePhoto(raw: any): Photo | null {
   if (!raw || typeof raw !== 'object') return null;
-
   const id = raw.id ?? raw.photo_id ?? raw.photoId ?? raw.uuid;
-  const url = raw.presignedUrl ?? raw.url; // 서버가 presigned를 주면 그대로 사용
+  const url = raw.presignedUrl ?? raw.url;
   const createdAt = raw.createdAt ?? raw.created_at;
-
   if (id == null || !url || !createdAt) return null;
-
   return {
     id: String(id),
     url: String(url),
     uploadedBy: raw.uploadedBy != null ? String(raw.uploadedBy) : undefined,
     createdAt: String(createdAt),
-
-    // 👉 서버가 아래 필드를 내려주면 미션 UI가 자동으로 살아남
     missionId: raw.missionId != null ? Number(raw.missionId) : null,
     missionTitle: raw.missionTitle ?? null,
     missionDate: raw.missionDate ?? null,
@@ -82,7 +77,6 @@ const groupPhotosByDate = (photos: Photo[]): PhotosByDate => {
   const grouped: PhotosByDate = {};
   photos.forEach((photo) => {
     try {
-      // createdAt은 ISO8601 이어야 정확 (서버에 'Z' 붙이는 걸 권장)
       const date = format(parseISO(photo.createdAt), 'yyyy-MM-dd');
       if (!grouped[date]) grouped[date] = [];
       grouped[date].push(photo);
@@ -93,27 +87,171 @@ const groupPhotosByDate = (photos: Photo[]): PhotosByDate => {
   return grouped;
 };
 
+/** ===== 캘린더 Day 셀(모듈 스코프, 훅 사용 금지) ===== */
+type DayCellProps = {
+  date?: DateData;
+  state?: string;
+  selectedDate: string | null;
+  photosByDate: PhotosByDate;
+  onDayPress: (day: DateData) => void;
+};
+
+function DayCell({ date, state, selectedDate, photosByDate, onDayPress }: DayCellProps) {
+  if (!date) return <View style={styles.emptyDayCell} />;
+
+  const dayText = String(date.day);
+  const dateString = date.dateString;
+  const photos = photosByDate[dateString] || [];
+  const hasPhoto = photos.length > 0;
+  const isSelected = dateString === selectedDate;
+  const thumbUri = hasPhoto ? photos[0].url : undefined;
+
+  const dayOfWeek = new Date(date.timestamp).getDay(); // 0=일
+  const isSunday = dayOfWeek === 0;
+
+  return (
+    <Pressable
+      style={styles.dayPressable}
+      onPress={() => onDayPress(date)}
+      disabled={state === 'disabled'}
+    >
+      {thumbUri ? (
+        <>
+          <Image
+            source={{ uri: thumbUri }}
+            style={[styles.thumbInCalendar, isSelected && { opacity: 0.85 }]}
+          />
+          <View style={[styles.dayTextOverlay, isSelected && { backgroundColor: 'rgba(0,0,0,0.3)' }]}>
+            <AppText
+              style={[
+                styles.dayText,
+                styles.dayTextOverlayText,
+                isSunday && { color: '#FFF' },
+              ]}
+            >
+              {dayText}
+            </AppText>
+          </View>
+        </>
+      ) : (
+        <View style={styles.emptyDayCellPlaceholder}>
+          <AppText
+            style={[
+              styles.dayText,
+              state === 'disabled' && styles.dayTextDisabled,
+              isSunday && styles.dayTextWeekend,
+              isSelected && styles.dayTextSelected,
+            ]}
+          >
+            {dayText}
+          </AppText>
+        </View>
+      )}
+    </Pressable>
+  );
+}
+
+/** ===== 미리보기 카드(모듈 스코프, 훅 사용 금지) ===== */
+type PreviewProps = {
+  preview: Photo | null;
+  selectedPhotos: Photo[];
+  saving: boolean;
+  deleting: boolean;
+  onSave: (p: Photo) => void;
+  onDelete: (p: Photo) => void;
+  onPick: (p: Photo) => void;
+};
+
+function PreviewCard({ preview, selectedPhotos, saving, deleting, onSave, onDelete, onPick }: PreviewProps) {
+  if (!preview) {
+    return (
+      <View style={styles.emptyPreview}>
+        <AppText style={styles.emptyText}>선택된 날짜에 사진이 없어요.</AppText>
+      </View>
+    );
+  }
+  const uploadedDate = format(parseISO(preview.createdAt), 'yyyy. MM. dd.');
+
+  return (
+    <View style={styles.previewContainer}>
+      <View style={styles.previewHeader}>
+        <View style={styles.profileContainer}>
+          <Ionicons name="person-circle" size={30} color="#666" style={styles.profileIcon} />
+          <View>
+            <AppText style={styles.uploaderText}>애인</AppText>
+            <AppText style={styles.dateText}>📅 {uploadedDate}</AppText>
+          </View>
+        </View>
+
+        <View style={styles.actions}>
+          <Pressable style={styles.actionBtn} onPress={() => onSave(preview)} disabled={saving}>
+            <Ionicons name="download-outline" size={22} color="#3279FF" />
+            <AppText style={styles.actionText}>{saving ? '저장 중' : '저장'}</AppText>
+          </Pressable>
+
+          <Pressable style={styles.actionBtn} onPress={() => onDelete(preview)} disabled={deleting}>
+            <Ionicons name="trash-outline" size={22} color="#FF4D4F" />
+            <AppText style={[styles.actionText, { color: '#FF4D4F' }]}>{deleting ? '삭제 중' : '삭제'}</AppText>
+          </Pressable>
+        </View>
+      </View>
+
+      <Image source={{ uri: preview.url }} style={styles.previewImage} resizeMode="cover" />
+
+      {preview.missionId ? (
+        <View style={styles.missionBox}>
+          <Ionicons name="checkmark-circle" size={20} color="#6198FF" />
+          <AppText style={styles.missionText}>
+            {preview.missionTitle || '미션 사진'}
+            {preview.missionDate ? ` · ${preview.missionDate}` : ''}
+          </AppText>
+        </View>
+      ) : null}
+
+      {selectedPhotos.length > 1 && (
+        <View style={styles.thumbnailsListContainer}>
+          <FlatList
+            data={selectedPhotos}
+            renderItem={({ item }) => (
+              <Pressable
+                style={[styles.thumbCell, preview?.id === item.id && styles.thumbCellSelected]}
+                onPress={() => onPick(item)}
+              >
+                <Image source={{ uri: item.url }} style={styles.thumbImage} />
+              </Pressable>
+            )}
+            keyExtractor={(item) => item.id}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.thumbnailsList}
+          />
+        </View>
+      )}
+    </View>
+  );
+}
+
+/** ===================== 메인 탭 ===================== */
 export default function GalleryTab() {
+  // ── 훅 선언(항상 같은 순서/개수) ────────────────────
   const [allPhotos, setAllPhotos] = useState<Photo[]>([]);
   const [photosByDate, setPhotosByDate] = useState<PhotosByDate>({});
-
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const selectedPhotos = useMemo(() => {
-    return selectedDate ? (photosByDate[selectedDate] || []) : [];
-  }, [selectedDate, photosByDate]);
-
   const [preview, setPreview] = useState<Photo | null>(null);
 
   const [initialLoading, setInitialLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   const tokenRef = useRef<string | null>(null);
   const coupleIdRef = useRef<number | null>(null);
 
-  /** 토큰/커플ID 확보 */
+  const selectedPhotos = useMemo(() => {
+    return selectedDate ? (photosByDate[selectedDate] || []) : [];
+  }, [selectedDate, photosByDate]);
+
+  // ── 인증 기초 확보 ─────────────────────────────────
   const ensureAuthBasics = useCallback(async () => {
     if (!tokenRef.current) tokenRef.current = await AsyncStorage.getItem('token');
 
@@ -137,10 +275,8 @@ export default function GalleryTab() {
         });
         const raw = await res.text();
         if (!res.ok) throw new Error(raw);
-
         let data: any = {};
         try { data = JSON.parse(raw); } catch {}
-
         const found = data?.coupleId ?? data?.couple_id ?? null;
         if (found != null && Number.isFinite(Number(found))) {
           coupleIdRef.current = Number(found);
@@ -153,11 +289,10 @@ export default function GalleryTab() {
     }
   }, []);
 
-  /** 공통 fetch (토큰 자동 헤더) */
+  // ── 공통 fetch ────────────────────────────────────
   const authedFetch = useCallback(
     async (path: string, init?: RequestInit) => {
       await ensureAuthBasics();
-
       const url = `${BASE_URL}${path}`;
       const headers: Record<string, string> = {
         Accept: 'application/json',
@@ -165,16 +300,12 @@ export default function GalleryTab() {
         ...(tokenRef.current ? { Authorization: `Bearer ${tokenRef.current}` } : {}),
         'ngrok-skip-browser-warning': 'true',
       };
-
       const res = await fetch(url, { ...init, headers });
       const raw = await res.text();
       console.log('[REQ]', init?.method || 'GET', url, 'status=', res.status, 'raw=', raw.slice(0, 200));
-
       if (res.status === 204 || raw.trim() === '') return null;
-
       let data: any;
       try { data = JSON.parse(raw); } catch { data = raw; }
-
       if (!res.ok) {
         const msg = (data && (data.message || data.error)) || `HTTP ${res.status}`;
         throw new Error(msg);
@@ -184,26 +315,22 @@ export default function GalleryTab() {
     [ensureAuthBasics]
   );
 
-  /** 목록 로드: GET /photo/{coupleId}/all */
+  // ── 목록 로드 ─────────────────────────────────────
   const loadAll = useCallback(
     async (showSpinner: boolean = true) => {
       if (showSpinner) setInitialLoading(true);
       try {
         await ensureAuthBasics();
         const cid = coupleIdRef.current;
-
         if (!cid || !Number.isFinite(cid)) {
           throw new Error('커플 ID를 찾을 수 없어요. 회원가입/연결을 먼저 완료해 주세요.');
         }
-
         const path = `/photo/${encodeURIComponent(String(cid))}/all`;
         const data = await authedFetch(path, { method: 'GET' });
-
         const arr: any[] = Array.isArray(data)
           ? data
           : (data?.items || data?.data || data?.content || data?.list || data?.records || []);
         const normalized = arr.map(normalizePhoto).filter(Boolean) as Photo[];
-
         const grouped = groupPhotosByDate(normalized);
 
         setAllPhotos(normalized);
@@ -234,29 +361,26 @@ export default function GalleryTab() {
 
   useEffect(() => { loadAll(true); }, [loadAll]);
 
-  /** 당겨서 새로고침 */
+  // ── 당겨서 새로고침 ───────────────────────────────
   const onRefreshFn = useCallback(async () => {
     setRefreshing(true);
     try { await loadAll(false); } finally { setRefreshing(false); }
   }, [loadAll]);
 
-  /** 저장(다운로드) */
+  // ── 저장(다운로드) ────────────────────────────────
   const savePhoto = useCallback(async (p: Photo) => {
     if (!p?.url) return;
-
     try {
       if (Platform.OS === 'web') {
         Alert.alert('안내', '웹 환경에서는 앨범 저장이 지원되지 않아요. iOS/Android에서 시도해 주세요.');
         return;
       }
       setSaving(true);
-
       const perm = await MediaLibrary.requestPermissionsAsync();
       if (!perm.granted) {
         Alert.alert('권한 필요', '사진을 앨범에 저장하려면 권한이 필요합니다.');
         return;
       }
-
       const baseDir = getWritableDir();
       const filenameRaw = p.url.split('/').pop() || `${p.id}.jpg`;
       const filename = filenameRaw.split('?')[0];
@@ -267,10 +391,8 @@ export default function GalleryTab() {
       if (!dirInfo.exists) {
         await FileSystem.makeDirectoryAsync(downloadDirUri, { intermediates: true });
       }
-
       const result = await (FileSystem as any).downloadAsync(p.url, fileUri);
       if (result.status !== 200) throw new Error(`다운로드 실패: HTTP ${result.status}`);
-
       await MediaLibrary.saveToLibraryAsync(result.uri);
       Alert.alert('저장 완료', '사진이 앨범에 저장되었어요.');
     } catch (e: any) {
@@ -281,7 +403,7 @@ export default function GalleryTab() {
     }
   }, []);
 
-  /** 삭제: DELETE /delete/{coupleId}/{photoId} */
+  // ── 삭제 ─────────────────────────────────────────
   const deletePhoto = useCallback((p: Photo) => {
     if (!p?.id) return;
     Alert.alert('삭제', '정말 삭제할까요?', [
@@ -293,10 +415,8 @@ export default function GalleryTab() {
           try {
             setDeleting(true);
             await ensureAuthBasics();
-
             const cid = coupleIdRef.current;
             if (!cid || !Number.isFinite(cid)) throw new Error('커플 ID가 없습니다.');
-
             await authedFetch(`/delete/${encodeURIComponent(String(cid))}/${encodeURIComponent(p.id)}`, {
               method: 'DELETE',
             });
@@ -313,7 +433,6 @@ export default function GalleryTab() {
               }
               setSelectedDate(nextSelected);
               setPreview(nextSelected ? (nextGrouped[nextSelected][0] || null) : null);
-
               return nextAll;
             });
           } catch (e: any) {
@@ -326,66 +445,15 @@ export default function GalleryTab() {
     ]);
   }, [authedFetch, ensureAuthBasics, selectedDate]);
 
-  // 날짜 클릭
+  // ── 날짜 클릭 ────────────────────────────────────
   const onDayPress = useCallback((day: DateData) => {
-    const dateString = day.dateString; // YYYY-MM-DD
+    const dateString = day.dateString;
     setSelectedDate(dateString);
     const photos = photosByDate[dateString];
     setPreview(photos && photos.length > 0 ? photos[0] : null);
   }, [photosByDate]);
 
-  // 날짜 셀
-  const DayCell = React.useMemo(
-    () =>
-      function DayCellComp(props: any) {
-        const { date, state } = props as { date?: DateData; state?: string; marking?: any };
-        if (!date) return <View style={styles.emptyDayCell} />;
-
-        const dayText = String(date.day);
-        const dateString = date.dateString;
-        const photos = photosByDate[dateString] || [];
-        const hasPhoto = photos.length > 0;
-        const isSelected = dateString === selectedDate;
-
-        const thumbUri = hasPhoto ? photos[0].url : undefined;
-
-        const dayOfWeek = new Date(date.timestamp).getDay(); // 0=일
-        const isSunday = dayOfWeek === 0;
-
-        const textStyle = [
-          styles.dayText,
-          state === 'disabled' && styles.dayTextDisabled,
-          isSunday && styles.dayTextWeekend, // 일요일 빨간색
-          isSelected && styles.dayTextSelected,
-        ];
-
-        return (
-          <Pressable
-            style={styles.dayPressable}
-            onPress={() => onDayPress(date)}
-            disabled={state === 'disabled'}
-          >
-            {thumbUri ? (
-              <Image source={{ uri: thumbUri }} style={[styles.thumbInCalendar, isSelected && { opacity: 0.85 }]} />
-            ) : (
-              <View style={styles.emptyDayCellPlaceholder}>
-                <AppText style={textStyle}>{dayText}</AppText>
-              </View>
-            )}
-
-            {thumbUri && (
-              <View style={[styles.dayTextOverlay, isSelected && { backgroundColor: 'rgba(0,0,0,0.3)' }]}>
-                <AppText style={[styles.dayText, styles.dayTextOverlayText, isSunday && { color: '#FFF' }]}>
-                  {dayText}
-                </AppText>
-              </View>
-            )}
-          </Pressable>
-        );
-      },
-    [photosByDate, selectedDate, onDayPress]
-  );
-
+  // ── 로딩 화면 ────────────────────────────────────
   if (initialLoading) {
     return (
       <View style={styles.loadingWrap}>
@@ -395,86 +463,9 @@ export default function GalleryTab() {
     );
   }
 
-  // 선택된 날짜가 없으면 오늘 날짜로
   const initialMonth = selectedDate || format(new Date(), 'yyyy-MM-dd');
 
-  const renderThumbItem = useCallback(
-    ({ item }: { item: Photo }) => (
-      <Pressable
-        style={[styles.thumbCell, preview?.id === item.id && styles.thumbCellSelected]}
-        onPress={() => setPreview(item)}
-      >
-        <Image source={{ uri: item.url }} style={styles.thumbImage} />
-      </Pressable>
-    ),
-    [preview]
-  );
-  const keyExtractor = useCallback((item: Photo) => item.id, []);
-
-  const PreviewComponent = () => {
-    if (!preview) {
-      return (
-        <View style={styles.emptyPreview}>
-          <AppText style={styles.emptyText}>선택된 날짜에 사진이 없어요.</AppText>
-        </View>
-      );
-    }
-
-    const uploadedDate = format(parseISO(preview.createdAt), 'yyyy. MM. dd.');
-
-    return (
-      <View style={styles.previewContainer}>
-        <View style={styles.previewHeader}>
-          <View style={styles.profileContainer}>
-            <Ionicons name="person-circle" size={30} color="#666" style={styles.profileIcon} />
-            <View>
-              <AppText style={styles.uploaderText}>애인</AppText>
-              <AppText style={styles.dateText}>📅 {uploadedDate}</AppText>
-            </View>
-          </View>
-
-          <View style={styles.actions}>
-            <Pressable style={styles.actionBtn} onPress={() => savePhoto(preview)} disabled={saving}>
-              <Ionicons name="download-outline" size={22} color="#3279FF" />
-              <AppText style={styles.actionText}>{saving ? '저장 중' : '저장'}</AppText>
-            </Pressable>
-
-            <Pressable style={styles.actionBtn} onPress={() => deletePhoto(preview)} disabled={deleting}>
-              <Ionicons name="trash-outline" size={22} color="#FF4D4F" />
-              <AppText style={[styles.actionText, { color: '#FF4D4F' }]}>{deleting ? '삭제 중' : '삭제'}</AppText>
-            </Pressable>
-          </View>
-        </View>
-
-        <Image source={{ uri: preview.url }} style={styles.previewImage} resizeMode="cover" />
-
-        {/* 미션 사진이면 라벨 표시 */}
-        {preview.missionId ? (
-          <View style={styles.missionBox}>
-            <Ionicons name="checkmark-circle" size={20} color="#6198FF" />
-            <AppText style={styles.missionText}>
-              {preview.missionTitle || '미션 사진'}
-              {preview.missionDate ? ` · ${preview.missionDate}` : ''}
-            </AppText>
-          </View>
-        ) : null}
-
-        {selectedPhotos.length > 1 && (
-          <View style={styles.thumbnailsListContainer}>
-            <FlatList
-              data={selectedPhotos}
-              renderItem={renderThumbItem}
-              keyExtractor={keyExtractor}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.thumbnailsList}
-            />
-          </View>
-        )}
-      </View>
-    );
-  };
-
+  // ── 렌더 ─────────────────────────────────────────
   return (
     <View style={styles.wrap}>
       <Calendar
@@ -489,7 +480,14 @@ export default function GalleryTab() {
         monthFormat={'yyyy년 M월'}
         headerStyle={styles.calendarHeader}
         initialDate={initialMonth}
-        dayComponent={DayCell as any}
+        dayComponent={(p: any) => (
+          <DayCell
+            {...p}
+            selectedDate={selectedDate}
+            photosByDate={photosByDate}
+            onDayPress={onDayPress}
+          />
+        )}
         enableSwipeMonths
         hideExtraDays={false}
         theme={{
@@ -518,7 +516,17 @@ export default function GalleryTab() {
         data={[]}
         renderItem={() => null}
         keyExtractor={() => 'key'}
-        ListEmptyComponent={<PreviewComponent />}
+        ListEmptyComponent={
+          <PreviewCard
+            preview={preview}
+            selectedPhotos={selectedPhotos}
+            saving={saving}
+            deleting={deleting}
+            onSave={savePhoto}
+            onDelete={deletePhoto}
+            onPick={setPreview}
+          />
+        }
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefreshFn} tintColor="#6198FF" />}
         contentContainerStyle={styles.previewScrollContainer}
       />
@@ -538,14 +546,14 @@ const styles = StyleSheet.create({
   // --- 캘린더 스타일 ---
   calendarHeader: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 6 },
 
-  // 날짜 셀: 부모 셀 영역 100% 사용 (aspectRatio 제거)
+  // 날짜 셀: 부모 셀 영역 100% 사용
   dayPressable: { flex: 1, width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' },
   emptyDayCell: { flex: 1, width: '100%', height: '100%' },
   emptyDayCellPlaceholder: { flex: 1, justifyContent: 'center', alignItems: 'center', width: '100%' },
 
   dayText: { fontSize: 13, textAlign: 'center' },
   dayTextDisabled: { color: '#ccc' },
-  dayTextWeekend: { color: 'red' }, // 일요일 빨간색
+  dayTextWeekend: { color: 'red' },
   dayTextSelected: { color: '#FFF' },
 
   thumbInCalendar: {
