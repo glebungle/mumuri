@@ -67,18 +67,11 @@ async function presignIfNeeded(rawUrl?: string | null) {
     { path: string; method: 'GET' | 'POST'; body?: any }
   > = [
     // --- 미션 전용 경로 후보 ---
-    { path: `/api/couples/missions/presign`, method: 'GET' },
-    { path: `/api/couples/missions/presign`, method: 'POST', body: { url: rawUrl } },
-    { path: `/api/couples/missions/photo/presign`, method: 'GET' },
-    { path: `/api/couples/missions/photo/presign`, method: 'POST', body: { url: rawUrl } },
-
-    // --- 일반 포토 presign 후보 ---
-    { path: `/photo/presign?url=${encodeURIComponent(rawUrl)}`, method: 'GET' },
-    { path: `/photo/presign`, method: 'POST', body: { url: rawUrl } },
+    { path: `/api/couples/missions/today`, method: 'GET' },
 
     // --- 백엔드에서 통합 presign을 쓰는 경우 대비 ---
-    { path: `/api/presign?url=${encodeURIComponent(rawUrl)}`, method: 'GET' },
-    { path: `/api/presign`, method: 'POST', body: { url: rawUrl } },
+    // { path: `/api/presign?url=${encodeURIComponent(rawUrl)}`, method: 'GET' },
+    // { path: `/api/presign`, method: 'POST', body: { url: rawUrl } },
   ];
 
   for (const c of candidates) {

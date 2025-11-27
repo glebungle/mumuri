@@ -17,6 +17,7 @@ const SEND_CHAT_IMAGE_AFTER_COMPLETE = true;
 // STOMP로 presignedUrl을 그대로 보낼지(권장: true)
 const USE_PRESIGNED_FOR_STOMP = true;
 
+// UUID
 function uuid4() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
     const r = (Math.random() * 16) | 0, v = c === 'x' ? r : (r & 0x3) | 0x8;
@@ -24,10 +25,29 @@ function uuid4() {
   });
 }
 
-// presignedUrl에서 ? 이하 제거 → raw 키 URL (백엔드가 presign해서 쓰고 싶을 때)
+// presignedUrl에서 ? 이하 제거 → 쿼리 없는 전체 URL
 function toRawUrl(url?: string | null) {
   if (!url) return null;
   try { return url.split('?')[0] || url; } catch { return url; }
+}
+
+// presigned/full URL에서 "S3 object key"만 추출 (예: couples/15/-1/xxx.jpg)
+function extractS3KeyFromUrl(url?: string | null) {
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    // "/couples/15/..." → "couples/15/..."
+    return u.pathname.replace(/^\/+/, '');
+  } catch {
+    // new URL 실패 시 문자열로 fallback
+    const marker = '.amazonaws.com/';
+    const idx = url.indexOf(marker);
+    if (idx >= 0) {
+      return url.substring(idx + marker.length);
+    }
+    // 그래도 못 뽑으면 원본 반환(최악의 경우)
+    return url;
+  }
 }
 
 // STOMP로 채팅방에 이미지 메시지 1회 발사
@@ -44,9 +64,6 @@ async function sendChatImageViaStomp({
         onReadUpdate: (_u: ChatReadUpdate) => {},
         onConnected: () => {
           const now = Date.now();
-          console.log('[PUB] /app/chat.send', JSON.stringify({
-            roomId, senderId, imageUrl, message: null, clientMsgId: uuid4(), createdAt: now
-          }));
           client.sendMessage(roomId, senderId, {
             message: null,
             imageUrl,
@@ -55,17 +72,20 @@ async function sendChatImageViaStomp({
           });
           setTimeout(() => { client.deactivate(); resolve(true); }, 300);
         },
-        onError: (e) => { console.warn('[STOMP ERROR]', (e as any)?.message); try { client.deactivate(); } finally { resolve(false); } },
+        onError: (e) => {
+          console.warn('[STOMP ERROR]', (e as any)?.message);
+          try { client.deactivate(); } finally { resolve(false); }
+        },
       },
       connectTimeoutMs: 5000,
     });
 
     client.activate();
-    // 연결 실패/무응답 대비 타임아웃
     setTimeout(() => { try { client.deactivate(); } finally { resolve(false); } }, 7000);
   });
 }
 
+// ===== 메인 컴포넌트 =====
 export default function ShareScreen() {
   const { uri, missionId, missionTitle, missionDescription } =
     useLocalSearchParams<{
@@ -84,6 +104,7 @@ export default function ShareScreen() {
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
 
+  // /user/getuser 로 보강
   const fetchMeAndStore = useCallback(async () => {
     const t = await AsyncStorage.getItem('token');
     if (!t) return;
@@ -158,6 +179,7 @@ export default function ShareScreen() {
     return { uid, cid };
   }, [token, userId, coupleId, fetchMeAndStore]);
 
+  // ===== 앨범 저장 =====
   const saveToAlbum = async () => {
     if (!photoUri || saving) return;
     try {
@@ -169,7 +191,6 @@ export default function ShareScreen() {
         return;
       }
 
-      // 편집본 생성(리사이즈)
       let toSaveUri = photoUri;
       try {
         const manipulated = await ImageManipulator.manipulateAsync(
@@ -190,13 +211,13 @@ export default function ShareScreen() {
     }
   };
 
+  // ===== 전송 =====
   const sendToPartner = async () => {
     if (!photoUri || sending) return;
     if (!token) { Alert.alert('오류','로그인 정보가 없습니다. 다시 로그인해 주세요.'); return; }
 
     setSending(true);
     try {
-      // 식별자 확보
       const { uid, cid } = await ensureIdsReady();
 
       // 1) 리사이즈 (업로드/저장 공통 소스)
@@ -212,68 +233,122 @@ export default function ShareScreen() {
         console.warn('[UPLOAD] resize failed, use original uri');
       }
 
-      // ====== 분기 시작 ======
+      // --- 공통: 사진을 먼저 /photo/{coupleId} 에 업로드해서 presignedUrl 확보 ---
+      const uploadUrl = `${BASE_URL}/photo/${encodeURIComponent(String(cid))}`;
+      console.log('[UPLOAD] url =', uploadUrl);
+
+      const uploadForm = new FormData();
+      uploadForm.append('file', {
+        uri: uploadUri,
+        name: `photo_${Date.now()}.jpg`,
+        type: 'image/jpeg',
+      } as any);
+
+      const upRes = await fetch(uploadUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+          'ngrok-skip-browser-warning': 'true',
+        },
+        body: uploadForm,
+      });
+      const upRaw = await upRes.text();
+      console.log('[UPLOAD] status =', upRes.status, 'raw body =', upRaw);
+      if (upRes.status === 413) {
+        Alert.alert('사진이 너무 커요','사진 용량 제한을 넘었어요.');
+        return;
+      }
+      if (!upRes.ok) throw new Error(`HTTP ${upRes.status}`);
+
+      // 2) 최신 presignedUrl 조회
+      const listUrl = `${BASE_URL}/photo/${encodeURIComponent(String(cid))}/all`;
+      const listRes = await fetch(listUrl, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+          'ngrok-skip-browser-warning': 'true',
+        },
+      });
+      const listRaw = await listRes.text();
+      console.log('[PHOTO LIST] status =', listRes.status, 'raw =', listRaw.slice(0, 200));
+      if (!listRes.ok) throw new Error(`photo list HTTP ${listRes.status}`);
+
+      let listJson: any[] = [];
+      try { listJson = JSON.parse(listRaw); } catch {}
+
+      // 미션이 있는 경우: 해당 미션 경로만 필터, 없으면 그냥 최신
+      let photoUrlPresigned: string | null = null;
+      const midNum = missionId ? Number(missionId) : null;
+
+      if (midNum != null && Number.isFinite(midNum)) {
+        const missionItems = listJson.filter(x =>
+          typeof x.presignedUrl === 'string' &&
+          x.presignedUrl.includes(`/${cid}/${midNum}/`)
+        );
+        if (missionItems.length > 0) {
+          let latest = missionItems[0];
+          for (const it of missionItems) { if (it?.id > latest?.id) latest = it; }
+          photoUrlPresigned = latest?.presignedUrl ?? null;
+        }
+      }
+
+      // 필터 결과가 없거나 미션이 없는 경우 → id 가장 큰 항목
+      if (!photoUrlPresigned) {
+        if (listJson.length > 0) {
+          let latest = listJson[0];
+          for (const it of listJson) { if (it?.id > latest?.id) latest = it; }
+          photoUrlPresigned =
+            typeof latest?.presignedUrl === 'string' ? latest.presignedUrl : null;
+        }
+      }
+
+      if (!photoUrlPresigned) {
+        throw new Error('presignedUrl을 찾을 수 없습니다.');
+      }
+
+      // ---- 여기서부터 미션 여부에 따라 분기 ----
       if (missionId) {
-        // 🔸 미션이 연결된 경우: 일반 갤러리 업로드(/photo/{cid})는 "하지 않는다" → 중복 제거
-        const midNum = Number(missionId);
+        // 🔸 미션 완료 API는 application/json {"file":"string"} 형식
+        const mid = Number(missionId);
+        const completeUrl = `${BASE_URL}/api/couples/missions/${mid}/complete-v2`;
 
-        // 2) 미션 완료 업로드만 수행
-        const completeUrl = `${BASE_URL}/api/couples/missions/${midNum}/complete`;
-        const completeForm = new FormData();
-        completeForm.append('file', { uri: uploadUri, name: `mission_${Date.now()}.jpg`, type: 'image/jpeg' } as any);
+        // 서버가 S3 Key를 기대한다고 보고, URL에서 key만 추출해서 보냄
+        const s3Key = extractS3KeyFromUrl(photoUrlPresigned) || photoUrlPresigned;
+        const bodyJson = JSON.stringify({ file: s3Key });
 
-        console.log('[MISSION COMPLETE] request →', completeUrl);
+        console.log('[MISSION COMPLETE] request →', completeUrl, bodyJson);
+
         const compRes = await fetch(completeUrl, {
           method: 'POST',
-          headers: { Authorization: `Bearer ${token}`, 'ngrok-skip-browser-warning': 'true' },
-          body: completeForm
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            'ngrok-skip-browser-warning': 'true',
+          },
+          body: bodyJson,
         });
         const compText = await compRes.text();
         console.log('[MISSION COMPLETE] response ←', compRes.status, compText);
         if (!compRes.ok) throw new Error(`mission complete ${compRes.status}: ${compText}`);
 
-        // 3) 채팅에 보낼 이미지 presignedUrl 확보
-        //    (백엔드가 응답으로 URL/키를 준다면 그걸 우선 사용)
-        let photoUrlPresigned: string | undefined;
-        try {
-          const compJson = JSON.parse(compText);
-          photoUrlPresigned = compJson?.presignedUrl || compJson?.url || compJson?.imageUrl;
-        } catch {}
-
-        if (!photoUrlPresigned) {
-          // 응답에 없으면 리스트에서 "해당 미션 경로"만 필터해서 최신 1장
-          const listUrl = `${BASE_URL}/photo/${cid}/all`;
-          const listRes = await fetch(listUrl, {
-            method: 'GET',
-            headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'ngrok-skip-browser-warning': 'true' },
-          });
-          const listRaw = await listRes.text();
-          console.log('[PHOTO LIST] status =', listRes.status, 'raw =', listRaw.slice(0, 200));
-          if (!listRes.ok) throw new Error(`photo list HTTP ${listRes.status}`);
-
-          let listJson: any[] = [];
-          try { listJson = JSON.parse(listRaw); } catch {}
-          const missionItems = listJson.filter(x =>
-            typeof x.presignedUrl === 'string' && x.presignedUrl.includes(`/${cid}/${midNum}/`)
-          );
-          const latest = missionItems.reduce((a,b) => (a?.id > b?.id ? a : b), missionItems[0]);
-          photoUrlPresigned = latest?.presignedUrl;
-        }
-
-        // 4) (옵션) STOMP로 채팅 전송
-        console.log('[STOMP GUARD]', {
+        // (옵션) STOMP로 채팅 전송
+        console.log('[STOMP GUARD(mission)]', {
           SEND_CHAT_IMAGE_AFTER_COMPLETE,
           hasPresigned: !!photoUrlPresigned,
           userId: uid,
           coupleId: cid,
           token: !!token,
         });
+
         if (SEND_CHAT_IMAGE_AFTER_COMPLETE && photoUrlPresigned && uid) {
           const imageUrlForStomp = USE_PRESIGNED_FOR_STOMP
             ? photoUrlPresigned
             : (toRawUrl(photoUrlPresigned) || photoUrlPresigned);
 
-          console.log('[STOMP SEND PREPARED]', {
+          console.log('[STOMP SEND PREPARED(mission)]', {
             roomId: String(cid),
             senderId: uid,
             usingPresigned: USE_PRESIGNED_FOR_STOMP,
@@ -287,57 +362,25 @@ export default function ShareScreen() {
               senderId: uid,
               imageUrl: imageUrlForStomp!,
             });
-            console.log('[CHAT IMAGE SEND] via STOMP =', ok);
+            console.log('[CHAT IMAGE SEND] (mission) via STOMP =', ok);
           } catch (e) {
-            console.warn('[CHAT IMAGE SEND] STOMP error', (e as any)?.message);
+            console.warn('[CHAT IMAGE SEND] (mission) STOMP error', (e as any)?.message);
           }
         }
 
-        // 5) 채팅으로 이동 + 낙관 파라미터 전달
+        // 채팅으로 이동 (미션 텍스트/사진 URL 같이 넘기기)
         router.replace({
           pathname: '/(tabs)/chat',
           params: {
-            justCompletedMissionId: String(midNum),
+            justCompletedMissionId: String(mid),
             justCompletedMissionText: missionDescription || missionTitle || '',
-            justCompletedPhotoUrl: (USE_PRESIGNED_FOR_STOMP ? (photoUrlPresigned || '') : (toRawUrl(photoUrlPresigned || '') || '')),
+            justCompletedPhotoUrl: USE_PRESIGNED_FOR_STOMP
+              ? (photoUrlPresigned || '')
+              : (toRawUrl(photoUrlPresigned || '') || ''),
           },
         });
-
       } else {
-        // 🔹 미션 연결이 없는 일반 전송: 기존 갤러리에 업로드 후 최신 1장 presigned 사용
-        const uploadUrl = `${BASE_URL}/photo/${encodeURIComponent(String(cid))}`;
-        console.log('[UPLOAD] url =', uploadUrl);
-        const uploadForm = new FormData();
-        uploadForm.append('file', { uri: uploadUri, name: `photo_${Date.now()}.jpg`, type: 'image/jpeg' } as any);
-
-        const upRes = await fetch(uploadUrl, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'ngrok-skip-browser-warning': 'true' },
-          body: uploadForm,
-        });
-        const upRaw = await upRes.text();
-        console.log('[UPLOAD] status =', upRes.status, 'raw body =', upRaw);
-        if (upRes.status === 413) { Alert.alert('사진이 너무 커요','사진 용량 제한을 넘었어요.'); return; }
-        if (!upRes.ok) throw new Error(`HTTP ${upRes.status}`);
-
-        // 최신 presignedUrl 조회 → id 가장 큰 항목
-        const listUrl = `${BASE_URL}/photo/${encodeURIComponent(String(cid))}/all`;
-        const listRes = await fetch(listUrl, {
-          method: 'GET',
-          headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'ngrok-skip-browser-warning': 'true' },
-        });
-        const listRaw = await listRes.text();
-        console.log('[PHOTO LIST] status =', listRes.status, 'raw =', listRaw.slice(0, 200));
-        if (!listRes.ok) throw new Error(`photo list HTTP ${listRes.status}`);
-
-        let listJson: any[] = [];
-        try { listJson = JSON.parse(listRaw); } catch {}
-        let latest = listJson[0];
-        for (const it of listJson) { if (it?.id > latest?.id) latest = it; }
-        const photoUrlPresigned: string | null =
-          typeof latest?.presignedUrl === 'string' ? latest.presignedUrl : null;
-
-        // (옵션) STOMP로 채팅 전송
+        // 🔹 일반 사진 전송: presigned를 STOMP로만 보내고 채팅으로 이동
         console.log('[STOMP GUARD(no mission)]', {
           SEND_CHAT_IMAGE_AFTER_COMPLETE,
           hasPresigned: !!photoUrlPresigned,
@@ -373,7 +416,6 @@ export default function ShareScreen() {
 
         router.replace('/(tabs)/chat');
       }
-      // ====== 분기 끝 ======
 
     } catch (e: any) {
       console.warn('[UPLOAD] error:', e?.message);
