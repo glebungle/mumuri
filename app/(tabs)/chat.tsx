@@ -68,10 +68,6 @@ async function presignIfNeeded(rawUrl?: string | null) {
   > = [
     // --- 미션 전용 경로 후보 ---
     { path: `/api/couples/missions/today`, method: 'GET' },
-
-    // --- 백엔드에서 통합 presign을 쓰는 경우 대비 ---
-    // { path: `/api/presign?url=${encodeURIComponent(rawUrl)}`, method: 'GET' },
-    // { path: `/api/presign`, method: 'POST', body: { url: rawUrl } },
   ];
 
   for (const c of candidates) {
@@ -146,7 +142,7 @@ type PerformedMission = {
   missionId: number;
   title: string;
   missionDateTs: number;
-  // 정렬/표시용
+  doneAtTs: number;    // ✅ 실제 완료 시각(정렬/시간표시용)
   me?: { url?: string | null; when?: number | null };
   partner?: { url?: string | null; when?: number | null };
 };
@@ -410,39 +406,44 @@ export default function ChatScreen() {
           const meP = (m.progresses || []).find(p => String(p.userId) === String(userId));
           const paP = (m.progresses || []).find(p => String(p.userId) !== String(userId));
 
+          const meWhen = (meP && isPerformed(meP.status))
+            ? (parseTSLocalOrISO(meP.completedAt) ?? parseTSLocalOrISO(meP.updatedAt) ?? null)
+            : null;
+          const paWhen = (paP && isPerformed(paP.status))
+            ? (parseTSLocalOrISO(paP.completedAt) ?? parseTSLocalOrISO(paP.updatedAt) ?? null)
+            : null;
+
           // presign
           const [meUrl, paUrl] = await Promise.all([
             presignIfNeeded(meP?.photoUrl),
             presignIfNeeded(paP?.photoUrl),
           ]);
 
+          // 이 미션의 "기준 시각" = 나/상대 완료 시각 중 가장 이른 것 (없으면 missionDateTs)
+          const candidates: number[] = [];
+          if (meWhen != null) candidates.push(meWhen);
+          if (paWhen != null) candidates.push(paWhen);
+          if (!candidates.length) candidates.push(missionDateTs);
+          const doneAtTs = Math.min(...candidates);
+
           out.push({
             missionId: m.missionId,
             title,
             missionDateTs,
+            doneAtTs,
             me: meP && isPerformed(meP.status) ? {
               url: meUrl,
-              when: parseTSLocalOrISO(meP.completedAt) ?? parseTSLocalOrISO(meP.updatedAt) ?? missionDateTs,
+              when: meWhen,
             } : undefined,
             partner: paP && isPerformed(paP.status) ? {
               url: paUrl,
-              when: parseTSLocalOrISO(paP.completedAt) ?? parseTSLocalOrISO(paP.updatedAt) ?? missionDateTs,
+              when: paWhen,
             } : undefined,
           });
         }
 
-        // 완료/업데이트 시각 기준으로 정렬(오래된→최근)
-        out.sort((a, b) => {
-          const aWhen = Math.min(
-            a.me?.when ?? a.missionDateTs,
-            a.partner?.when ?? a.missionDateTs,
-          );
-          const bWhen = Math.min(
-            b.me?.when ?? b.missionDateTs,
-            b.partner?.when ?? b.missionDateTs,
-          );
-          return aWhen - bWhen;
-        });
+        // ✅ 실제 완료 시각 기준으로 정렬(오래된→최근)
+        out.sort((a, b) => a.doneAtTs - b.doneAtTs);
 
         setPerformedMissions(out);
       } catch (e: any) {
@@ -465,8 +466,22 @@ export default function ChatScreen() {
     // 텍스트 → 이미지 (같은 미션 아이템 아래)
     setMessages(prev => ([
       ...prev,
-      { id: `mission_text_opt_${justCompletedMissionId}_${ts}`, type: 'mission_text', text: title, mine: true, createdAt: ts, status: 'sent' },
-      ...(img ? [{ id: `mission_img_opt_${justCompletedMissionId}_${ts}`, type: 'image', imageUrl: img, mine: true, createdAt: ts + 1, status: 'sent' } as ChatMessage] : []),
+      {
+        id: `mission_text_opt_${justCompletedMissionId}_${ts}`,
+        type: 'mission_text',
+        text: title,
+        mine: true,
+        createdAt: ts,
+        status: 'sent',
+      },
+      ...(img ? [{
+        id: `mission_img_opt_${justCompletedMissionId}_${ts}`,
+        type: 'image',
+        imageUrl: img,
+        mine: true,
+        createdAt: ts,
+        status: 'sent',
+      } as ChatMessage] : []),
     ]));
     appendedOnceRef.current = true;
     requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
@@ -529,13 +544,15 @@ export default function ChatScreen() {
 
     const missionMsgs: ChatMessage[] = [];
     for (const m of performedMissions) {
-      // 1) 미션 텍스트(한 번)
+      const baseTs = m.doneAtTs ?? m.missionDateTs;
+
+      // 1) 미션 텍스트 (완료 시각 기준)
       missionMsgs.push({
         id: `mission_text_${m.missionId}`,
         type: 'mission_text',
         text: m.title || '오늘의 미션',
         mine: true,
-        createdAt: m.missionDateTs,
+        createdAt: baseTs,
         status: 'sent',
       });
 
@@ -546,7 +563,7 @@ export default function ChatScreen() {
           type: 'image',
           imageUrl: m.partner.url,
           mine: false,
-          createdAt: (m.partner.when ?? m.missionDateTs),
+          createdAt: m.partner.when ?? baseTs,
           status: 'sent',
         });
       }
@@ -558,12 +575,13 @@ export default function ChatScreen() {
           type: 'image',
           imageUrl: m.me.url,
           mine: true,
-          createdAt: (m.me.when ?? m.missionDateTs) + 1,
+          createdAt: m.me.when ?? baseTs,
           status: 'sent',
         });
       }
     }
 
+    // ✅ 채팅 히스토리 + 미션 메시지들을 createdAt 기준으로 한 번 더 정렬
     const merged = [...baseMsgs, ...missionMsgs].sort((a,b) => a.createdAt - b.createdAt);
 
     const out: (ChatMessage | DateMarker)[] = [];
