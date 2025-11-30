@@ -541,25 +541,25 @@ const styles = StyleSheet.create({
 
   emptyPreview: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
   emptyText: { color: '#777', fontSize: 16 },
-  separator: { height: 1, backgroundColor: '#eee', marginVertical: 8 },
+  separator: { height: 0 },
 
   // --- 캘린더 스타일 ---
-  calendarHeader: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 6 },
+  calendarHeader: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12 },
 
   // 날짜 셀: 부모 셀 영역 100% 사용
   dayPressable: { flex: 1, width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' },
   emptyDayCell: { flex: 1, width: '100%', height: '100%' },
   emptyDayCellPlaceholder: { flex: 1, justifyContent: 'center', alignItems: 'center', width: '100%' },
 
-  dayText: { fontSize: 13, textAlign: 'center' },
-  dayTextDisabled: { color: '#ccc' },
-  dayTextWeekend: { color: 'red' },
+  dayText: { fontSize: 15, textAlign: 'center', fontWeight: '600' },
+  dayTextDisabled: { color: '#D1D1D6' },
+  dayTextWeekend: { color: '#FF3B30' },
   dayTextSelected: { color: '#FFF' },
 
   thumbInCalendar: {
     position: 'absolute',
-    top: 2, bottom: 2, left: 2, right: 2,
-    borderRadius: 8,
+    top: 0, bottom: 0, left: 0, right: 0,
+    borderRadius: 12,
     backgroundColor: '#eee',
   },
   dayTextOverlay: {
@@ -567,52 +567,70 @@ const styles = StyleSheet.create({
     top: 0, left: 0, right: 0, bottom: 0,
     justifyContent: 'flex-start',
     alignItems: 'flex-start',
-    padding: 4,
-    borderRadius: 8,
+    padding: 6,
+    borderRadius: 12,
   },
   dayTextOverlayText: {
     color: '#FFF',
-    fontWeight: 'bold',
-    fontSize: 14,
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
+    fontWeight: '700',
+    fontSize: 15,
+    textShadowColor: 'rgba(0, 0, 0, 0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
 
   // --- 미리보기/상세 ---
-  previewScrollContainer: { flexGrow: 1, padding: 10, backgroundColor: '#f9f9f9' },
+  previewScrollContainer: { flexGrow: 1, padding: 16, backgroundColor: '#FFF' },
   previewContainer: {
-    padding: 8,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    backgroundColor: '#F7F7F7',
+    borderRadius: 20,
+    overflow: 'hidden',
   },
 
-  previewHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 12 },
-  profileContainer: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  previewHeader: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+    backgroundColor: 'rgba(255,255,255,0.6)'
+  },
+  profileContainer: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   profileIcon: { color: '#6198FF' },
-  uploaderText: { fontWeight: 'bold', fontSize: 16, color: '#333' },
-  dateText: { fontSize: 12, color: '#777' },
+  uploaderText: { fontWeight: '700', fontSize: 17, color: '#000' },
+  dateText: { fontSize: 14, color: '#8E8E93', marginTop: 2 },
 
-  previewImage: { width: '100%', height: SCREEN_WIDTH * 0.7, borderRadius: 10, backgroundColor: '#ccc', marginVertical: 8 },
+  previewImage: { 
+    width: '100%', 
+    height: SCREEN_WIDTH * 1.2, 
+    backgroundColor: '#E5E5EA',
+  },
 
   missionBox: {
+    position: 'absolute',
+    bottom: 24,
+    left: 20,
+    right: 20,
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 10,
-    backgroundColor: '#e7f0ff',
-    borderRadius: 8,
+    padding: 14,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    borderRadius: 16,
     gap: 8,
-    marginBottom: 10,
   },
-  missionText: { fontSize: 14, color: '#333' },
+  missionText: { fontSize: 15, color: '#FFF', fontWeight: '600', flex: 1 },
 
-  actions: { flexDirection: 'row', gap: 10 },
-  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 },
+  actions: { flexDirection: 'row', gap: 8 },
+  actionBtn: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 4, 
+    paddingHorizontal: 12, 
+    paddingVertical: 6, 
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.9)'
+  },
   actionText: { color: '#3279FF', fontWeight: '600', fontSize: 14 },
 
   thumbnailsListContainer: { paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#eee' },

@@ -23,12 +23,44 @@ const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 const BASE_URL = 'https://mumuri.shop';
 const SWIPE_THRESHOLD = 40; // 스와이프로 인식할 최소 이동 거리
 
+// ================== 공통 authedFetch ==================
+async function authedFetch(path: string, init: RequestInit = {}) {
+  const token = await AsyncStorage.getItem('token');
+  const headers = {
+    Accept: 'application/json',
+    'ngrok-skip-browser-warning': 'true',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(init.body && typeof init.body === 'string'
+      ? { 'Content-Type': 'application/json' }
+      : {}),
+    ...(init.headers || {}),
+  };
+
+  const res = await fetch(`${BASE_URL}${path}`, { ...init, headers });
+  const text = await res.text();
+
+  if (!res.ok) {
+    const msg = `${path} ${res.status}: ${text.slice(0, 200)}`;
+    console.log('[authedFetch error]', msg);
+    throw new Error(msg);
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
+// ================== 타입 ==================
 type CropRect = { originX: number; originY: number; width: number; height: number };
 
 type MissionProgress = {
   userId: number;
   status: string;
   photoUrl: string | null;
+  // 백엔드가 나중에 completedAt 추가해도 TS 에러 안 나도록 옵션으로 열어둠
+  completedAt?: string | null;
 };
 
 type TodayMission = {
@@ -38,8 +70,10 @@ type TodayMission = {
   difficulty: string;
   reward: number;
   status: string;
-  missionDate: string;
+  missionDate: string; // 지금은 사용 안 하지만 응답 형식 맞춰둠
   progresses: MissionProgress[];
+  myDone?: boolean;
+  myCompletedAt?: string;
 };
 
 export default function CameraHome() {
@@ -62,6 +96,7 @@ export default function CameraHome() {
   // 오늘의 미션 (여러 개 캐러셀 선택)
   const [missions, setMissions] = useState<TodayMission[]>([]);
   const [sel, setSel] = useState(0);
+
   // 스와이프 처리를 위한 상태
   const [startX, setStartX] = useState<number | null>(null);
 
@@ -83,18 +118,17 @@ export default function CameraHome() {
 
   // 스와이프 핸들러
   const handleTouchStart = (e: any) => {
-    // 터치 시작 X 좌표 저장
     setStartX(e.nativeEvent.pageX);
-    return true; // Responder로 지정
+    return true;
   };
 
   const handleTouchEnd = (e: any) => {
     if (startX == null) return;
     const endX = e.nativeEvent.pageX;
     const dx = endX - startX;
-    setStartX(null); // 초기화
+    setStartX(null);
 
-    if (Math.abs(dx) < SWIPE_THRESHOLD) return; // 임계값 미만은 무시
+    if (Math.abs(dx) < SWIPE_THRESHOLD) return;
 
     if (dx < 0) {
       // 왼쪽으로 스와이프 (다음 미션)
@@ -131,28 +165,38 @@ export default function CameraHome() {
     fetchDday();
   }, []);
 
-  // 오늘의 미션 가져오기
+  // 오늘의 미션 가져오기 (500 에러 메시지까지 확인)
   useEffect(() => {
     const fetchTodayMission = async () => {
       try {
-        const token = await AsyncStorage.getItem('token');
-        if (!token) return;
-
-        const res = await fetch(`${BASE_URL}/api/couples/missions/today`, {
+        const json = await authedFetch('/api/couples/missions/today', {
           method: 'GET',
-          headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
         });
-        if (!res.ok) return;
-        const json = await res.json();
-        if (Array.isArray(json) && json.length > 0) {
-          setMissions(json);
+
+        console.log('[today missions raw]', JSON.stringify(json, null, 2));
+
+        let missionsData: TodayMission[] = [];
+
+        if (Array.isArray(json)) {
+          missionsData = json as TodayMission[];
+        } else if (json && Array.isArray((json as any).missions)) {
+          missionsData = (json as any).missions as TodayMission[];
+        }
+
+        if (missionsData.length > 0) {
+          setMissions(missionsData);
           setSel(0);
         } else {
           setMissions([]);
           setSel(0);
         }
-      } catch {}
+      } catch (e: any) {
+        console.log('[today missions error]', e?.message);
+        setMissions([]);
+        setSel(0);
+      }
     };
+
     fetchTodayMission();
   }, []);
 
@@ -280,7 +324,6 @@ export default function CameraHome() {
       {!previewUri && (
         <View
           style={styles.hintBubbleWrap}
-          // 스와이프 처리를 위해 View를 Responder로 설정
           onMoveShouldSetResponder={() => true}
           onResponderGrant={handleTouchStart}
           onResponderRelease={handleTouchEnd}
@@ -297,9 +340,11 @@ export default function CameraHome() {
           <View style={styles.hintRow}>
             <View style={styles.hintBubble}>
               <AppText style={styles.hintText}>
-                {missions[sel]?.description || missions[sel]?.title || '오늘의 미션을 찍어 보내주세요'}
+                {missions[sel]?.description ||
+                  missions[sel]?.title ||
+                  '오늘의 미션을 찍어 보내주세요'}
               </AppText>
-              <Ionicons name="play" size={18} color="#FFFFFF" /> 
+              <Ionicons name="play" size={18} color="#FFFFFF" />
             </View>
           </View>
         </View>
@@ -419,16 +464,22 @@ const styles = StyleSheet.create({
   },
   missionDotsRow: { flexDirection: 'row', marginBottom: 8 },
   missionDot: {
-    width: 6, height: 6, borderRadius: 3, marginHorizontal: 3,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginHorizontal: 3,
     backgroundColor: 'rgba(255,255,255,0.7)',
   },
   missionDotActive: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#3279FF' },
 
   hintRow: { flexDirection: 'row', alignItems: 'center' },
   arrowBtn: {
-    width: 32, height: 32, borderRadius: 16,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: 'rgba(255,255,255,0.7)',
-    alignItems: 'center', justifyContent: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginHorizontal: 6,
   },
 
@@ -445,34 +496,49 @@ const styles = StyleSheet.create({
   // 하단 버튼 영역
   bottomOverlay: {
     position: 'absolute',
-    left: 0, right: 0, bottom: -40,
-    alignItems: 'center', justifyContent: 'center',
+    left: 0,
+    right: 0,
+    bottom: -40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   shutterOuter: {
-    width: 86, height: 86, borderRadius: 43, backgroundColor: '#fff',
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 4, borderColor: '#FF9191',
+    width: 86,
+    height: 86,
+    borderRadius: 43,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 4,
+    borderColor: '#FF9191',
   },
   shutterInner: { width: 66, height: 66, borderRadius: 33, backgroundColor: '#FF9191' },
 
   topBarPreview: {
     position: 'absolute',
     top: Platform.select({ ios: 0, android: 10 }),
-    left: 0, right: 0,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
     justifyContent: 'flex-start',
     paddingHorizontal: 14,
     zIndex: 10,
   },
   topIconBtnRetake: {
-    width: 40, height: 40, borderRadius: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: 'rgba(0,0,0,0.4)',
-    alignItems: 'center', justifyContent: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   confirmBtn: {
-    width: 80, height: 80, borderRadius: 40,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: '#FF9191',
-    alignItems: 'center', justifyContent: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
