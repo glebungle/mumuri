@@ -3,7 +3,7 @@ import { StyleSheet, Text, TextProps } from 'react-native';
 
 interface AppTextProps extends TextProps {
     // 💡 기본값을 'bold'로 지정
-    type?: 'bold' | 'medium' | 'regular'|'semibold'|'extrabold'|'light'|'extralight'|'thin'; 
+    type?: 'bold' | 'medium' | 'regular'|'semibold'|'extrabold'|'light'|'extralight'|'thin'|'pretendard-r'|'pretendard-m'|'pretendard-b'; 
 }
 
 // 🚨 type의 기본값을 'bold'로 설정합니다.
@@ -35,8 +35,15 @@ const AppText: React.FC<AppTextProps> = ({ type = 'bold', style, children, ...re
         case 'thin':
             fontFamilyName = 'Paperlogy-1Thin';
             break;
-        // default 케이스는 'bold'가 default 값으로 설정되었으므로 사실상 불필요하지만, 
-        // 방어를 위해 'bold'로 지정할 수 있습니다. (여기서는 제거)
+        case 'pretendard-r':
+            fontFamilyName = 'Pretendard-Regular';
+            break;
+        case 'pretendard-m':
+            fontFamilyName = 'Pretendard-Medium';
+            break;
+        case 'pretendard-b':
+            fontFamilyName = 'Pretendard-Bold';
+            break;
     }
 
     return (

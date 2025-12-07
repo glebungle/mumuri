@@ -448,7 +448,7 @@ export default function ShareScreen() {
           onPress={sendToPartner}
           disabled={sending || !token || !coupleId || !userId}
         >
-          <Ionicons name="paper-plane" size={32} color={sending ? '#999' : '#fff'} />
+          <Ionicons name="paper-plane" size={32} color={sending ? '#FF9191' : '#FF9191'} />
         </Pressable>
         <Pressable style={styles.saveBtn} onPress={saveToAlbum} disabled={saving || sending}>
           <Ionicons name="download-outline" size={24} color="#FF9191" />
@@ -475,7 +475,7 @@ const styles = StyleSheet.create({
     width: 76,
     height: 76,
     borderRadius: 38,
-    backgroundColor: '#FF9191',
+    backgroundColor: '#1A1A1A',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -489,7 +489,7 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: '#fdeaea',
+    // backgroundColor: '#fdeaea',
     alignItems: 'center',
     justifyContent: 'center',
   },

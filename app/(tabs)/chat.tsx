@@ -22,6 +22,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppText from '../../components/AppText';
 import { ChatIncoming, ChatReadUpdate, createChatClient } from '../lib/chatSocket';
 
+// 이 스크린에서만 pretendard-r 쓰는 래퍼
+const ChatText = (props: React.ComponentProps<typeof AppText>) => {
+  const { style, ...rest } = props;
+  return (
+    <AppText
+      {...rest}
+      style={[{ fontFamily: 'Pretendard-Medium' }, style]}
+    />
+  );
+};
+
 // ================== 환경 ==================
 const API_BASE = 'https://mumuri.shop';
 const WS_URL   = `${API_BASE}/ws-chat`;
@@ -125,7 +136,7 @@ type MissionProgressDto = {
   userId: number;
   status: string;      // NOT_DONE / HALF_DONE / DONE 등
   photoUrl?: string;   // raw or presigned
-  completedAt?: string; 
+  completedAt?: string;
   updatedAt?: string;
 };
 
@@ -226,7 +237,6 @@ export default function ChatScreen() {
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [inputBarHeight, setInputBarHeight] = useState(56);
 
-  // ✅ 여러 개의 “수행된” 미션을 보관
   const [performedMissions, setPerformedMissions] = useState<PerformedMission[]>([]);
 
   const listRef = useRef<FlatList<ChatMessage | DateMarker>>(null);
@@ -487,7 +497,6 @@ export default function ChatScreen() {
     requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
   }, [justCompletedMissionId, justCompletedMissionText, justCompletedPhotoUrl, justCompletedAt]);
 
-  
   // 텍스트 전송(이미지 전송 기능 제거)
   const sendMessage = useCallback(async () => {
     if (!ROOM_KEY || !userId) {
@@ -625,7 +634,7 @@ export default function ChatScreen() {
     if (isDateMarker(item)) {
       return (
         <View style={styles.dateWrap}>
-          <AppText style={styles.dateText}>{formatDate(item.ts)}</AppText>
+          <ChatText style={styles.dateText}>{formatDate(item.ts)}</ChatText>
         </View>
       );
     }
@@ -639,17 +648,19 @@ export default function ChatScreen() {
       ? (mine ? styles.bubbleMissionMine : styles.bubbleMissionOther)
       : (mine ? styles.bubbleMine : styles.bubbleOther);
 
+    const contentContainerStyle =
+      m.type === 'image'
+        ? (mine ? styles.imageBoxMine : styles.imageBoxOther)
+        : [styles.bubble, bubbleStyle, isMissionText && styles.bubbleMissionText];
+
     return (
       <View style={[styles.row, mine ? styles.rowMine : styles.rowOther]}>
         <View style={styles.msgCol}>
-          <View style={[styles.bubble, bubbleStyle, isMissionText && styles.bubbleMissionText]}>
+          <View style={contentContainerStyle}>
             {isMissionText ? (
-              <>
-                <AppText style={styles.missionLabel}>오늘의 미션</AppText>
-                <AppText style={[styles.msgText, mine ? styles.msgTextMine : styles.msgTextOther]}>
-                  {m.text}
-                </AppText>
-              </>
+              <ChatText style={[styles.msgText, mine ? styles.msgTextMine : styles.msgTextOther]}>
+                {m.text}
+              </ChatText>
             ) : m.type === 'image' ? (
               <Image
                 source={{ uri: m.imageUrl! }}
@@ -662,15 +673,21 @@ export default function ChatScreen() {
                 }}
               />
             ) : (
-              <AppText style={[styles.msgText, mine ? styles.msgTextMine : styles.msgTextOther]}>
+              <ChatText style={[styles.msgText, mine ? styles.msgTextMine : styles.msgTextOther]}>
                 {m.text}
-              </AppText>
+              </ChatText>
             )}
             {m.alt ? (
-              <AppText style={[styles.msgText, { marginTop: 6, color: mine ? '#FCECEC' : '#C00' }]}>{m.alt}</AppText>
+              <ChatText style={[styles.msgText, { marginTop: 6, color: mine ? '#FCECEC' : '#C00' }]}>
+                {m.alt}
+              </ChatText>
             ) : null}
           </View>
-          {showTime && <AppText style={styles.timeTextLeft}>{formatTime(m.createdAt)}</AppText>}
+          {showTime && (
+            <ChatText style={styles.timeTextLeft}>
+              {formatTime(m.createdAt)}
+            </ChatText>
+          )}
         </View>
 
         <View style={styles.metaWrapRight}>
@@ -754,7 +771,7 @@ export default function ChatScreen() {
             multiline
           />
           <Pressable style={[styles.sendBtn, sending && { opacity: 0.6 }]} onPress={sendMessage} disabled={sending}>
-            <Ionicons name="arrow-up" size={22} color="#fff" />
+            <Ionicons name="arrow-up" size={22} color="#4D5053" />
           </Pressable>
         </View>
       )}
@@ -773,7 +790,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 6,
   },
-  headerTitle: { flex: 1, textAlign: 'center', fontSize: 16, fontWeight: '700', color: '#111' },
+  headerTitle: { flex: 1, textAlign: 'center', fontSize: 16, color: '#111' },
 
   row: {
     width: '100%',
@@ -790,6 +807,18 @@ const styles = StyleSheet.create({
   bubbleMine: { backgroundColor: '#6198FF' },
   bubbleOther: { backgroundColor: '#fff', borderWidth: StyleSheet.hairlineWidth, borderColor: '#e5e7eb' },
 
+  // 이미지 전용 카드 컨테이너 (배경 말풍선 없음)
+  imageBoxMine: {
+    borderRadius: 18,
+    overflow: 'hidden',
+    alignSelf: 'flex-end',
+  },
+  imageBoxOther: {
+    borderRadius: 18,
+    overflow: 'hidden',
+    alignSelf: 'flex-start',
+  },
+
   bubbleMissionMine: { backgroundColor: '#6198FF' },
   bubbleMissionOther: {
     backgroundColor: '#FFE8D2',
@@ -799,7 +828,7 @@ const styles = StyleSheet.create({
   missionImage: {
     width: STICKER_SIZE * 1.6,
     height: STICKER_SIZE * 1.6,
-    borderRadius: 12,
+    borderRadius: 0, // 컨테이너에서 radius 처리
     backgroundColor: '#DDE7FF', // 로딩 시 배경
   },
   bubbleMissionText: {
@@ -853,7 +882,6 @@ const styles = StyleSheet.create({
   sendBtn: {
     width: 40, height: 40, borderRadius: 20,
     alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#FF9191',
-    shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 6, elevation: 3,
+    backgroundColor: '#EEEFEF',
   },
 });

@@ -3,6 +3,7 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CameraCapturedPicture, CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImageManipulator from 'expo-image-manipulator';
+import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -21,7 +22,6 @@ import AppText from '../../components/AppText';
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 const BASE_URL = 'https://mumuri.shop';
-const SWIPE_THRESHOLD = 40; // 스와이프로 인식할 최소 이동 거리
 
 // ================== 공통 authedFetch ==================
 async function authedFetch(path: string, init: RequestInit = {}) {
@@ -59,7 +59,6 @@ type MissionProgress = {
   userId: number;
   status: string;
   photoUrl: string | null;
-  // 백엔드가 나중에 completedAt 추가해도 TS 에러 안 나도록 옵션으로 열어둠
   completedAt?: string | null;
 };
 
@@ -70,7 +69,7 @@ type TodayMission = {
   difficulty: string;
   reward: number;
   status: string;
-  missionDate: string; // 지금은 사용 안 하지만 응답 형식 맞춰둠
+  missionDate: string;
   progresses: MissionProgress[];
   myDone?: boolean;
   myCompletedAt?: string;
@@ -86,6 +85,7 @@ export default function CameraHome() {
   const [isReady, setIsReady] = useState(false);
   const [capturing, setCapturing] = useState(false);
   const [previewUri, setPreviewUri] = useState<string | null>(null);
+  const [facing, setFacing] = useState<'back' | 'front'>('back');
 
   const [viewW, setViewW] = useState(0);
   const [viewH, setViewH] = useState(0);
@@ -96,9 +96,6 @@ export default function CameraHome() {
   // 오늘의 미션 (여러 개 캐러셀 선택)
   const [missions, setMissions] = useState<TodayMission[]>([]);
   const [sel, setSel] = useState(0);
-
-  // 스와이프 처리를 위한 상태
-  const [startX, setStartX] = useState<number | null>(null);
 
   const nextMission = React.useCallback(() => {
     if (!missions.length) return;
@@ -114,29 +111,6 @@ export default function CameraHome() {
     const { width, height } = e.nativeEvent.layout;
     setViewW(width);
     setViewH(height);
-  };
-
-  // 스와이프 핸들러
-  const handleTouchStart = (e: any) => {
-    setStartX(e.nativeEvent.pageX);
-    return true;
-  };
-
-  const handleTouchEnd = (e: any) => {
-    if (startX == null) return;
-    const endX = e.nativeEvent.pageX;
-    const dx = endX - startX;
-    setStartX(null);
-
-    if (Math.abs(dx) < SWIPE_THRESHOLD) return;
-
-    if (dx < 0) {
-      // 왼쪽으로 스와이프 (다음 미션)
-      nextMission();
-    } else {
-      // 오른쪽으로 스와이프 (이전 미션)
-      prevMission();
-    }
   };
 
   // 카메라 권한
@@ -165,7 +139,7 @@ export default function CameraHome() {
     fetchDday();
   }, []);
 
-  // 오늘의 미션 가져오기 (500 에러 메시지까지 확인)
+  // 오늘의 미션 가져오기
   useEffect(() => {
     const fetchTodayMission = async () => {
       try {
@@ -277,6 +251,29 @@ export default function CameraHome() {
     }
   };
 
+  // 갤러리에서 사진 선택
+  const pickFromGallery = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [3, 4],
+        quality: 1,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setPreviewUri(result.assets[0].uri);
+      }
+    } catch (e) {
+      Alert.alert('오류', '갤러리에서 사진을 가져올 수 없습니다.');
+    }
+  };
+
+  // 카메라 전환
+  const toggleCameraFacing = () => {
+    setFacing((prev) => (prev === 'back' ? 'front' : 'back'));
+  };
+
   const retake = () => setPreviewUri(null);
 
   // share 이동 (선택된 미션으로)
@@ -307,12 +304,12 @@ export default function CameraHome() {
         <CameraView
           ref={cameraRef}
           style={styles.previewFrameImage}
-          facing="back"
+          facing={facing}
           onCameraReady={() => setIsReady(true)}
         />
       )}
 
-      {/* 상단 디데이 (가운데 정렬) - 미리보기 화면에서는 숨김 */}
+      {/* 상단 디데이 (왼쪽 정렬, 회색 배경) */}
       {!previewUri && (
         <View style={styles.ddayBadge}>
           <Ionicons name="heart-outline" size={18} color="#fff" />
@@ -320,14 +317,9 @@ export default function CameraHome() {
         </View>
       )}
 
-      {/* 오늘의 미션 캐러셀 (스와이프/화살표) */}
-      {!previewUri && (
-        <View
-          style={styles.hintBubbleWrap}
-          onMoveShouldSetResponder={() => true}
-          onResponderGrant={handleTouchStart}
-          onResponderRelease={handleTouchEnd}
-        >
+      {/* 오늘의 미션 캐러셀 (화살표 포함 말풍선) */}
+      {!previewUri && missions.length > 0 && (
+        <View style={styles.hintBubbleWrap}>
           <View style={styles.missionDotsRow}>
             {missions.map((_, i) => (
               <View
@@ -339,12 +331,49 @@ export default function CameraHome() {
 
           <View style={styles.hintRow}>
             <View style={styles.hintBubble}>
-              <AppText style={styles.hintText}>
-                {missions[sel]?.description ||
-                  missions[sel]?.title ||
-                  '오늘의 미션을 찍어 보내주세요'}
-              </AppText>
-              <Ionicons name="play" size={18} color="#FFFFFF" />
+              {/* 왼쪽 화살표 (흰색 삼각형) */}
+              {missions.length > 1 ? (
+                <Pressable
+                  style={styles.innerArrowArea}
+                  onPress={prevMission}
+                  hitSlop={8}
+                >
+                  <Ionicons
+                    name="caret-forward"
+                    size={16}
+                    color="#3279FF"
+                    style={{ transform: [{ rotate: '180deg' }] }}
+                  />
+                </Pressable>
+              ) : (
+                <View style={styles.innerArrowArea} />
+              )}
+
+              {/* 가운데 텍스트 */}
+              <View style={styles.hintTextWrap}>
+                <AppText style={styles.hintText}>
+                  {missions[sel]?.description ||
+                    missions[sel]?.title ||
+                    '오늘의 미션을 찍어 보내주세요'}
+                </AppText>
+              </View>
+
+              {/* 오른쪽 화살표 (파란 삼각형) */}
+              {missions.length > 1 ? (
+                <Pressable
+                  style={styles.innerArrowArea}
+                  onPress={nextMission}
+                  hitSlop={8}
+                >
+                  <Ionicons
+                    name="caret-forward"
+                    size={16}
+                    color="#3279FF"
+                  />
+                </Pressable>
+              ) : (
+                <View style={styles.innerArrowArea} />
+              )}
             </View>
           </View>
         </View>
@@ -359,20 +388,33 @@ export default function CameraHome() {
         </View>
       )}
 
-      {/* 하단 촬영 / 확인 버튼 */}
+      {/* 하단 버튼 영역 */}
       <View style={[styles.bottomOverlay, { paddingBottom: 24 + insets.bottom }]}>
         {previewUri ? (
           <Pressable onPress={confirm} style={styles.confirmBtn}>
             <Ionicons name="checkmark-sharp" size={36} color="#fff" />
           </Pressable>
         ) : (
-          <Pressable
-            onPress={takePhoto}
-            disabled={!isReady || capturing}
-            style={[styles.shutterOuter, (!isReady || capturing) && { opacity: 0.5 }]}
-          >
-            <View style={styles.shutterInner} />
-          </Pressable>
+          <View style={styles.bottomButtonsRow}>
+            {/* 갤러리 버튼 */}
+            <Pressable style={styles.galleryBtn} onPress={pickFromGallery}>
+              <Ionicons name="images-outline" size={28} color="#fff" />
+            </Pressable>
+
+            {/* 촬영 버튼 */}
+            <Pressable
+              onPress={takePhoto}
+              disabled={!isReady || capturing}
+              style={[styles.shutterOuter, (!isReady || capturing) && { opacity: 0.5 }]}
+            >
+              <View style={styles.shutterInner} />
+            </Pressable>
+
+            {/* 카메라 전환 버튼 */}
+            <Pressable style={styles.flipBtn} onPress={toggleCameraFacing}>
+              <Ionicons name="camera-reverse-outline" size={28} color="#fff" />
+            </Pressable>
+          </View>
         )}
       </View>
     </View>
@@ -421,17 +463,19 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
 
-  // D-DAY
+  // D-DAY (왼쪽 상단, 회색 배경)
   ddayBadge: {
     position: 'absolute',
     top: 18,
-    alignSelf: 'center',
+    left: 18,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    borderRadius: 20,
   },
-  ddayText: { marginLeft: 6, color: '#fff', fontSize: 14 },
+  ddayText: { marginLeft: 6, color: '#fff', fontSize: 13, fontWeight: '600' },
 
   // 상단 오른쪽 버튼
   floatingTopButtonsGroupCamera: {
@@ -442,16 +486,12 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   floatBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: 'rgba(255,255,255,0.7)',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 3,
   },
 
   // 미션 말풍선 영역
@@ -468,30 +508,39 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
     marginHorizontal: 3,
-    backgroundColor: 'rgba(255,255,255,0.7)',
+    backgroundColor: 'rgba(255,255,255,0.5)',
   },
   missionDotActive: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#3279FF' },
 
-  hintRow: { flexDirection: 'row', alignItems: 'center' },
-  arrowBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.7)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: 6,
-  },
+  hintRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
 
+  // 첨부 이미지 스타일에 맞춘 말풍선
   hintBubble: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
     backgroundColor: 'rgba(255,255,255,0.7)',
-    borderRadius: 12,
+    borderRadius: 22,
+    maxWidth: '80%',
   },
-  hintText: { color: '#3279FF', fontSize: 13, textAlign: 'center', marginRight: 10 },
+  innerArrowArea: {
+    width: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hintTextWrap: {
+    flex: 1,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hintText: {
+    color: '#3279FF',
+    fontSize: 13,
+    textAlign: 'center',
+    fontWeight: '600',
+  },
 
   // 하단 버튼 영역
   bottomOverlay: {
@@ -501,6 +550,23 @@ const styles = StyleSheet.create({
     bottom: -40,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  bottomButtonsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    paddingHorizontal: 40,
+  },
+  galleryBtn: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(117, 117, 117, 0.9)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'absolute',
+    left: 40,
   },
   shutterOuter: {
     width: 86,
@@ -513,6 +579,16 @@ const styles = StyleSheet.create({
     borderColor: '#FF9191',
   },
   shutterInner: { width: 66, height: 66, borderRadius: 33, backgroundColor: '#FF9191' },
+  flipBtn: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(117, 117, 117, 0.9)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'absolute',
+    right: 40,
+  },
 
   topBarPreview: {
     position: 'absolute',
