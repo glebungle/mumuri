@@ -1,7 +1,7 @@
 // app/(tabs)/chat.tsx
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent, ListRenderItem } from 'react-native';
 import {
@@ -22,7 +22,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppText from '../../components/AppText';
 import { ChatIncoming, ChatReadUpdate, createChatClient } from '../lib/chatSocket';
 
-// 이 스크린에서만 pretendard-r 쓰는 래퍼
 const ChatText = (props: React.ComponentProps<typeof AppText>) => {
   const { style, ...rest } = props;
   return (
@@ -35,7 +34,7 @@ const ChatText = (props: React.ComponentProps<typeof AppText>) => {
 
 // ================== 환경 ==================
 const API_BASE = 'https://mumuri.shop';
-const WS_URL   = `${API_BASE}/ws-chat`;
+const WS_URL = `${API_BASE}/ws-chat`;
 
 const MAX_TEXT_LEN = 500;
 const HEADER_HEIGHT = 56;
@@ -43,6 +42,74 @@ const HEADER_HEIGHT = 56;
 const USE_STOMP = true;
 
 // ================== 내부 유틸(API) ==================
+const CHAT_CACHE_KEY = (roomId: string) => `chat_cache_${roomId}`;
+const MISSION_CACHE_KEY = 'performed_missions_cache';
+const CACHE_VERSION = 'v1'; 
+
+// 채팅 캐시 저장
+async function saveChatCache(roomId: string, messages: ChatMessage[]) {
+  try {
+    // 1. 상태가 failed인 것만 제외하고, sent나 sending은 모두 저장
+    const toSave = messages
+      .filter(m => m.status !== 'failed') 
+      .slice(-100); // 최근 100개
+
+    await AsyncStorage.setItem(
+      CHAT_CACHE_KEY(roomId),
+      JSON.stringify({ version: CACHE_VERSION, data: toSave })
+    );
+    console.log(`[cache saved] ${toSave.length} messages saved (room: ${roomId})`);
+  } catch (e) {
+    console.warn('[cache save]', e);
+  }
+}
+
+// 채팅 캐시 로드
+async function loadChatCache(roomId: string): Promise<ChatMessage[]> {
+  try {
+    const cached = await AsyncStorage.getItem(CHAT_CACHE_KEY(roomId));
+    if (!cached) return [];
+
+    const parsed = JSON.parse(cached);
+    if (parsed.version !== CACHE_VERSION) return []; 
+
+    return parsed.data || [];
+  } catch {
+    return [];
+  }
+}
+
+// 미션 캐시 저장
+async function saveMissionCache(missions: PerformedMission[]) {
+  try {
+    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const toSave = missions.filter(m => m.doneAtTs > cutoff);
+
+    await AsyncStorage.setItem(
+      MISSION_CACHE_KEY,
+      JSON.stringify({ version: CACHE_VERSION, data: toSave })
+    );
+  } catch (e) {
+    console.warn('[mission cache save]', e);
+  }
+}
+
+// 미션 캐시 로드
+async function loadMissionCache(): Promise<PerformedMission[]> {
+  try {
+    const cached = await AsyncStorage.getItem(MISSION_CACHE_KEY);
+    if (!cached) return [];
+
+    const parsed = JSON.parse(cached);
+    if (parsed.version !== CACHE_VERSION) return [];
+
+    return parsed.data || [];
+  } catch {
+    return [];
+  }
+}
+
+//--------------------------
 async function authedFetch(path: string, init: RequestInit = {}) {
   const token = await AsyncStorage.getItem('token');
   const headers = {
@@ -72,14 +139,13 @@ function normalizeGetUser(raw: any) {
 
 async function presignIfNeeded(rawUrl?: string | null) {
   if (!rawUrl) return null;
-  if (/\bX-Amz-Algorithm=/.test(rawUrl)) return rawUrl; // 이미 서명됨
+  if (/\bX-Amz-Algorithm=/.test(rawUrl)) return rawUrl; 
 
   const candidates: Array<
     { path: string; method: 'GET' | 'POST'; body?: any }
   > = [
-    // --- 미션 전용 경로 후보 ---
-    { path: `/api/couples/missions/today`, method: 'GET' },
-  ];
+      { path: `/api/couples/missions/today`, method: 'GET' },
+    ];
 
   for (const c of candidates) {
     try {
@@ -122,11 +188,11 @@ type ChatMessage = {
   text?: string;
   imageUrl?: string;
   mine: boolean;
-  createdAt: number; // ms
+  createdAt: number; 
   type: 'text' | 'image' | 'mission_text';
   status?: SendStatus;
   clientMsgId?: string | null;
-  alt?: string; // 이미지 로딩 실패 안내문 등
+  alt?: string; 
 };
 
 type DateMarker = { __type: 'date'; key: string; ts: number };
@@ -134,15 +200,15 @@ function isDateMarker(x: ChatMessage | DateMarker): x is DateMarker { return (x 
 
 type MissionProgressDto = {
   userId: number;
-  status: string;      // NOT_DONE / HALF_DONE / DONE 등
-  photoUrl?: string;   // raw or presigned
+  status: string;       
+  photoUrl?: string;    
   completedAt?: string;
   updatedAt?: string;
 };
 
 type MissionTodayDto = {
   missionId: number;
-  missionDate?: string; // 'YYYY-MM-DD'
+  missionDate?: string; 
   title?: string;
   description?: string | null;
   status?: string;
@@ -153,12 +219,12 @@ type PerformedMission = {
   missionId: number;
   title: string;
   missionDateTs: number;
-  doneAtTs: number;    // ✅ 실제 완료 시각(정렬/시간표시용)
+  doneAtTs: number;     
   me?: { url?: string | null; when?: number | null };
   partner?: { url?: string | null; when?: number | null };
 };
 
-// ================== 유틸(날짜/문자열) ==================
+// ================== 유틸 ==================
 function sameYMD(a: number, b: number) {
   const da = new Date(a), db = new Date(b);
   return da.getFullYear() === db.getFullYear()
@@ -176,7 +242,7 @@ function sameMinute(a: number, b: number) {
 function formatDate(ts: number) {
   const d = new Date(ts);
   const y = d.getFullYear(), m = d.getMonth() + 1, day = d.getDate();
-  const w = ['일','월','화','수','목','금','토'][d.getDay()];
+  const w = ['일', '월', '화', '수', '목', '금', '토'][d.getDay()];
   return `${y}년 ${m}월 ${day}일 ${w}요일`;
 }
 function formatTime(ts: number) {
@@ -190,13 +256,12 @@ function formatTime(ts: number) {
 }
 function uuid4() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-    const r = (Math.random()*16)|0, v = c === 'x' ? r : (r&0x3|0x8);
+    const r = (Math.random() * 16) | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
   });
 }
 function parseTSLocalOrISO(s?: string | null): number | null {
   if (!s) return null;
-  // YYYY-MM-DD 로컬 00:00 처리
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
   if (m) {
     const y = Number(m[1]), mo = Number(m[2]) - 1, d = Number(m[3]);
@@ -208,7 +273,6 @@ function parseTSLocalOrISO(s?: string | null): number | null {
 function isPerformed(status?: string) {
   if (!status) return false;
   const s = String(status).toUpperCase();
-  // NOT_STARTED 제외, 그 외(HALF_DONE/DONE/COMPLETE 등)는 수행으로 간주
   return !s.includes('NOT');
 }
 
@@ -222,7 +286,7 @@ export default function ChatScreen() {
       justCompletedMissionId?: string;
       justCompletedMissionText?: string;
       justCompletedPhotoUrl?: string;
-      justCompletedAt?: string; // complete API 가 리턴한 ISO(서버시간)
+      justCompletedAt?: string; 
     }>();
 
   const [token, setToken] = useState<string | undefined>(undefined);
@@ -239,6 +303,19 @@ export default function ChatScreen() {
 
   const [performedMissions, setPerformedMissions] = useState<PerformedMission[]>([]);
 
+  // 안전한 저장을 위한 Ref
+  const latestMessages = useRef(messages);
+  const latestPerformedMissions = useRef(performedMissions);
+
+  // State와 Ref 동기화
+  useEffect(() => {
+    latestMessages.current = messages;
+  }, [messages]);
+
+  useEffect(() => {
+    latestPerformedMissions.current = performedMissions;
+  }, [performedMissions]);
+
   const listRef = useRef<FlatList<ChatMessage | DateMarker>>(null);
   const chatRef = useRef<ReturnType<typeof createChatClient> | null>(null);
   const latestVisibleMsgId = useRef<string | null>(null);
@@ -246,12 +323,12 @@ export default function ChatScreen() {
   // 초기 사용자/커플 식별자 확보
   useEffect(() => {
     (async () => {
-      const entries = await AsyncStorage.multiGet(['token','userId','coupleId','coupleCode']);
+      const entries = await AsyncStorage.multiGet(['token', 'userId', 'coupleId', 'coupleCode']);
       const map = Object.fromEntries(entries);
-      const tokenStr   = map.token || undefined;
-      const userIdNum  = map.userId ? Number(map.userId) : null;
-      const coupleIdNum= map.coupleId ? Number(map.coupleId) : null;
-      const codeStr    = map.coupleCode || null;
+      const tokenStr = map.token || undefined;
+      const userIdNum = map.userId ? Number(map.userId) : null;
+      const coupleIdNum = map.coupleId ? Number(map.coupleId) : null;
+      const codeStr = map.coupleCode || null;
 
       setToken(tokenStr);
       setUserId(userIdNum);
@@ -271,20 +348,20 @@ export default function ChatScreen() {
           console.warn('[getuser] failed:', e?.message);
         }
       }
-
-      setTimeout(async () => {
-        const after = Object.fromEntries(await AsyncStorage.multiGet(['token','userId','coupleId','coupleCode']));
-        console.log('[chat final]', {
-          token: !!after.token,
-          userId: after.userId ?? null,
-          coupleId: after.coupleId ?? null,
-          coupleCode: after.coupleCode ?? null,
-        });
-      }, 300);
     })();
   }, []);
 
   const ROOM_KEY: string | null = (coupleId != null ? String(coupleId) : null);
+
+  // ✅ 화면이 종료(Unmount)될 때 최신 데이터 저장
+  useEffect(() => {
+    return () => {
+      if (ROOM_KEY) {
+        saveChatCache(ROOM_KEY, latestMessages.current);
+        saveMissionCache(latestPerformedMissions.current);
+      }
+    };
+  }, [ROOM_KEY]);
 
   // 키보드
   useEffect(() => {
@@ -301,24 +378,26 @@ export default function ChatScreen() {
     return () => { s1.remove(); s2.remove(); };
   }, []);
 
-  // STOMP 연결
+  // ✅ [수정] onIncoming을 useFocusEffect보다 위로 올림 (Hoisting 문제 해결)
   const onIncoming = useCallback((p: ChatIncoming) => {
     setMessages(prev => {
       if (p.id != null && prev.some(x => String(x.id) === String(p.id))) return prev;
 
-      // 클라 낙관 전송과 매칭
       if (p.clientMsgId) {
         const ix = prev.findIndex(x => x.clientMsgId === p.clientMsgId);
         if (ix >= 0) {
           const updated = [...prev];
           const cur = updated[ix];
           updated[ix] = {
-            ...cur,
+            ...(cur as ChatMessage),
             id: String(p.id ?? cur.id),
             status: 'sent',
             createdAt: p.createdAt ?? cur.createdAt,
             imageUrl: p.imageUrl ?? cur.imageUrl,
-          };
+          } as ChatMessage;
+
+          // 실시간 저장
+          if (ROOM_KEY) saveChatCache(ROOM_KEY, updated);
           return updated;
         }
       }
@@ -334,85 +413,138 @@ export default function ChatScreen() {
         status: 'sent',
       };
       if (prev.some(x => x.id === add.id)) return prev;
-      return [...prev, add];
+
+      const newMessages = [...prev, add];
+      if (ROOM_KEY) saveChatCache(ROOM_KEY, newMessages);
+      return newMessages;
     });
-  }, [userId]);
+  }, [userId, ROOM_KEY]);
 
-  useEffect(() => {
-    if (!USE_STOMP) return;
-    if (!token || !ROOM_KEY || !userId) {
-      console.log('[stomp guard]', { hasToken: !!token, ROOM_KEY, userId });
-      return;
-    }
+  // ✅ useFocusEffect (onIncoming 선언 후 사용)
+  useFocusEffect(
+    useCallback(() => {
+      // 1. 포커스 얻었을 때 (Mount/Focus)
+      if (!USE_STOMP || !token || !ROOM_KEY || !userId) return;
 
-    console.log('[stomp connect]', { ROOM_KEY, userId });
-    const chat = createChatClient({
-      wsUrl: WS_URL,
-      token,
-      roomId: ROOM_KEY,
-      handlers: {
-        onMessage: onIncoming,
-        onReadUpdate: (_u: ChatReadUpdate) => {},
-        onConnected: () => {
-          chatRef.current?.markAsRead(ROOM_KEY, userId, latestVisibleMsgId.current ?? undefined);
+      console.log('[useFocusEffect] Mounted/Focused - Connecting STOMP');
+      
+      const chat = createChatClient({
+        wsUrl: WS_URL,
+        token,
+        roomId: ROOM_KEY,
+        handlers: {
+          onMessage: onIncoming, // 이제 에러 안 남
+          onReadUpdate: (_u: ChatReadUpdate) => { },
+          onConnected: () => {
+            chatRef.current?.markAsRead(ROOM_KEY, userId, latestVisibleMsgId.current ?? undefined);
+          },
+          onError: (e: unknown) => console.warn('[STOMP ERROR]', e),
         },
-        onError: (e: unknown) => console.warn('[STOMP ERROR]', e),
-      },
-      connectTimeoutMs: 6000,
-    });
+        connectTimeoutMs: 6000,
+      });
 
-    chatRef.current = chat;
-    chat.activate();
-    return () => { chat.deactivate(); chatRef.current = null; };
-  }, [token, ROOM_KEY, userId, onIncoming]);
+      chatRef.current = chat;
+      chat.activate();
 
-  // 채팅 히스토리(있으면)
+      // 2. 포커스 잃었을 때 (Unmount/Blur)
+      return () => {
+        console.log('[useFocusEffect] Unmounted/Blurred - Disconnecting & Saving');
+        
+        chat.deactivate();
+        chatRef.current = null;
+
+        // 다른 탭 갈 때 반드시 저장!
+        if (ROOM_KEY) {
+            saveChatCache(ROOM_KEY, latestMessages.current);
+            saveMissionCache(latestPerformedMissions.current);
+        }
+      };
+    }, [token, ROOM_KEY, userId, onIncoming]) 
+  );
+
+
+  // 채팅 캐시 로드 + 히스토리 API 로드
   useEffect(() => {
     if (!ROOM_KEY || !token) return;
-    (async () => {
+
+    const loadData = async () => {
+      let cachedMsgs: ChatMessage[] = [];
+      let historyMsgs: ChatMessage[] = [];
+
       try {
-        const rows = await authedFetch(`/chat/${ROOM_KEY}/history?limit=50`, { method: 'GET' });
-        const mapped: ChatMessage[] = (rows || []).map((r: any) => ({
+        cachedMsgs = await loadChatCache(ROOM_KEY);
+      } catch (e: any) {
+        console.warn('[chat cache] load failed:', e?.message);
+      }
+
+      try {
+        const res: any = await authedFetch(`/chat/${ROOM_KEY}/history?size=50`, { method: 'GET' });
+        
+        // 🔍 디버깅용 로그
+        console.log('[chat history DEBUG]', JSON.stringify(res, null, 2));
+
+        let rows = [];
+        if (Array.isArray(res)) {
+          rows = res;
+        } else if (res && Array.isArray(res.messages)) {
+          rows = res.messages;
+        } else if (res && Array.isArray(res.content)) {
+          rows = res.content;
+        }
+
+        historyMsgs = rows.map((r: any) => ({
           id: String(r.id),
           text: r.message ?? undefined,
           imageUrl: r.imageUrl ?? undefined,
           mine: String(r.senderId) === String(userId ?? ''),
-          createdAt: Number(r.createdAt ?? Date.now()),
+          createdAt: r.sentAt ? new Date(r.sentAt).getTime() : (r.createdAt ? new Date(r.createdAt).getTime() : Date.now()),
           type: r.imageUrl ? 'image' : 'text',
           status: 'sent',
-        }));
-        setMessages(prev => {
-          const ids = new Set(prev.map(p => p.id));
-          const merged = [...prev, ...mapped.filter(m => !ids.has(m.id))];
-          return merged.sort((a, b) => a.createdAt - b.createdAt);
-        });
+        })) as ChatMessage[];
       } catch (e: any) {
         console.warn('[chat history] load failed:', e?.message);
       }
-    })();
+
+      setMessages(prev => {
+        const allMsgs = [...prev, ...cachedMsgs, ...historyMsgs];
+        const idMap = new Map<string, ChatMessage>();
+        for (const m of allMsgs) {
+          if (m.id.startsWith('local_') || m.id.startsWith('mission_')) {
+            idMap.set(m.id, m);
+            continue;
+          }
+          const existing = idMap.get(m.id);
+          if (!existing || m.createdAt > existing.createdAt) {
+            idMap.set(m.id, m);
+          }
+        }
+        const merged = Array.from(idMap.values());
+        return merged.sort((a, b) => a.createdAt - b.createdAt);
+      });
+    };
+
+    loadData();
   }, [ROOM_KEY, token, userId]);
 
-  // 오늘의 “수행된” 미션들만 가져오기 + presign
+  // 미션 캐시 로드 + 오늘 미션 API 병합
   useEffect(() => {
     if (!token || !userId) return;
-    (async () => {
+
+    const fetchAndMergeMissions = async () => {
+      let todayMissions: PerformedMission[] = [];
+      let cachedMissions: PerformedMission[] = [];
+
       try {
         const raw: MissionTodayDto[] = await authedFetch('/api/couples/missions/today', { method: 'GET' });
-        console.log('[mission today raw]', raw);
-
-        const out: PerformedMission[] = [];
-
+        
         for (const m of raw || []) {
-          // 미션 자체가 NOT_STARTED 라면 스킵(방어)
           if (!isPerformed(m.status)) {
-            // 단, progresses 중 누군가가 한 경우는 수행으로 간주
             const someoneDid = (m.progresses || []).some(p => isPerformed(p.status));
             if (!someoneDid) continue;
           }
 
           const title = (m.description || m.title || '오늘의 미션').trim();
           const missionDateTs = parseTSLocalOrISO(m.missionDate) ?? Date.now();
-
           const meP = (m.progresses || []).find(p => String(p.userId) === String(userId));
           const paP = (m.progresses || []).find(p => String(p.userId) !== String(userId));
 
@@ -423,47 +555,55 @@ export default function ChatScreen() {
             ? (parseTSLocalOrISO(paP.completedAt) ?? parseTSLocalOrISO(paP.updatedAt) ?? null)
             : null;
 
-          // presign
           const [meUrl, paUrl] = await Promise.all([
             presignIfNeeded(meP?.photoUrl),
             presignIfNeeded(paP?.photoUrl),
           ]);
 
-          // 이 미션의 "기준 시각" = 나/상대 완료 시각 중 가장 이른 것 (없으면 missionDateTs)
           const candidates: number[] = [];
           if (meWhen != null) candidates.push(meWhen);
           if (paWhen != null) candidates.push(paWhen);
           if (!candidates.length) candidates.push(missionDateTs);
           const doneAtTs = Math.min(...candidates);
 
-          out.push({
+          todayMissions.push({
             missionId: m.missionId,
             title,
             missionDateTs,
             doneAtTs,
-            me: meP && isPerformed(meP.status) ? {
-              url: meUrl,
-              when: meWhen,
-            } : undefined,
-            partner: paP && isPerformed(paP.status) ? {
-              url: paUrl,
-              when: paWhen,
-            } : undefined,
+            me: meP && isPerformed(meP.status) ? { url: meUrl, when: meWhen } : undefined,
+            partner: paP && isPerformed(paP.status) ? { url: paUrl, when: paWhen } : undefined,
           });
         }
 
-        // ✅ 실제 완료 시각 기준으로 정렬(오래된→최근)
-        out.sort((a, b) => a.doneAtTs - b.doneAtTs);
+        cachedMissions = await loadMissionCache();
 
-        setPerformedMissions(out);
+        const allMissions = new Map<number, PerformedMission>();
+        for (const m of cachedMissions) allMissions.set(m.missionId, m);
+        for (const m of todayMissions) allMissions.set(m.missionId, m);
+
+        const mergedMissions = Array.from(allMissions.values());
+        mergedMissions.sort((a, b) => a.doneAtTs - b.doneAtTs);
+
+        setPerformedMissions(mergedMissions);
+        saveMissionCache(mergedMissions);
+
       } catch (e: any) {
-        console.warn('[mission today] failed:', e?.message);
-        setPerformedMissions([]);
+        console.warn('[mission load failed]', e?.message);
+        try {
+          const cached = await loadMissionCache();
+          cached.sort((a, b) => a.doneAtTs - b.doneAtTs);
+          setPerformedMissions(cached);
+        } catch {
+          setPerformedMissions([]);
+        }
       }
-    })();
+    };
+
+    fetchAndMergeMissions();
   }, [token, userId]);
 
-  // ✅ share → chat로 넘어올 때, 방금 완료한 미션을 "그 시각"으로 낙관 반영
+  // 미션 완료 후 처리
   const appendedOnceRef = useRef(false);
   useEffect(() => {
     if (appendedOnceRef.current) return;
@@ -473,31 +613,64 @@ export default function ChatScreen() {
     const title = (justCompletedMissionText || '오늘의 미션').trim();
     const img = (justCompletedPhotoUrl || '').trim() || undefined;
 
-    // 텍스트 → 이미지 (같은 미션 아이템 아래)
-    setMessages(prev => ([
-      ...prev,
-      {
-        id: `mission_text_opt_${justCompletedMissionId}_${ts}`,
-        type: 'mission_text',
-        text: title,
-        mine: true,
-        createdAt: ts,
-        status: 'sent',
-      },
-      ...(img ? [{
-        id: `mission_img_opt_${justCompletedMissionId}_${ts}`,
-        type: 'image',
-        imageUrl: img,
-        mine: true,
-        createdAt: ts,
-        status: 'sent',
-      } as ChatMessage] : []),
-    ]));
+    setMessages(prev => {
+      const newMsgs = [
+        ...prev,
+        {
+          id: `mission_text_opt_${justCompletedMissionId}_${ts}`,
+          type: 'mission_text',
+          text: title,
+          mine: true,
+          createdAt: ts,
+          status: 'sent',
+        } as ChatMessage,
+        ...(img ? [{
+          id: `mission_img_opt_${justCompletedMissionId}_${ts}`,
+          type: 'image',
+          imageUrl: img,
+          mine: true,
+          createdAt: ts,
+          status: 'sent',
+        } as ChatMessage] : []),
+      ];
+
+      if (ROOM_KEY) saveChatCache(ROOM_KEY, newMsgs);
+      return newMsgs;
+    });
+
+    setPerformedMissions(prev => {
+      const newMission: PerformedMission = {
+        missionId: Number(justCompletedMissionId),
+        title,
+        missionDateTs: ts,
+        doneAtTs: ts,
+        me: { url: img, when: ts },
+        partner: undefined
+      };
+
+      const map = new Map<number, PerformedMission>();
+      prev.forEach(m => map.set(m.missionId, m));
+      const existing = map.get(newMission.missionId);
+      if (existing) {
+        map.set(newMission.missionId, {
+          ...existing,
+          me: newMission.me,
+          doneAtTs: Math.min(existing.doneAtTs, ts)
+        });
+      } else {
+        map.set(newMission.missionId, newMission);
+      }
+
+      const updated = Array.from(map.values()).sort((a, b) => a.doneAtTs - b.doneAtTs);
+      saveMissionCache(updated);
+      return updated;
+    });
+
     appendedOnceRef.current = true;
     requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
-  }, [justCompletedMissionId, justCompletedMissionText, justCompletedPhotoUrl, justCompletedAt]);
+  }, [justCompletedMissionId, justCompletedMissionText, justCompletedPhotoUrl, justCompletedAt, ROOM_KEY]);
 
-  // 텍스트 전송(이미지 전송 기능 제거)
+  // 텍스트 전송
   const sendMessage = useCallback(async () => {
     if (!ROOM_KEY || !userId) {
       Alert.alert('안내', '커플 정보가 아직 준비되지 않았어요.');
@@ -517,7 +690,7 @@ export default function ChatScreen() {
     const tempId = `local_${clientMsgId}`;
     const createdAt = Date.now();
 
-    setMessages(prev => ([...prev, {
+    const newMessage: ChatMessage = {
       id: tempId,
       text: trimmed,
       mine: true,
@@ -525,7 +698,12 @@ export default function ChatScreen() {
       type: 'text',
       status: USE_STOMP ? 'sending' : 'sent',
       clientMsgId,
-    }]));
+    };
+
+    setMessages(prev => {
+      const newMessages = [...prev, newMessage];
+      return newMessages;
+    });
     setText('');
 
     try {
@@ -537,61 +715,82 @@ export default function ChatScreen() {
           createdAt,
         });
       } else {
-        setMessages(prev => prev.map(m => m.id === tempId ? ({ ...m, status: 'sent' }) : m));
+        setMessages(prev => {
+          const newMessages = prev.map(m => m.id === tempId ? ({ ...m, status: 'sent' } as ChatMessage) : m);
+          if (ROOM_KEY) saveChatCache(ROOM_KEY, newMessages);
+          return newMessages;
+        });
       }
     } catch {
-      setMessages(prev => prev.map(m => m.id === tempId ? ({ ...m, status:'failed' }) : m));
-      Alert.alert('전송 실패','메시지 전송 중 오류가 발생했어요.');
+      setMessages(prev => prev.map(m => m.id === tempId ? ({ ...m, status: 'failed' } as ChatMessage) : m));
+      Alert.alert('전송 실패', '메시지 전송 중 오류가 발생했어요.');
     } finally {
       setSending(false);
     }
   }, [ROOM_KEY, userId, sending, text]);
 
-  // 날짜 마커 + “수행된 미션들”을 ‘텍스트 바로 아래 그 미션의 사진’으로 묶어 합성
+  // 렌더링 데이터 생성
   const listData = useMemo<(ChatMessage | DateMarker)[]>(() => {
-    const baseMsgs = [...messages].sort((a,b) => a.createdAt - b.createdAt);
-
+    const baseMsgs = [...messages];
     const missionMsgs: ChatMessage[] = [];
+
     for (const m of performedMissions) {
       const baseTs = m.doneAtTs ?? m.missionDateTs;
 
-      // 1) 미션 텍스트 (완료 시각 기준)
-      missionMsgs.push({
-        id: `mission_text_${m.missionId}`,
-        type: 'mission_text',
-        text: m.title || '오늘의 미션',
-        mine: true,
-        createdAt: baseTs,
-        status: 'sent',
-      });
+      const missionTextId = `mission_text_${m.missionId}`;
+      const optTextId = `mission_text_opt_${m.missionId}`;
+      
+      const hasText = baseMsgs.some(msg => 
+        msg.id === missionTextId || msg.id.startsWith(optTextId)
+      );
 
-      // 2) (있다면) 파트너 사진
-      if (m.partner?.url) {
+      if (!hasText) {
         missionMsgs.push({
-          id: `mission_img_partner_${m.missionId}`,
-          type: 'image',
-          imageUrl: m.partner.url,
-          mine: false,
-          createdAt: m.partner.when ?? baseTs,
+          id: missionTextId,
+          type: 'mission_text',
+          text: m.title || '오늘의 미션',
+          mine: true,
+          createdAt: baseTs,
           status: 'sent',
-        });
+        } as ChatMessage);
       }
 
-      // 3) (있다면) 내 사진
+      if (m.partner?.url) {
+        const missionImgPartnerId = `mission_img_partner_${m.missionId}`;
+        const hasImg = baseMsgs.some(msg => msg.id === missionImgPartnerId);
+        if (!hasImg) {
+          missionMsgs.push({
+            id: missionImgPartnerId,
+            type: 'image',
+            imageUrl: m.partner.url,
+            mine: false,
+            createdAt: m.partner.when ?? baseTs,
+            status: 'sent',
+          } as ChatMessage);
+        }
+      }
+
       if (m.me?.url) {
-        missionMsgs.push({
-          id: `mission_img_me_${m.missionId}`,
-          type: 'image',
-          imageUrl: m.me.url,
-          mine: true,
-          createdAt: m.me.when ?? baseTs,
-          status: 'sent',
-        });
+        const missionImgMeId = `mission_img_me_${m.missionId}`;
+        const optImgId = `mission_img_opt_${m.missionId}`;
+        const hasImg = baseMsgs.some(msg => 
+          msg.id === missionImgMeId || msg.id.startsWith(optImgId)
+        );
+
+        if (!hasImg) {
+          missionMsgs.push({
+            id: missionImgMeId,
+            type: 'image',
+            imageUrl: m.me.url,
+            mine: true,
+            createdAt: m.me.when ?? baseTs,
+            status: 'sent',
+          } as ChatMessage);
+        }
       }
     }
 
-    // ✅ 채팅 히스토리 + 미션 메시지들을 createdAt 기준으로 한 번 더 정렬
-    const merged = [...baseMsgs, ...missionMsgs].sort((a,b) => a.createdAt - b.createdAt);
+    const merged = [...baseMsgs, ...missionMsgs].sort((a, b) => a.createdAt - b.createdAt);
 
     const out: (ChatMessage | DateMarker)[] = [];
     let lastTs: number | null = null;
@@ -629,7 +828,7 @@ export default function ChatScreen() {
     }
   }).current;
 
-  // ================== 렌더러 ==================
+  // 렌더링
   const renderItem: ListRenderItem<ChatMessage | DateMarker> = useCallback(({ item, index }) => {
     if (isDateMarker(item)) {
       return (
@@ -668,7 +867,6 @@ export default function ChatScreen() {
                 resizeMode="cover"
                 onError={(e) => {
                   console.warn('[IMG ERROR]', m.imageUrl, e.nativeEvent?.error);
-                  // presign 실패/만료 등으로 안 보일 때 안내
                   m.alt = '이미지를 불러오지 못했어요';
                 }}
               />
@@ -684,7 +882,7 @@ export default function ChatScreen() {
             ) : null}
           </View>
           {showTime && (
-            <ChatText style={styles.timeTextLeft}>
+            <ChatText style={[styles.timeTextLeft, mine ? { alignSelf: 'flex-end', marginRight: 6 } : { alignSelf: 'flex-start', marginLeft: 6 }]}>
               {formatTime(m.createdAt)}
             </ChatText>
           )}
@@ -720,7 +918,6 @@ export default function ChatScreen() {
           <Ionicons name="chevron-back" size={24} color="#111" />
         </Pressable>
         <AppText style={styles.headerTitle}>애인</AppText>
-        {/* 갤러리/카메라 버튼 삭제: “그냥 사진 보내기” 기능 제거 */}
         <View style={{ width: 30 }} />
       </View>
 
@@ -807,7 +1004,6 @@ const styles = StyleSheet.create({
   bubbleMine: { backgroundColor: '#6198FF' },
   bubbleOther: { backgroundColor: '#fff', borderWidth: StyleSheet.hairlineWidth, borderColor: '#e5e7eb' },
 
-  // 이미지 전용 카드 컨테이너 (배경 말풍선 없음)
   imageBoxMine: {
     borderRadius: 18,
     overflow: 'hidden',
@@ -828,8 +1024,8 @@ const styles = StyleSheet.create({
   missionImage: {
     width: STICKER_SIZE * 1.6,
     height: STICKER_SIZE * 1.6,
-    borderRadius: 0, // 컨테이너에서 radius 처리
-    backgroundColor: '#DDE7FF', // 로딩 시 배경
+    borderRadius: 0, 
+    backgroundColor: '#DDE7FF', 
   },
   bubbleMissionText: {
     paddingHorizontal: 12,
@@ -846,7 +1042,7 @@ const styles = StyleSheet.create({
   msgTextMine: { color: '#fff' },
   msgTextOther: { color: '#111' },
 
-  timeTextLeft: { marginTop: 4, fontSize: 10, color: '#888', alignSelf: 'flex-start', marginLeft: 6 },
+  timeTextLeft: { marginTop: 4, fontSize: 10, color: '#888' },
 
   metaWrapRight: { marginLeft: 6, alignItems: 'center', justifyContent: 'flex-end' },
 
