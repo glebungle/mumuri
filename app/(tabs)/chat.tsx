@@ -351,7 +351,8 @@ export default function ChatScreen() {
     })();
   }, []);
 
-  const ROOM_KEY: string | null = (coupleId != null ? String(coupleId) : null);
+  // const ROOM_KEY: string | null = (coupleId != null ? String(coupleId) : null);
+  const ROOM_KEY = "902";
 
   // ✅ 화면이 종료(Unmount)될 때 최신 데이터 저장
   useEffect(() => {
@@ -378,11 +379,14 @@ export default function ChatScreen() {
     return () => { s1.remove(); s2.remove(); };
   }, []);
 
-  // ✅ [수정] onIncoming을 useFocusEffect보다 위로 올림 (Hoisting 문제 해결)
+  // ✅ [수정] STOMP 메시지 수신 핸들러 (내용 기반 중복 제거 추가)
   const onIncoming = useCallback((p: ChatIncoming) => {
     setMessages(prev => {
+      // 1. 이미 똑같은 서버 ID를 가진 메시지가 있으면 무시 (완전 중복 방지)
       if (p.id != null && prev.some(x => String(x.id) === String(p.id))) return prev;
 
+      // 2. [기존 로직] clientMsgId가 일치하는 로컬 메시지 찾기
+      // (백엔드가 clientMsgId를 안 돌려주면 여기서 못 찾고 넘어감)
       if (p.clientMsgId) {
         const ix = prev.findIndex(x => x.clientMsgId === p.clientMsgId);
         if (ix >= 0) {
@@ -396,13 +400,39 @@ export default function ChatScreen() {
             imageUrl: p.imageUrl ?? cur.imageUrl,
           } as ChatMessage;
 
-          // 실시간 저장
           if (ROOM_KEY) saveChatCache(ROOM_KEY, updated);
           return updated;
         }
       }
 
       const isMine = String(p.senderId) === String(userId ?? '');
+      
+      // ✅ [신규 추가] clientMsgId가 없어도, "내용"과 "보낸 사람"이 같으면 같은 메시지로 간주 (방어 로직)
+      if (isMine && p.message) {
+        // 내 로컬 메시지 중, 내용이 같고 아직 'sending' 상태이거나 id가 'local_'로 시작하는 녀석을 찾음
+        const matchIndex = prev.findIndex(m => 
+          m.id.startsWith('local_') && 
+          m.text === p.message &&
+          m.mine === true
+        );
+
+        if (matchIndex >= 0) {
+          // 찾았다! 로컬 메시지를 서버 메시지로 교체 (중복 생성 X)
+          const updated = [...prev];
+          const cur = updated[matchIndex];
+          updated[matchIndex] = {
+            ...cur, // 기존 로컬 속성 유지
+            id: String(p.id ?? cur.id), // ID는 서버 ID로 교체
+            status: 'sent', // 전송 완료 처리
+            createdAt: p.createdAt ?? cur.createdAt, // 시간 서버 시간으로 동기화
+          } as ChatMessage;
+
+          if (ROOM_KEY) saveChatCache(ROOM_KEY, updated);
+          return updated;
+        }
+      }
+
+      // 3. 일치하는 로컬 메시지가 없으면 "새 메시지"로 추가 (상대방 메시지 등)
       const add: ChatMessage = {
         id: String(p.id ?? `${Date.now()}`),
         text: p.message ?? undefined,
@@ -412,6 +442,8 @@ export default function ChatScreen() {
         type: p.imageUrl ? 'image' : 'text',
         status: 'sent',
       };
+      
+      // 혹시라도 ID가 겹치는지 마지막 확인
       if (prev.some(x => x.id === add.id)) return prev;
 
       const newMessages = [...prev, add];
@@ -463,68 +495,102 @@ export default function ChatScreen() {
   );
 
 
-  // 채팅 캐시 로드 + 히스토리 API 로드
-  useEffect(() => {
-    if (!ROOM_KEY || !token) return;
+  // ✅ 채팅 캐시 로드 + 히스토리 API 로드 (중복 제거 로직 강화)
+    useEffect(() => {
+      if (!ROOM_KEY || !token) return;
 
-    const loadData = async () => {
-      let cachedMsgs: ChatMessage[] = [];
-      let historyMsgs: ChatMessage[] = [];
+      const loadData = async () => {
+        let cachedMsgs: ChatMessage[] = [];
+        // [Correction 1] Initialize as empty array first. Do not map 'rows' here.
+        let historyMsgs: ChatMessage[] = []; 
 
-      try {
-        cachedMsgs = await loadChatCache(ROOM_KEY);
-      } catch (e: any) {
-        console.warn('[chat cache] load failed:', e?.message);
-      }
-
-      try {
-        const res: any = await authedFetch(`/chat/${ROOM_KEY}/history?size=50`, { method: 'GET' });
-        
-        // 🔍 디버깅용 로그
-        console.log('[chat history DEBUG]', JSON.stringify(res, null, 2));
-
-        let rows = [];
-        if (Array.isArray(res)) {
-          rows = res;
-        } else if (res && Array.isArray(res.messages)) {
-          rows = res.messages;
-        } else if (res && Array.isArray(res.content)) {
-          rows = res.content;
+        // 1. 캐시 로드
+        try {
+          cachedMsgs = await loadChatCache(ROOM_KEY);
+        } catch (e: any) {
+          console.warn('[chat cache] load failed:', e?.message);
         }
 
-        historyMsgs = rows.map((r: any) => ({
-          id: String(r.id),
-          text: r.message ?? undefined,
-          imageUrl: r.imageUrl ?? undefined,
-          mine: String(r.senderId) === String(userId ?? ''),
-          createdAt: r.sentAt ? new Date(r.sentAt).getTime() : (r.createdAt ? new Date(r.createdAt).getTime() : Date.now()),
-          type: r.imageUrl ? 'image' : 'text',
-          status: 'sent',
-        })) as ChatMessage[];
-      } catch (e: any) {
-        console.warn('[chat history] load failed:', e?.message);
-      }
+        // 2. 히스토리 API 로드
+        try {
+          const res: any = await authedFetch(`/chat/${ROOM_KEY}/history?size=50`, { method: 'GET' });
+          
+          let rows = [];
+          if (Array.isArray(res)) {
+            rows = res;
+          } else if (res && Array.isArray(res.messages)) {
+            rows = res.messages;
+          } else if (res && Array.isArray(res.content)) {
+            rows = res.content;
+          }
 
-      setMessages(prev => {
-        const allMsgs = [...prev, ...cachedMsgs, ...historyMsgs];
-        const idMap = new Map<string, ChatMessage>();
-        for (const m of allMsgs) {
-          if (m.id.startsWith('local_') || m.id.startsWith('mission_')) {
-            idMap.set(m.id, m);
-            continue;
-          }
-          const existing = idMap.get(m.id);
-          if (!existing || m.createdAt > existing.createdAt) {
-            idMap.set(m.id, m);
-          }
+          // [Correction 2] Move the mapping logic INSIDE here, after 'rows' is defined
+          historyMsgs = rows.map((r: any) => {
+            // ✅ 시간 보정 로직 (moved inside)
+            let timeString = r.sentAt;
+            if (timeString && !timeString.endsWith('Z')) {
+              timeString += 'Z'; 
+            }
+
+            return {
+              id: String(r.id),
+              text: r.message ?? undefined,
+              imageUrl: r.imageUrl ?? undefined,
+              mine: String(r.senderId) === String(userId ?? ''),
+              // ✅ 수정된 timeString 사용
+              createdAt: timeString 
+                ? new Date(timeString).getTime() 
+                : (r.createdAt ? new Date(r.createdAt).getTime() : Date.now()),
+              type: r.imageUrl ? 'image' : 'text',
+              status: 'sent',
+            };
+          }) as ChatMessage[];
+          
+        } catch (e: any) {
+          console.warn('[chat history] load failed:', e?.message);
         }
-        const merged = Array.from(idMap.values());
-        return merged.sort((a, b) => a.createdAt - b.createdAt);
-      });
-    };
 
-    loadData();
-  }, [ROOM_KEY, token, userId]);
+        // 3. 병합 및 똑똑한 중복 제거 (Dedup Logic)
+        setMessages(prev => {
+          // (1) 서버에서 온 메시지들 중 가장 최신 시간 구하기
+          const serverMsgs = historyMsgs.filter(m => !m.id.startsWith('local_'));
+          const latestServerTime = serverMsgs.length > 0 
+            ? Math.max(...serverMsgs.map(m => m.createdAt)) 
+            : 0;
+
+          // (2) 모든 메시지 합치기
+          const allMsgs = [...prev, ...cachedMsgs, ...historyMsgs];
+          const idMap = new Map<string, ChatMessage>();
+
+          for (const m of allMsgs) {
+            // A. 서버 메시지(숫자 ID)는 무조건 저장
+            if (!m.id.startsWith('local_') && !m.id.startsWith('mission_')) {
+              idMap.set(m.id, m);
+              continue;
+            }
+
+            // B. 미션 메시지는 유지
+            if (m.id.startsWith('mission_')) {
+              idMap.set(m.id, m);
+              continue;
+            }
+
+            // C. 로컬 메시지('local_') 처리:
+            if (m.id.startsWith('local_')) {
+              if (m.createdAt <= latestServerTime + 1000) {
+                continue; 
+              }
+              idMap.set(m.id, m);
+            }
+          }
+
+          const merged = Array.from(idMap.values());
+          return merged.sort((a, b) => a.createdAt - b.createdAt);
+        });
+      };
+
+      loadData();
+    }, [ROOM_KEY, token, userId]);
 
   // 미션 캐시 로드 + 오늘 미션 API 병합
   useEffect(() => {

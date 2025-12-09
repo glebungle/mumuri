@@ -269,7 +269,7 @@ export default function MyPage() {
             </View>
           </View>
 
-          <AppText style={styles.nameText}>
+          <AppText type='pretendard-b' style={styles.nameText}>
             {profile.name || (loading ? '불러오는 중...' : '이름 미등록')}
           </AppText>
           {!!profile.birthDate && (
@@ -277,7 +277,7 @@ export default function MyPage() {
           )}
 
           <Pressable style={styles.editButton}>
-            <AppText style={styles.editButtonText}>프로필 편집</AppText>
+            <AppText type='pretendard-m' style={styles.editButtonText}>프로필 편집</AppText>
           </Pressable>
         </View>
 
@@ -303,7 +303,7 @@ export default function MyPage() {
               <AppText style={styles.smallDateText}>
                 {formatDate(profile.startDay)}
               </AppText>
-              <AppText style={styles.bigNumberText}>
+              <AppText type='pretendard-m' style={styles.bigNumberText}>
                 {profile.currentDayCount}일째
               </AppText>
               <AppText style={styles.subLabelText}>기념일</AppText>
@@ -316,9 +316,9 @@ export default function MyPage() {
               <View key={days} style={styles.listItem}>
                 <View style={styles.listItemLeft}>
                   <Ionicons name="heart-outline" size={20} color="#FF9E9E" />
-                  <AppText style={styles.dayLabel}>{days}일</AppText>
+                  <AppText type='pretendard-b' style={styles.dayLabel}>{days}일</AppText>
                 </View>
-                <AppText type='medium' style={styles.dateValue}>{getAnniversaryDate(days)}</AppText>
+                <AppText type='pretendard-m' style={styles.dateValue}>{getAnniversaryDate(days)}</AppText>
               </View>
             ))}
 
@@ -328,7 +328,7 @@ export default function MyPage() {
                 <Ionicons name="heart-outline" size={20} color="#FF9E9E" />
                 <AppText style={styles.dayLabel}>1주년</AppText>
               </View>
-              <AppText type='medium' style={styles.dateValue}>{getAnniversaryDate(365)}</AppText>
+              <AppText type='pretendard-m' style={styles.dateValue}>{getAnniversaryDate(365)}</AppText>
             </View>
           </View>
         </View>
@@ -379,16 +379,10 @@ const styles = StyleSheet.create({
   },
   editButton: {
     backgroundColor: '#FFF',
+    marginTop: 15,
     paddingVertical: 8,
     paddingHorizontal: 16,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#EEE',
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    borderRadius: 8,
   },
   editButtonText: {
     fontSize: 13,
@@ -421,9 +415,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   verticalDivider: {
-    width: 1,
-    height: '80%',
-    backgroundColor: '#E0E0E0',
+    width: 2,
+    height: '100%',
+    backgroundColor: '#E2E2E2',
     marginHorizontal: 10,
   },
   bigNumberText: {
@@ -448,9 +442,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#FFF0F2',
-    borderWidth: 2,
-    borderColor: '#F3BDB8',
+    backgroundColor: '#FFF1F1',
     borderRadius: 12,
     paddingVertical: 16,
     paddingHorizontal: 20,
@@ -466,6 +458,6 @@ const styles = StyleSheet.create({
   },
   dateValue: {
     fontSize: 13,
-    color: '#666',
+    color: '#626262',
   },
 });

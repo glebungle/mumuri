@@ -55,13 +55,27 @@ export type Photo = {
 
 type PhotosByDate = Record<string, Photo[]>;
 
-/** 서버 응답 → 클라이언트 표준화 */
+/** ✅ [수정됨] 서버 응답 → 클라이언트 표준화 (photoUrl 추가 및 로그 강화) */
 function normalizePhoto(raw: any): Photo | null {
   if (!raw || typeof raw !== 'object') return null;
-  const id = raw.id ?? raw.photo_id ?? raw.photoId ?? raw.uuid;
-  const url = raw.presignedUrl ?? raw.url;
-  const createdAt = raw.createdAt ?? raw.created_at;
-  if (id == null || !url || !createdAt) return null;
+
+  // ID 필드명 호환성 강화
+  const id = raw.id ?? raw.photo_id ?? raw.photoId ?? raw.uuid ?? raw.missionId;
+  
+  // ✅ [핵심 수정] photoUrl 추가 (미션 API와 동일하게 맞춤)
+  const url = raw.presignedUrl ?? raw.url ?? raw.photoUrl ?? raw.photo_url;
+  
+  const createdAt = raw.createdAt ?? raw.created_at ?? raw.date;
+
+  // 🔍 [디버깅] 데이터가 있는데 버려지는지 확인하기 위한 로그
+  if (id == null || !url || !createdAt) {
+    console.log('[gallery skip] 필수 데이터 누락되어 제외됨:', 
+      { id, hasUrl: !!url, createdAt }, 
+      JSON.stringify(raw)
+    );
+    return null;
+  }
+
   return {
     id: String(id),
     url: String(url),
@@ -275,6 +289,7 @@ export default function GalleryTab() {
     [ensureAuthBasics],
   );
 
+  // ✅ [수정됨] loadAll 함수: 로그 추가
   const loadAll = useCallback(
     async (showSpinner: boolean = true) => {
       if (showSpinner) setInitialLoading(true);
@@ -285,11 +300,23 @@ export default function GalleryTab() {
           throw new Error('커플 ID를 찾을 수 없어요.');
         }
         const path = `/photo/${encodeURIComponent(String(cid))}/all`;
+        console.log(`[gallery] requesting: ${path}`);
+
         const data = await authedFetch(path, { method: 'GET' });
+        
+        // 🔍 [디버깅] 서버가 실제로 뭘 주는지 원본 로그 출력 (가장 중요!)
+        // 데이터가 너무 길 수 있으니 앞부분 1000자만 찍습니다.
+        console.log('[gallery raw data]', JSON.stringify(data, null, 2).slice(0, 1000)); 
+
         const arr: any[] = Array.isArray(data)
           ? data
           : data?.items || data?.data || data?.content || data?.list || data?.records || [];
+        
+        console.log(`[gallery] items count from server: ${arr.length}`);
+
         const normalized = arr.map(normalizePhoto).filter(Boolean) as Photo[];
+        console.log(`[gallery] normalized count: ${normalized.length}`); 
+
         const grouped = groupPhotosByDate(normalized);
 
         setAllPhotos(normalized);
@@ -437,6 +464,7 @@ export default function GalleryTab() {
 
   return (
     <View style={styles.container}>
+      <AppText style={styles.calendar}>미션 캘린더</AppText>
       <Calendar
         style={styles.calendar}
         renderArrow={(direction) => (
