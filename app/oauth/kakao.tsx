@@ -39,7 +39,7 @@ export default function KakaoDeepLinkHandler() {
 
         // 3) 라우팅
         if (status === 'NEW' || status === 'NEED_INFO') router.replace('/signup');
-        else router.replace('/(tabs)/camera');
+        else router.replace('/(tabs)/home');
       } catch (e: any) {
         console.warn('getuser failed:', e?.message);
         // // 그래도 회원가입으로 안내

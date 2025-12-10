@@ -158,7 +158,7 @@ export default function KakaoLoginButton() {
         }
 
         if (/COUPLED|OK|DONE/i.test(status)) {
-          router.replace('/(tabs)/camera');
+          router.replace('/(tabs)/home');
         } else {
           router.replace('/signup');
         }

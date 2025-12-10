@@ -6,8 +6,8 @@ import * as MediaLibrary from 'expo-media-library';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, Image, Pressable, StyleSheet, View } from 'react-native';
-import AppText from '../../components/AppText';
-import { ChatIncoming, ChatReadUpdate, createChatClient } from '../lib/chatSocket';
+import AppText from '../components/AppText';
+import { ChatIncoming, ChatReadUpdate, createChatClient } from './lib/chatSocket';
 
 const BASE_URL = 'https://mumuri.shop';
 const WS_URL   = `${BASE_URL}/ws-chat`;
@@ -370,7 +370,7 @@ export default function ShareScreen() {
 
         // 채팅으로 이동 (미션 텍스트/사진 URL 같이 넘기기)
         router.replace({
-          pathname: '/(tabs)/chat',
+          pathname: '/chat',
           params: {
             justCompletedMissionId: String(mid),
             justCompletedMissionText: missionDescription || missionTitle || '',
@@ -414,7 +414,7 @@ export default function ShareScreen() {
           }
         }
 
-        router.replace('/(tabs)/chat');
+        router.replace('/chat');
       }
 
     } catch (e: any) {
