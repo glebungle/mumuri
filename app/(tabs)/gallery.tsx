@@ -1,3 +1,4 @@
+// app/(tabs)/gallery.tsx
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { format, parseISO } from 'date-fns';
@@ -185,7 +186,7 @@ export default function GalleryScreen() {
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <View style={styles.tabSwitch}>
           <Pressable onPress={goHome} style={styles.inactiveTab}>
-            <AppText style={styles.inactiveTabText}>   홈   </AppText>
+            <AppText type='medium' style={styles.inactiveTabText}>   홈   </AppText>
           </Pressable>
           <Pressable style={styles.activeTab}>
             <AppText style={styles.activeTabText}>갤러리</AppText>
@@ -200,7 +201,7 @@ export default function GalleryScreen() {
       {/* 2. 그리드 뷰 */}
       {!coupleId ? (
         <View style={styles.center}>
-          <AppText style={styles.emptyText}>커플을 연결해주세요!</AppText>
+          <AppText type='medium' style={styles.emptyText}>마이페이지에서 커플을 연결해주세요!</AppText>
         </View>
       ) : photos.length === 0 ? (
         <View style={styles.center}>
@@ -298,6 +299,8 @@ export default function GalleryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    paddingTop:'7%',
+    paddingHorizontal:20,
     backgroundColor: '#FFFCF5',
   },
   center: {
@@ -306,8 +309,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyText: {
-    color: '#888',
+    color: '#808080',
     fontSize: 16,
+    marginBottom:'50%',
   },
 
   // --- 헤더 ---
@@ -342,7 +346,7 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
   inactiveTabText: {
-    color: '#AAA',
+    color: '#666666',
     fontSize: 14,
   },
 

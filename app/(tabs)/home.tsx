@@ -1,3 +1,4 @@
+// app/(tabs)/home.tsx
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
@@ -152,7 +153,7 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      {/* 1. 배경 이미지 & 그라데이션 (Position Absolute로 뒤에 깔림) */}
+      {/* 1. 배경 이미지 & 그라데이션  */}
       <View style={styles.backgroundLayer}>
         <ImageBackground
           source={bgImage ? { uri: bgImage } : require('../../assets/images/default_bg.jpeg')} 
@@ -162,11 +163,11 @@ export default function HomeScreen() {
           {/* 이미지 위 어두운 필터 */}
           <View style={styles.dimOverlay} />
           
-          {/* ✅ 하단 그라데이션: 이미지가 끝나면서 배경색과 자연스럽게 연결 */}
+          {/* 그라데이션*/}
           <LinearGradient
             colors={['transparent', '#FFFCF5']}
             style={styles.gradientOverlay}
-            locations={[0.2, 1]} // 투명에서 시작해 맨 끝에서 배경색이 됨
+            locations={[0.2, 1]} 
           />
         </ImageBackground>
       </View>
@@ -174,16 +175,16 @@ export default function HomeScreen() {
       {/* 2. 메인 컨텐츠 (z-index 상위) */}
       <View style={styles.contentContainer}>
         
-        {/* 상단 영역 (헤더 + 정보) */}
-        <View>
+        {/* 상단 영역 */}
+        <View style={styles.headerContainer}>
           <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
             <View style={styles.tabSwitch}>
               <Pressable style={styles.activeTab}>
-                <AppText style={styles.activeTabText}>   홈   </AppText>
+                <AppText style={styles.activeTabText}>   홈   </AppText>
                 <View style={styles.activeIndicator} />
               </Pressable>
               <Pressable onPress={handlePressGalleryTab} style={styles.inactiveTab}>
-                <AppText style={styles.inactiveTabText}>갤러리</AppText>
+                <AppText type='medium' style={styles.inactiveTabText}>갤러리</AppText>
               </Pressable>
             </View>
             
@@ -191,12 +192,13 @@ export default function HomeScreen() {
               <Ionicons name="person-circle-outline" size={32} color="#FFF" />
             </Pressable>
           </View>
-
-          <View style={styles.infoSection}>
+            <View style={styles.Divider} />
             <View style={styles.dDayBadge}>
               <Ionicons name="heart-outline" size={16} color="#FFF" style={{ marginRight: 4 }} />
               <AppText type='bold' style={styles.dDayText}>{coupleId ? `${dDay}일째` : '연결 대기중'}</AppText>
             </View>
+        </View>
+          <View style={styles.infoSection}>
             <View style={styles.nameDateContainer}>
               <AppText style={styles.userName}>{userName}</AppText>
               <AppText style={styles.dateText}>
@@ -204,7 +206,6 @@ export default function HomeScreen() {
               </AppText>
             </View>
           </View>
-        </View>
 
         {/* 하단 대시보드 (카드 영역) */}
         <View style={[styles.dashboard, { paddingBottom: insets.bottom + 20 }]}>
@@ -293,7 +294,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: '75%', // 화면의 75%까지만 이미지가 옴
+    height: '60%', // 화면의 75%까지만 이미지가 옴
     zIndex: 0,
   },
   backgroundImage: {
@@ -316,10 +317,14 @@ const styles = StyleSheet.create({
   contentContainer: {
     flex: 1,
     zIndex: 1,
-    justifyContent: 'space-between', // 상단 정보 <-> 하단 카드 분리
+    justifyContent: 'space-between', 
   },
 
   // 헤더
+  headerContainer:{
+    paddingTop:'7%',
+    paddingHorizontal:20,
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -339,7 +344,6 @@ const styles = StyleSheet.create({
   activeTabText: {
     color: '#FFF',
     fontSize: 14,
-    fontWeight: '700',
   },
   activeIndicator: {
     width: '100%',
@@ -351,7 +355,7 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
   inactiveTabText: {
-    color: 'rgba(255,255,255,0.7)',
+    color: '#EAEAEA',
     fontSize: 14,
   },
   profileButton: {
@@ -363,17 +367,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     marginTop: 14,
   },
+  Divider: {
+    width: '100%',
+    height: 0.7,
+    backgroundColor: '#E2E2E2',
+  },
   dDayBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+      borderRadius: 20,
+      marginTop: 14,
   },
   dDayText: {
     color: '#FFF',
@@ -385,7 +389,6 @@ const styles = StyleSheet.create({
   userName: {
     color: '#FFF',
     fontSize: 26,
-    fontWeight: '800',
     textShadowColor: 'rgba(0,0,0,0.3)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
@@ -396,7 +399,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  // 하단 대시보드
   dashboard: {
     paddingHorizontal: 16,
     gap: 12,
@@ -406,7 +408,7 @@ const styles = StyleSheet.create({
     opacity: 0.9,
     transform: [{ scale: 0.98 }],
   },
-  // ✅ 3. 디자인상 비활성화 스타일
+  // ✅디자인상 비활성화 
   disabledCard: {
     opacity: 0.5, // 전체적으로 흐리게
     backgroundColor: '#DDD', // 배경색을 회색으로 덮음 (선택 사항)
@@ -414,32 +416,28 @@ const styles = StyleSheet.create({
   disabledMissionCard: {
     opacity: 0.7,
     backgroundColor: '#EEE',
+    color: '#353535ff',
   },
 
   // 카메라(미션) 카드
   missionCard: {
-    backgroundColor: 'rgba(255,255,255,0.92)', // 거의 불투명
-    borderRadius: 24,
+    backgroundColor: 'rgba(247,245,241,0.8)', 
+    borderRadius: 12,
     padding: 20,
-    minHeight: 140,
+    minHeight: 220,
     justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 4,
   },
   missionHeader: {
-    marginBottom: 8,
+
   },
   cardTitle: {
-    fontSize: 14,
-    color: '#333',
+    fontSize: 13,
+    color: '#000',
   },
   missionContent: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#444',
-    marginBottom: 30, // 텍스트와 라벨 사이 간격 확보
+    marginBottom: 150,
   },
   cameraLabelBox: {
     position: 'absolute',
@@ -448,7 +446,6 @@ const styles = StyleSheet.create({
   },
   cameraLabel: {
     fontSize: 22,
-    fontWeight: '800',
     color: '#000',
   },
 
@@ -456,22 +453,16 @@ const styles = StyleSheet.create({
   bottomRow: {
     flexDirection: 'row',
     gap: 12,
-    height: 120,
+    height: 160,
   },
   squareCard: {
-    borderRadius: 24,
+    borderRadius: 12,
     padding: 20,
     justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
   },
   
-  // ✅ 2. 캘린더가 채팅보다 더 넓게 (flex 비율 조정)
   calendarCard: {
-    flex: 1.3, // 채팅보다 1.3배 넓음
+    flex: 1.7, 
     backgroundColor: '#3E3C3C',
   },
   chatCard: {
@@ -481,12 +472,10 @@ const styles = StyleSheet.create({
 
   cardLabelWhite: {
     fontSize: 17,
-    fontWeight: '700',
     color: '#FFF',
   },
   cardLabelBlack: {
     fontSize: 17,
-    fontWeight: '700',
     color: '#111',
   },
   cardIcon: {

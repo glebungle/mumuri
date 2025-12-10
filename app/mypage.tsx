@@ -1,12 +1,18 @@
-// app/(tabs)/mypage.tsx
+// app/mypage.tsx
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { router } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppText from '../components/AppText';
 
 const API_BASE = 'https://mumuri.shop';
+
+const handlePressSetting = () => {
+  router.push('/setting');
+};
+
 
 // 날짜 포맷 헬퍼 함수 (YYYY. MM. DD)
 const formatDate = (date: Date) => {
@@ -256,7 +262,7 @@ export default function MyPage() {
         {/* 1. 상단 헤더 (설정 아이콘) */}
         <View style={styles.header}>
           <View style={{ width: 24 }} />
-          <Pressable onPress={() => console.log('설정 이동')}>
+          <Pressable onPress={handlePressSetting}>
             <Ionicons name="settings-outline" size={24} color="#444" />
           </Pressable>
         </View>
