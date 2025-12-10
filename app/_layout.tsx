@@ -44,7 +44,7 @@ const handleDeepLink = async (url: string) => {
         router.replace('/signup');
       } else {
         console.log('➡️ Existing user, routing to /(tabs)');
-        router.replace('/(tabs)');
+        router.replace('/(tabs)/home');
       }
     } catch (e) {
       console.error('AsyncStorage 저장 오류:', e);

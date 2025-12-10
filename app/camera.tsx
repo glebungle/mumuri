@@ -18,7 +18,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import AppText from '../../components/AppText';
+import AppText from '../components/AppText';
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 const BASE_URL = 'https://mumuri.shop';

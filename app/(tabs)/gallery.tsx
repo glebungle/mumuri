@@ -185,7 +185,7 @@ export default function GalleryScreen() {
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <View style={styles.tabSwitch}>
           <Pressable onPress={goHome} style={styles.inactiveTab}>
-            <AppText style={styles.inactiveTabText}>홈</AppText>
+            <AppText style={styles.inactiveTabText}>   홈   </AppText>
           </Pressable>
           <Pressable style={styles.activeTab}>
             <AppText style={styles.activeTabText}>갤러리</AppText>
@@ -330,8 +330,7 @@ const styles = StyleSheet.create({
   },
   activeTabText: {
     color: '#111',
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 14,
   },
   activeIndicator: {
     width: '100%',
@@ -340,12 +339,11 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   inactiveTab: {
-    paddingBottom: 4,
+    paddingBottom: 10,
   },
   inactiveTabText: {
     color: '#AAA',
-    fontSize: 18,
-    fontWeight: '500',
+    fontSize: 14,
   },
 
   // --- 그리드 ---
@@ -379,7 +377,6 @@ const styles = StyleSheet.create({
   viewerDate: {
     color: '#FFF',
     fontSize: 16,
-    fontWeight: '600',
   },
   fullScreenImageContainer: {
     width: SCREEN_WIDTH,
@@ -419,6 +416,5 @@ const styles = StyleSheet.create({
   menuText: {
     fontSize: 14,
     color: '#333',
-    fontWeight: '500',
   },
 });

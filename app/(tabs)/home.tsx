@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
+import { LinearGradient } from 'expo-linear-gradient'; // ✅ 그라데이션 추가
 import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import {
@@ -13,10 +14,10 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import AppText from '../../components/AppText'; // 사용중인 커스텀 텍스트 컴포넌트 경로 확인
+import AppText from '../../components/AppText';
 
 const BASE_URL = 'https://mumuri.shop';
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // API 호출 유틸
 async function authedFetch(path: string, method: string = 'GET') {
@@ -43,7 +44,6 @@ function normalizeUser(raw: any) {
   return {
     name: raw.name || raw.nickname || '알 수 없음',
     coupleId: raw.coupleId ?? raw.couple_id ?? null,
-    // 백엔드에서 startDate 필드가 없을 경우를 대비
     startDate: raw.startDate ?? raw.start_date ?? raw.anniversary ?? null, 
   };
 }
@@ -57,17 +57,15 @@ export default function HomeScreen() {
   const [startDate, setStartDate] = useState<string | null>(null);
   const [todayMissionTitle, setTodayMissionTitle] = useState<string | null>(null);
   
-  // 배경 이미지 (필요시 서버에서 받아오거나 로컬 이미지 사용)
+  // 배경 이미지
   const bgImage = null; 
 
-  // 화면이 포커스 될 때마다 데이터 갱신 (커플 연결 직후 반영 위해)
   useFocusEffect(
     useCallback(() => {
       let isActive = true;
 
       const fetchData = async () => {
         try {
-          // 1. 유저 정보 & 커플 정보 가져오기
           const userData = await authedFetch('/user/getuser');
           const normalized = normalizeUser(userData);
           
@@ -81,7 +79,6 @@ export default function HomeScreen() {
             }
           }
 
-          // 2. 커플 연결된 경우에만 오늘의 미션 가져오기
           if (normalized.coupleId) {
             try {
               const missions = await authedFetch('/api/couples/missions/today');
@@ -108,7 +105,6 @@ export default function HomeScreen() {
     }, [])
   );
 
-  // D-Day 계산
   const dDay = startDate 
     ? differenceInCalendarDays(new Date(), parseISO(startDate)) + 1 
     : 1;
@@ -139,7 +135,6 @@ export default function HomeScreen() {
   };
 
   const handlePressGalleryTab = () => {
-    // 탭 간 이동
     router.push('/(tabs)/gallery');
   };
 
@@ -157,22 +152,34 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      {/* 배경 이미지 영역 */}
-      <View style={styles.backgroundContainer}>
+      {/* 1. 배경 이미지 & 그라데이션 (Position Absolute로 뒤에 깔림) */}
+      <View style={styles.backgroundLayer}>
         <ImageBackground
-          // assets 폴더에 이미지가 없다면 uri를 사용하거나 이미지를 추가해야 함
           source={bgImage ? { uri: bgImage } : require('../../assets/images/default_bg.jpeg')} 
           style={styles.backgroundImage}
           resizeMode="cover"
         >
-          {/* 어두운 오버레이 (텍스트 가독성) */}
+          {/* 이미지 위 어두운 필터 */}
           <View style={styles.dimOverlay} />
+          
+          {/* ✅ 하단 그라데이션: 이미지가 끝나면서 배경색과 자연스럽게 연결 */}
+          <LinearGradient
+            colors={['transparent', '#FFFCF5']}
+            style={styles.gradientOverlay}
+            locations={[0.2, 1]} // 투명에서 시작해 맨 끝에서 배경색이 됨
+          />
+        </ImageBackground>
+      </View>
 
-          {/* 상단 헤더 */}
+      {/* 2. 메인 컨텐츠 (z-index 상위) */}
+      <View style={styles.contentContainer}>
+        
+        {/* 상단 영역 (헤더 + 정보) */}
+        <View>
           <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
             <View style={styles.tabSwitch}>
               <Pressable style={styles.activeTab}>
-                <AppText style={styles.activeTabText}>홈</AppText>
+                <AppText style={styles.activeTabText}>   홈   </AppText>
                 <View style={styles.activeIndicator} />
               </Pressable>
               <Pressable onPress={handlePressGalleryTab} style={styles.inactiveTab}>
@@ -185,13 +192,11 @@ export default function HomeScreen() {
             </Pressable>
           </View>
 
-          {/* 메인 정보 (D-Day, 이름) */}
           <View style={styles.infoSection}>
             <View style={styles.dDayBadge}>
-              <Ionicons name="heart" size={16} color="#FFF" style={{ marginRight: 4 }} />
-              <AppText style={styles.dDayText}>{coupleId ? `${dDay}일째` : '연결 대기중'}</AppText>
+              <Ionicons name="heart-outline" size={16} color="#FFF" style={{ marginRight: 4 }} />
+              <AppText type='bold' style={styles.dDayText}>{coupleId ? `${dDay}일째` : '연결 대기중'}</AppText>
             </View>
-            
             <View style={styles.nameDateContainer}>
               <AppText style={styles.userName}>{userName}</AppText>
               <AppText style={styles.dateText}>
@@ -199,67 +204,72 @@ export default function HomeScreen() {
               </AppText>
             </View>
           </View>
-        </ImageBackground>
-      </View>
-
-      {/* 하단 대시보드 (카드 영역) */}
-      <View style={[styles.dashboard, { paddingBottom: insets.bottom + 20 }]}>
-        
-        {/* 1. 카메라 (오늘의 미션) 카드 */}
-        <Pressable 
-          style={({ pressed }) => [styles.missionCard, pressed && styles.pressedCard]} 
-          onPress={handlePressCamera}
-        >
-          <View style={styles.missionHeader}>
-            <AppText style={styles.cardTitle}>오늘의 미션</AppText>
-          </View>
-          <AppText 
-            style={[
-              styles.missionContent, 
-              !coupleId && { color: '#FF6B6B', fontWeight: 'bold' }
-            ]} 
-            numberOfLines={2}
-          >
-            {coupleId 
-              ? (todayMissionTitle || '오늘의 미션을 불러오는 중...') 
-              : '커플을 연결해주세요! (터치하여 연결)'}
-          </AppText>
-          <View style={styles.cameraLabelBox}>
-            <AppText style={styles.cameraLabel}>카메라</AppText>
-          </View>
-        </Pressable>
-
-        {/* 2. 하단 2분할 버튼 (캘린더 / 채팅) */}
-        <View style={styles.bottomRow}>
-          {/* 캘린더 버튼 */}
-          <Pressable 
-            style={({ pressed }) => [
-              styles.squareCard, 
-              styles.calendarCard, 
-              pressed && styles.pressedCard,
-              !coupleId && styles.disabledCard
-            ]}
-            onPress={handlePressCalendar}
-          >
-            <AppText style={styles.cardLabelWhite}>캘린더</AppText>
-            <Ionicons name="calendar" size={32} color="rgba(255,255,255,0.8)" style={styles.cardIcon} />
-          </Pressable>
-
-          {/* 채팅 버튼 */}
-          <Pressable 
-            style={({ pressed }) => [
-              styles.squareCard, 
-              styles.chatCard, 
-              pressed && styles.pressedCard,
-              !coupleId && styles.disabledCard
-            ]}
-            onPress={handlePressChat}
-          >
-            <AppText style={styles.cardLabelBlack}>채팅</AppText>
-            <Ionicons name="chatbubble-ellipses" size={32} color="#4A4A4A" style={styles.cardIcon} />
-          </Pressable>
         </View>
 
+        {/* 하단 대시보드 (카드 영역) */}
+        <View style={[styles.dashboard, { paddingBottom: insets.bottom + 20 }]}>
+          
+          {/* 카메라 (오늘의 미션) 카드 */}
+          <Pressable 
+            style={({ pressed }) => [
+              styles.missionCard, 
+              pressed && styles.pressedCard,
+              // ✅ 3. 디자인상 비활성화 처리 (반투명 + 회색조)
+              !coupleId && styles.disabledMissionCard 
+            ]} 
+            onPress={handlePressCamera}
+          >
+            <View style={styles.missionHeader}>
+              <AppText type='semibold' style={styles.cardTitle}>오늘의 미션</AppText>
+            </View>
+            <AppText 
+              type='regular' style={[
+                styles.missionContent, 
+                !coupleId && { color: '#FF6B6B', fontSize: 13 }
+              ]} 
+              numberOfLines={2}
+            >
+              {coupleId 
+                ? (todayMissionTitle || '오늘의 미션을 불러오는 중...') 
+                : '커플을 연결해주세요.'}
+            </AppText>
+            <View style={styles.cameraLabelBox}>
+              <AppText style={styles.cameraLabel}>카메라</AppText>
+            </View>
+          </Pressable>
+
+          {/* 하단 2분할 버튼 (캘린더 / 채팅) */}
+          <View style={styles.bottomRow}>
+            {/* 캘린더 버튼 */}
+            <Pressable 
+              style={({ pressed }) => [
+                styles.squareCard, 
+                styles.calendarCard, 
+                pressed && styles.pressedCard,
+                !coupleId && styles.disabledCard // 비활성화 스타일
+              ]}
+              onPress={handlePressCalendar}
+            >
+              <AppText style={styles.cardLabelWhite}>캘린더</AppText>
+              <Ionicons name="calendar" size={32} color="rgba(255,255,255,0.8)" style={styles.cardIcon} />
+            </Pressable>
+
+            {/* 채팅 버튼 */}
+            <Pressable 
+              style={({ pressed }) => [
+                styles.squareCard, 
+                styles.chatCard, 
+                pressed && styles.pressedCard,
+                !coupleId && styles.disabledCard // 비활성화 스타일
+              ]}
+              onPress={handlePressChat}
+            >
+              <AppText style={styles.cardLabelBlack}>채팅</AppText>
+              <Ionicons name="chatbubble-ellipses" size={32} color="#4A4A4A" style={styles.cardIcon} />
+            </Pressable>
+          </View>
+
+        </View>
       </View>
     </View>
   );
@@ -274,22 +284,39 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: '#F2F2F2',
+    backgroundColor: '#FFFCF5', // 메인 배경색
   },
   
-  // 배경 이미지 영역
-  backgroundContainer: {
-    flex: 1,
-    position: 'relative',
+  // 1. 배경 레이어 (화면 뒤에 고정)
+  backgroundLayer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '75%', // 화면의 75%까지만 이미지가 옴
+    zIndex: 0,
   },
   backgroundImage: {
     width: '100%',
     height: '100%',
-    justifyContent: 'space-between', 
   },
   dimOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.25)', 
+    backgroundColor: 'rgba(0,0,0,0.2)', // 전체적으로 살짝 어둡게
+  },
+  gradientOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: '30%', // 이미지 하단 30% 영역에 그라데이션 적용
+  },
+
+  // 2. 컨텐츠 컨테이너 (위로 쌓임)
+  contentContainer: {
+    flex: 1,
+    zIndex: 1,
+    justifyContent: 'space-between', // 상단 정보 <-> 하단 카드 분리
   },
 
   // 헤더
@@ -311,7 +338,7 @@ const styles = StyleSheet.create({
   },
   activeTabText: {
     color: '#FFF',
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: '700',
   },
   activeIndicator: {
@@ -321,12 +348,11 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   inactiveTab: {
-    paddingBottom: 4,
+    paddingBottom: 10,
   },
   inactiveTabText: {
     color: 'rgba(255,255,255,0.7)',
-    fontSize: 18,
-    fontWeight: '500',
+    fontSize: 14,
   },
   profileButton: {
     padding: 4,
@@ -335,31 +361,30 @@ const styles = StyleSheet.create({
   // 상단 정보
   infoSection: {
     paddingHorizontal: 24,
-    marginTop: 20,
+    marginTop: 14,
   },
   dDayBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: 20,
-    marginBottom: 12,
+    marginBottom: 8,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.4)',
+    borderColor: 'rgba(255,255,255,0.3)',
   },
   dDayText: {
     color: '#FFF',
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 13,
   },
   nameDateContainer: {
-    gap: 4,
+    gap: 2,
   },
   userName: {
     color: '#FFF',
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: '800',
     textShadowColor: 'rgba(0,0,0,0.3)',
     textShadowOffset: { width: 0, height: 1 },
@@ -367,7 +392,7 @@ const styles = StyleSheet.create({
   },
   dateText: {
     color: '#EEE',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
   },
 
@@ -381,45 +406,48 @@ const styles = StyleSheet.create({
     opacity: 0.9,
     transform: [{ scale: 0.98 }],
   },
+  // ✅ 3. 디자인상 비활성화 스타일
   disabledCard: {
-    opacity: 0.6,
+    opacity: 0.5, // 전체적으로 흐리게
+    backgroundColor: '#DDD', // 배경색을 회색으로 덮음 (선택 사항)
+  },
+  disabledMissionCard: {
+    opacity: 0.7,
+    backgroundColor: '#EEE',
   },
 
   // 카메라(미션) 카드
   missionCard: {
-    backgroundColor: 'rgba(255,255,255,0.92)',
+    backgroundColor: 'rgba(255,255,255,0.92)', // 거의 불투명
     borderRadius: 24,
-    padding: 24,
+    padding: 20,
     minHeight: 140,
     justifyContent: 'space-between',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 4,
   },
   missionHeader: {
     marginBottom: 8,
   },
   cardTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111',
+    fontSize: 14,
+    color: '#333',
   },
   missionContent: {
-    fontSize: 15,
+    fontSize: 14,
     color: '#444',
-    lineHeight: 22,
-    marginTop: 4,
-    marginBottom: 20,
+    marginBottom: 30, // 텍스트와 라벨 사이 간격 확보
   },
   cameraLabelBox: {
     position: 'absolute',
-    bottom: 24,
-    left: 24,
+    bottom: 20,
+    left: 20,
   },
   cameraLabel: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '800',
     color: '#000',
   },
@@ -431,29 +459,33 @@ const styles = StyleSheet.create({
     height: 120,
   },
   squareCard: {
-    flex: 1,
     borderRadius: 24,
     padding: 20,
     justifyContent: 'space-between',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
   },
+  
+  // ✅ 2. 캘린더가 채팅보다 더 넓게 (flex 비율 조정)
   calendarCard: {
+    flex: 1.3, // 채팅보다 1.3배 넓음
     backgroundColor: '#3E3C3C',
   },
+  chatCard: {
+    flex: 1,
+    backgroundColor: '#EAE8E3',
+  },
+
   cardLabelWhite: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '700',
     color: '#FFF',
   },
-  chatCard: {
-    backgroundColor: '#EAE8E3',
-  },
   cardLabelBlack: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '700',
     color: '#111',
   },

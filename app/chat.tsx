@@ -19,8 +19,8 @@ import {
   ViewToken,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import AppText from '../../components/AppText';
-import { ChatIncoming, ChatReadUpdate, createChatClient } from '../lib/chatSocket';
+import AppText from '../components/AppText';
+import { ChatIncoming, ChatReadUpdate, createChatClient } from './lib/chatSocket';
 
 const ChatText = (props: React.ComponentProps<typeof AppText>) => {
   const { style, ...rest } = props;
