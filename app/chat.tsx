@@ -881,12 +881,11 @@ export default function ChatScreen() {
     const contentContainerStyle =
       m.type === 'image'
         ? (mine ? styles.imageBoxMine : styles.imageBoxOther)
-        : [styles.bubble, bubbleStyle, isMissionText && styles.bubbleMissionText];
+        : [styles.bubble, bubbleStyle];
 
     return (
       <View style={[styles.row, mine ? styles.rowMine : styles.rowOther]}>
         <View style={[styles.msgCol, mine ? { flexDirection: 'row', justifyContent: 'flex-end' } : { flexDirection: 'row', justifyContent: 'flex-start' }]}>
-          {/* 내 메시지일 때: 시간 - 말풍선 */}
           {mine && showTime && (
             <ChatText style={styles.timeTextMine}>
               {formatTime(m.createdAt)}
@@ -895,8 +894,7 @@ export default function ChatScreen() {
 
           <View style={contentContainerStyle}>
             {isMissionText ? (
-              // ✅ [요청 1] 폰트 변경
-              <AppText style={[styles.msgText, { fontFamily: 'Paperlogy-7Bold' }]}>
+              <AppText type='pretendard-b' style={[styles.msgText]}>
                 {m.text}
               </AppText>
             ) : m.type === 'image' ? (
@@ -910,7 +908,7 @@ export default function ChatScreen() {
                 }}
               />
             ) : (
-              <AppText style={[styles.msgText, mine ? styles.msgTextMine : styles.msgTextOther, { fontFamily: 'Paperlogy-7Bold' }]}>
+              <AppText type='pretendard-m'style={[mine ? styles.msgTextMine : styles.msgTextOther]}>
                 {m.text}
               </AppText>
             )}
@@ -955,15 +953,13 @@ export default function ChatScreen() {
       keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + HEADER_HEIGHT : 0}
     >
       <View style={[styles.header, { paddingTop: insets.top }]}>
-        {/* ✅ [요청 3] 헤더 좌측: 뒤로가기 */}
         <Pressable style={{ paddingHorizontal: 8 }} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={24} color="#111" />
         </Pressable>
         {/* 헤더 중앙: 타이틀 */}
         <AppText style={styles.headerTitle}>애인</AppText>
-        {/* ✅ [요청 3] 헤더 우측: 카메라 버튼 */}
         <Pressable onPress={() => router.push('/camera')} style={{ paddingHorizontal: 8 }}>
-           <Ionicons name="camera-outline" size={24} color="#111" />
+          <Ionicons name="camera-outline" size={24} color="#111" />
         </Pressable>
       </View>
 
@@ -986,7 +982,6 @@ export default function ChatScreen() {
             onLayout={(e) => setInputBarHeight(e.nativeEvent.layout.height)}
           >
             <TextInput
-              // ✅ [요청 2] 입력창 폰트 변경
               style={[styles.input, { fontFamily: 'Pretendard-Medium' }]}
               placeholder="대화를 입력하세요"
               value={text}
@@ -1008,7 +1003,6 @@ export default function ChatScreen() {
           onLayout={(e) => setInputBarHeight(e.nativeEvent.layout.height)}
         >
           <TextInput
-            // ✅ [요청 2] 입력창 폰트 변경
             style={[styles.input, { fontFamily: 'Pretendard-Medium' }]}
             placeholder="대화를 입력하세요"
             value={text}
@@ -1035,18 +1029,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 6,
     justifyContent: 'space-between', // 헤더 요소 양 끝 정렬
+    marginVertical: 25,
   },
   headerTitle: { fontSize: 16, color: '#111' },
 
   row: {
     width: '100%',
     marginVertical: 6,
-    // alignItems 제거 (내부 컨테이너에서 처리)
   },
   rowMine: { alignItems: 'flex-end' }, // 전체 행을 우측 정렬
   rowOther: { alignItems: 'flex-start' }, // 전체 행을 좌측 정렬
 
-  // msgCol의 동작 변경: 내부 요소(시간, 말풍선)를 가로로 배치
   msgCol: { 
     maxWidth: '80%', 
     alignItems: 'flex-end', // 기본 정렬 (시간 텍스트 정렬용)
@@ -1054,7 +1047,7 @@ const styles = StyleSheet.create({
 
   bubble: { paddingHorizontal: 12, paddingVertical: 10, borderRadius: 16 },
   bubbleMine: { backgroundColor: '#BED5FF', borderTopRightRadius: 2 },
-  bubbleOther: { backgroundColor: '#FFADAD', borderWidth: StyleSheet.hairlineWidth, borderTopLeftRadius: 2 },
+  bubbleOther: { backgroundColor: '#FFADAD', borderTopLeftRadius: 2 },
 
   imageBoxMine: {
     borderRadius: 18,
@@ -1067,10 +1060,11 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
 
-  bubbleMissionMine: { backgroundColor: '#6198FF', },
+  bubbleMissionMine: { backgroundColor: '#6198FF', borderBottomRightRadius: 0,width:'80%',},
   bubbleMissionOther: {
     backgroundColor: '#FFADAD',
-    borderWidth: StyleSheet.hairlineWidth,
+    borderTopRightRadius: 0,
+    width:'80%',
   },
   missionImage: {
     width: STICKER_SIZE * 1.6,
@@ -1078,24 +1072,11 @@ const styles = StyleSheet.create({
     borderRadius: 0, 
     backgroundColor: '#DDE7FF', 
   },
-  bubbleMissionText: {
-    fontSize: 10, 
-    color: '#fff',
-    paddingHorizontal: 12,
-    paddingTop: 10,
-    paddingBottom: 10,
-  },
-  missionLabel: {
-    fontSize: 11,
-    color: '#ffffff',
-    marginBottom: 4,
-  },
 
-  msgText: { fontSize: 14, lineHeight: 20, color: '#fff' },
+  msgText: { fontSize: 13, lineHeight: 20, color: '#fff', paddingVertical:12, paddingHorizontal:20},
   msgTextMine: { color: '#3F3F3F' },
   msgTextOther: { color: '#3F3F3F' },
 
-  // ✅ 시간 텍스트 스타일 분리 (바깥쪽 배치용)
   timeTextMine: { 
     marginRight: 6, 
     marginBottom: 0, 
@@ -1110,11 +1091,10 @@ const styles = StyleSheet.create({
     color: '#75787B',
     alignSelf: 'flex-end'
   },
-  
 
   metaWrapRight: { marginLeft: 6, alignItems: 'center', justifyContent: 'flex-end' },
 
-  dateWrap: { alignItems: 'center', marginVertical: 26 },
+  dateWrap: { alignItems: 'center', marginVertical: 14 },
   dateText: {
     fontSize: 12,
     color: '#4D5053',
@@ -1139,7 +1119,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 12,
-    borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#e5e7eb',
     color: '#111',
   },
