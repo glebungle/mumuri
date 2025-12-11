@@ -1,6 +1,7 @@
 // app/mypage.tsx
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -12,7 +13,6 @@ const API_BASE = 'https://mumuri.shop';
 const handlePressSetting = () => {
   router.push('/setting');
 };
-
 
 // 날짜 포맷 헬퍼 함수 (YYYY. MM. DD)
 const formatDate = (date: Date) => {
@@ -59,11 +59,11 @@ const formatBirthString = (raw?: string | null): string => {
 
 type ProfileState = {
   name: string;
-  birthDate: string;            // "YYYY. MM. DD"
-  startDay: Date;               // 사귄 날
+  birthDate: string; // "YYYY. MM. DD"
+  startDay: Date; // 사귄 날
   partnerName: string;
-  partnerBirthString: string;   // "MM.DD" 등
-  currentDayCount: number;      // 오늘 기준 D-day(몇 일째인지)
+  partnerBirthString: string; // "MM.DD" 등
+  currentDayCount: number; // 오늘 기준 D-day(몇 일째인지)
 };
 
 export default function MyPage() {
@@ -109,14 +109,12 @@ export default function MyPage() {
           const text = await res.text();
           if (res.ok) {
             let data: any = {};
-            try { data = JSON.parse(text); } catch {}
+            try {
+              data = JSON.parse(text);
+            } catch {}
 
             // 내 이름 후보 키
-            myName =
-              data.name ??
-              data.nickname ??
-              data.username ??
-              '';
+            myName = data.name ?? data.nickname ?? data.username ?? '';
 
             // 내 생일 후보 키 (YYYY-MM-DD / YYYY.MM.DD 등)
             const myBirthRaw =
@@ -142,14 +140,13 @@ export default function MyPage() {
               partner.birthday ??
               data.partnerBirth ??
               null;
-            partnerBirth = partnerBirthRaw ? formatBirthString(String(partnerBirthRaw)) : '';
+            partnerBirth = partnerBirthRaw
+              ? formatBirthString(String(partnerBirthRaw))
+              : '';
 
             // 사귄 날(커플 시작일) 정보가 있다면 사용
             const startRaw =
-              data.coupleStartDate ??
-              data.startDate ??
-              data.firstDate ??
-              null;
+              data.coupleStartDate ?? data.startDate ?? data.firstDate ?? null;
             const parsedStart = startRaw ? parseToDate(String(startRaw)) : null;
             if (parsedStart) coupleStartFromUser = parsedStart;
           } else {
@@ -175,19 +172,18 @@ export default function MyPage() {
           const text = await res.text();
           if (res.ok) {
             let data: any = {};
-            try { data = JSON.parse(text); } catch {}
+            try {
+              data = JSON.parse(text);
+            } catch {}
 
-            // dday 숫자 (몇 일째인지) – 카메라에서 쓰던 json.dday와 동일
+            // dday 숫자 (몇 일째인지) 
             if (typeof data.dday === 'number') {
               ddayCount = data.dday;
             }
 
             // 시작일이 따로 오면 사용
             const startRaw =
-              data.startDay ??
-              data.coupleStartDay ??
-              data.firstDate ??
-              null;
+              data.startDay ?? data.coupleStartDay ?? data.firstDate ?? null;
             const parsedStart = startRaw ? parseToDate(String(startRaw)) : null;
             if (parsedStart) {
               startDayFromMain = parsedStart;
@@ -223,7 +219,11 @@ export default function MyPage() {
           const base = new Date(
             today.getFullYear(),
             today.getMonth(),
-            today.getDate(), 0, 0, 0, 0,
+            today.getDate(),
+            0,
+            0,
+            0,
+            0
           );
           base.setDate(base.getDate() - (finalDday - 1));
           finalStartDay = base;
@@ -234,7 +234,7 @@ export default function MyPage() {
         }
 
         setProfile({
-          name: myName || '애인',
+          name: myName || '이름',
           birthDate: myBirth || '',
           startDay: finalStartDay,
           partnerName: partnerName || '',
@@ -257,107 +257,143 @@ export default function MyPage() {
   const upcomingAnniversaries = useMemo(() => [50, 100, 200, 300], []);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
-        {/* 1. 상단 헤더 (설정 아이콘) */}
-        <View style={styles.header}>
-          <View style={{ width: 24 }} />
-          <Pressable onPress={handlePressSetting}>
-            <Ionicons name="settings-outline" size={24} color="#444" />
-          </Pressable>
-        </View>
-
-        {/* 2. 프로필 섹션 */}
-        <View style={styles.profileSection}>
-          <View style={styles.avatarContainer}>
-            <View style={styles.avatarPlaceholder}>
-              <Ionicons name="person" size={40} color="#FF9E9E" />
-            </View>
+    <LinearGradient
+      colors={['#FFFCF5', '#E4DED0']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 0, y: 0.5 }}
+      style={styles.gradientBackground}
+    >
+      <SafeAreaView style={styles.container}>
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1 }}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* 1. 상단 헤더 (설정 아이콘) */}
+          <View style={styles.header}>
+            <View style={{ width: 24 }} />
+            <Pressable onPress={handlePressSetting}>
+              <Ionicons name="settings-outline" size={24} color="#444" />
+            </Pressable>
           </View>
 
-          <AppText type='pretendard-b' style={styles.nameText}>
-            {profile.name || (loading ? '불러오는 중...' : '이름 미등록')}
-          </AppText>
-          {!!profile.birthDate && (
-            <AppText style={styles.birthText}>{profile.birthDate}</AppText>
-          )}
-
-          <Pressable style={styles.editButton}>
-            <AppText type='pretendard-m' style={styles.editButtonText}>프로필 편집</AppText>
-          </Pressable>
-        </View>
-
-        {/* 3. 흰색 카드 영역 (정보 및 리스트) */}
-        <View style={styles.whiteCard}>
-          {/* 상단: 생일 및 현재 기념일수 */}
-          <View style={styles.dashboardRow}>
-            {/* 왼쪽: 생일 */}
-            <View style={styles.dashboardItem}>
-              <AppText style={styles.bigNumberText}>
-                {profile.partnerBirthString || '--.--'}
-              </AppText>
-              <AppText style={styles.subLabelText}>
-                {profile.partnerName || '상대방'}님의 생일
-              </AppText>
+          {/* 2. 프로필 섹션 */}
+          <View style={styles.profileSection}>
+            <View style={styles.avatarContainer}>
+              <View style={styles.avatarPlaceholder}>
+                <Ionicons name="person" size={40} color="#FF9E9E" />
+              </View>
             </View>
 
-            {/* 구분선 */}
-            <View style={styles.verticalDivider} />
+            <AppText type="pretendard-b" style={styles.nameText}>
+              {profile.name || (loading ? '불러오는 중...' : '이름 미등록')}
+            </AppText>
+            {!!profile.birthDate && (
+              <AppText style={styles.birthText}>{profile.birthDate}</AppText>
+            )}
 
-            {/* 오른쪽: 기념일 */}
-            <View style={styles.dashboardItem}>
-              <AppText style={styles.smallDateText}>
-                {formatDate(profile.startDay)}
+            <Pressable style={styles.editButton}>
+              <AppText type="pretendard-m" style={styles.editButtonText}>
+                프로필 편집
               </AppText>
-              <AppText type='pretendard-m' style={styles.bigNumberText}>
-                {profile.currentDayCount}일째
-              </AppText>
-              <AppText style={styles.subLabelText}>기념일</AppText>
-            </View>
+            </Pressable>
           </View>
 
-          {/* 하단: 기념일 리스트 */}
-          <View style={styles.listContainer}>
-            {upcomingAnniversaries.map((days) => (
-              <View key={days} style={styles.listItem}>
+          {/* 3. 흰색 카드 영역 (정보 및 리스트) */}
+          <View style={styles.whiteCard}>
+            {/* 상단: 생일 및 현재 기념일수 */}
+            <View style={styles.dashboardRow}>
+              {/* 왼쪽: 생일 */}
+              <View style={styles.dashboardItem}>
+                <AppText type="pretendard-m" style={styles.bigNumberText}>
+                  {profile.partnerBirthString || '--.--'}
+                </AppText>
+                <AppText
+                  type="pretendard-m"
+                  style={styles.subLabelText}
+                >
+                  {profile.partnerName || '상대방'}님의 생일
+                </AppText>
+              </View>
+
+              {/* 구분선 */}
+              <View style={styles.verticalDivider} />
+
+              {/* 오른쪽: 기념일 */}
+              <View style={styles.dashboardItem}>
+                <AppText type="pretendard-m" style={styles.smallDateText}>
+                  {formatDate(profile.startDay)}
+                </AppText>
+                <AppText type="pretendard-m" style={styles.bigNumberText}>
+                  {profile.currentDayCount}일째
+                </AppText>
+                <AppText
+                  type="pretendard-m"
+                  style={styles.subLabelText}
+                >
+                  기념일
+                </AppText>
+              </View>
+            </View>
+
+            {/* 하단: 기념일 리스트 */}
+            <View style={styles.listContainer}>
+              {upcomingAnniversaries.map((days) => (
+                <View key={days} style={styles.listItem}>
+                  <View style={styles.listItemLeft}>
+                    <Ionicons name="heart-outline" size={20} color="#FF9E9E" />
+                    <AppText type="pretendard-b" style={styles.dayLabel}>
+                      {days}일
+                    </AppText>
+                  </View>
+                  <AppText
+                    type="pretendard-m"
+                    style={styles.dateValue}
+                  >
+                    {getAnniversaryDate(days)}
+                  </AppText>
+                </View>
+              ))}
+
+              {/* 1주년
+              <View style={styles.listItem}>
                 <View style={styles.listItemLeft}>
                   <Ionicons name="heart-outline" size={20} color="#FF9E9E" />
-                  <AppText type='pretendard-b' style={styles.dayLabel}>{days}일</AppText>
+                  <AppText style={styles.dayLabel}>1주년</AppText>
                 </View>
-                <AppText type='pretendard-m' style={styles.dateValue}>{getAnniversaryDate(days)}</AppText>
-              </View>
-            ))}
-
-            {/* 1주년 */}
-            <View style={styles.listItem}>
-              <View style={styles.listItemLeft}>
-                <Ionicons name="heart-outline" size={20} color="#FF9E9E" />
-                <AppText style={styles.dayLabel}>1주년</AppText>
-              </View>
-              <AppText type='pretendard-m' style={styles.dateValue}>{getAnniversaryDate(365)}</AppText>
+                <AppText
+                  type="pretendard-m"
+                  style={styles.dateValue}
+                >
+                  {getAnniversaryDate(365)}
+                </AppText>
+              </View> */}
             </View>
           </View>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+        </ScrollView>
+      </SafeAreaView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
+  gradientBackground: {
+    flex: 1,
+  },
   container: {
     flex: 1,
-    backgroundColor: '#FFFCF5',
+    backgroundColor: 'transparent',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingVertical: 20,
+    marginBottom:'12%',
   },
   profileSection: {
     alignItems: 'center',
-    marginBottom: 30,
+    marginVertical: 30,
   },
   avatarContainer: {
     marginBottom: 12,
@@ -374,8 +410,7 @@ const styles = StyleSheet.create({
   },
   nameText: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
+    color: '#444',
     marginBottom: 4,
   },
   birthText: {
@@ -403,17 +438,12 @@ const styles = StyleSheet.create({
     paddingTop: 40,
     paddingHorizontal: 24,
     paddingBottom: 40,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 5,
   },
   dashboardRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 40,
+    marginBottom: 30,
   },
   dashboardItem: {
     flex: 1,
@@ -428,21 +458,19 @@ const styles = StyleSheet.create({
   },
   bigNumberText: {
     fontSize: 28,
-    fontWeight: '600',
     color: '#444',
     marginBottom: 4,
   },
   smallDateText: {
     fontSize: 12,
-    color: '#999',
-    marginBottom: 2,
+    color: '#A8A8A8',
   },
   subLabelText: {
     fontSize: 14,
-    color: '#999',
+    color: '#A8A8A8',
   },
   listContainer: {
-    gap: 12,
+    gap: 10,
   },
   listItem: {
     flexDirection: 'row',
@@ -450,7 +478,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#FFF1F1',
     borderRadius: 12,
-    paddingVertical: 16,
+    paddingVertical: 15,
     paddingHorizontal: 20,
   },
   listItemLeft: {
@@ -459,11 +487,11 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   dayLabel: {
-    fontSize: 15,
-    color: '#444',
+    fontSize: 13,
+    color: '#626262',
   },
   dateValue: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#626262',
   },
 });
