@@ -2,7 +2,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { format, parseISO } from 'date-fns';
-import * as FileSystem from 'expo-file-system';
+// [수정됨] 에러 해결을 위해 legacy 경로로 변경
+import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
 import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useRef, useState } from 'react';
@@ -150,6 +151,7 @@ export default function GalleryScreen() {
       const filename = `mumuri_${photo.id}.jpg`;
       const fileUri = `${getWritableDir()}${filename}`;
 
+      // [수정됨] legacy API 사용으로 에러 해결
       const { uri } = await FileSystem.downloadAsync(photo.url, fileUri);
       await MediaLibrary.saveToLibraryAsync(uri);
       
@@ -300,7 +302,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingTop:'7%',
-    paddingHorizontal:20,
     backgroundColor: '#FFFCF5',
   },
   center: {
@@ -316,6 +317,7 @@ const styles = StyleSheet.create({
 
   // --- 헤더 ---
   header: {
+    paddingHorizontal:20,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -352,7 +354,7 @@ const styles = StyleSheet.create({
   // --- 그리드 ---
   gridItem: {
     width: SCREEN_WIDTH / 3,
-    height: SCREEN_WIDTH / 3,
+    height: SCREEN_WIDTH/1.5,
     borderWidth: 0.5,
     borderColor: '#FFF',
   },

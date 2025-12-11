@@ -49,9 +49,10 @@ const CACHE_VERSION = 'v1';
 // 채팅 캐시 저장
 async function saveChatCache(roomId: string, messages: ChatMessage[]) {
   try {
+    // 1. 상태가 failed인 것만 제외하고, sent나 sending은 모두 저장
     const toSave = messages
       .filter(m => m.status !== 'failed') 
-      .slice(-100); 
+      .slice(-100); // 최근 100개
 
     await AsyncStorage.setItem(
       CHAT_CACHE_KEY(roomId),
@@ -443,8 +444,15 @@ export default function ChatScreen() {
     });
   }, [userId, ROOM_KEY]);
 
+  // ✅ [수정] onIncoming 핸들러의 최신 상태를 Ref로 관리
+  const onIncomingRef = useRef(onIncoming);
+  useEffect(() => {
+    onIncomingRef.current = onIncoming;
+  }, [onIncoming]);
+
   useFocusEffect(
     useCallback(() => {
+      // 1. 포커스 얻었을 때 (Mount/Focus)
       if (!USE_STOMP || !token || !ROOM_KEY || !userId) return;
 
       console.log('[useFocusEffect] Mounted/Focused - Connecting STOMP');
@@ -454,7 +462,8 @@ export default function ChatScreen() {
         token,
         roomId: ROOM_KEY,
         handlers: {
-          onMessage: onIncoming,
+          // ✅ [수정] Ref를 통해 최신 핸들러 호출 (의존성 제거 효과)
+          onMessage: (p) => onIncomingRef.current(p),
           onReadUpdate: (_u: ChatReadUpdate) => { },
           onConnected: () => {
             chatRef.current?.markAsRead(ROOM_KEY, userId, latestVisibleMsgId.current ?? undefined);
@@ -467,16 +476,20 @@ export default function ChatScreen() {
       chatRef.current = chat;
       chat.activate();
 
+      // 2. 포커스 잃었을 때 (Unmount/Blur)
       return () => {
         console.log('[useFocusEffect] Unmounted/Blurred - Disconnecting & Saving');
+        
         chat.deactivate();
         chatRef.current = null;
+
+        // 다른 탭 갈 때 반드시 저장!
         if (ROOM_KEY) {
             saveChatCache(ROOM_KEY, latestMessages.current);
             saveMissionCache(latestPerformedMissions.current);
         }
       };
-    }, [token, ROOM_KEY, userId, onIncoming]) 
+    }, [token, ROOM_KEY, userId]) // ✅ [수정] onIncoming 제거하여 불필요한 재연결 방지
   );
 
   useEffect(() => {
@@ -919,7 +932,6 @@ export default function ChatScreen() {
             ) : null}
           </View>
 
-          {/* 상대 메시지일 때: 말풍선 - 시간 */}
           {!mine && showTime && (
             <ChatText style={styles.timeTextOther}>
               {formatTime(m.createdAt)}
@@ -931,7 +943,8 @@ export default function ChatScreen() {
           {m.status === 'failed' ? (
             <Ionicons name="alert-circle" size={14} color="#FF4D4F" />
           ) : m.status === 'sending' ? (
-            <Ionicons name="time-outline" size={12} color="#1622ffff" />
+            <AppText type='pretendard-b' style={styles.SendingText}> 전송 중..</AppText>
+            // <Ionicons name="time-outline" size={12} color="#1622ffff" />
           ) : null}
         </View>
       </View>
@@ -956,7 +969,6 @@ export default function ChatScreen() {
         <Pressable style={{ paddingHorizontal: 8 }} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={24} color="#111" />
         </Pressable>
-        {/* 헤더 중앙: 타이틀 */}
         <AppText style={styles.headerTitle}>애인</AppText>
         <Pressable onPress={() => router.push('/camera')} style={{ paddingHorizontal: 8 }}>
           <Ionicons name="camera-outline" size={24} color="#111" />
@@ -1046,8 +1058,8 @@ const styles = StyleSheet.create({
   },
 
   bubble: { paddingHorizontal: 12, paddingVertical: 10, borderRadius: 16 },
-  bubbleMine: { backgroundColor: '#BED5FF', borderTopRightRadius: 2 },
-  bubbleOther: { backgroundColor: '#FFADAD', borderTopLeftRadius: 2 },
+  bubbleMine: { backgroundColor: '#BED5FF', borderBottomRightRadius: 2 },
+  bubbleOther: { backgroundColor: '#FFADAD', borderWidth: StyleSheet.hairlineWidth, borderTopLeftRadius: 2 },
 
   imageBoxMine: {
     borderRadius: 18,
@@ -1074,8 +1086,10 @@ const styles = StyleSheet.create({
   },
 
   msgText: { fontSize: 13, lineHeight: 20, color: '#fff', paddingVertical:12, paddingHorizontal:20},
-  msgTextMine: { color: '#3F3F3F' },
-  msgTextOther: { color: '#3F3F3F' },
+  msgTextMine: { fontSize: 13, color: '#3F3F3F' },
+  msgTextOther: { fontSize: 13, color: '#3F3F3F' },
+
+  SendingText:{fontSize:10, color:'#6198FF'},
 
   timeTextMine: { 
     marginRight: 6, 
@@ -1094,7 +1108,7 @@ const styles = StyleSheet.create({
 
   metaWrapRight: { marginLeft: 6, alignItems: 'center', justifyContent: 'flex-end' },
 
-  dateWrap: { alignItems: 'center', marginVertical: 14 },
+  dateWrap: { alignItems: 'center', marginVertical: 26 },
   dateText: {
     fontSize: 12,
     color: '#4D5053',
@@ -1119,6 +1133,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#e5e7eb',
     color: '#111',
   },
