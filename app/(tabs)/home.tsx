@@ -1,8 +1,6 @@
-// app/(tabs)/home.tsx
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { differenceInCalendarDays, parseISO } from 'date-fns';
-import { LinearGradient } from 'expo-linear-gradient'; // ✅ 그라데이션 추가
+import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import {
@@ -44,7 +42,7 @@ function normalizeUser(raw: any) {
   if (!raw) return { name: '', coupleId: null, startDate: null };
   return {
     name: raw.name || raw.nickname || '알 수 없음',
-    coupleId: raw.coupleId ?? raw.couple_id ?? null,
+    coupleId: raw.coupleId ?? raw.couple_id ?? raw.coupleID ?? null,
     startDate: raw.startDate ?? raw.start_date ?? raw.anniversary ?? null, 
   };
 }
@@ -58,6 +56,9 @@ export default function HomeScreen() {
   const [startDate, setStartDate] = useState<string | null>(null);
   const [todayMissionTitle, setTodayMissionTitle] = useState<string | null>(null);
   
+  // ✅ [수정] D-Day를 State로 관리 (API에서 받아오기 위해)
+  const [dDay, setDDay] = useState<number>(1); 
+  
   // 배경 이미지
   const bgImage = null; 
 
@@ -67,27 +68,51 @@ export default function HomeScreen() {
 
       const fetchData = async () => {
         try {
-          const userData = await authedFetch('/user/getuser');
+          // 1. 로컬 스토리지 확인
+          const storedCid = await AsyncStorage.getItem('coupleId');
+          const storedCidNum = storedCid ? Number(storedCid) : null;
+
+          // 2. 유저 정보 API 호출
+          let userData = null;
+          try {
+            userData = await authedFetch('/user/getuser');
+          } catch (e) {
+            console.warn('[Home] 유저 정보 로드 실패, 로컬 값 사용');
+          }
+
           const normalized = normalizeUser(userData);
           
           if (isActive) {
-            setCoupleId(normalized.coupleId);
+            const finalCoupleId = normalized.coupleId || storedCidNum;
+
+            setCoupleId(finalCoupleId);
             setUserName(normalized.name || '사용자');
             setStartDate(normalized.startDate);
             
             if (normalized.coupleId) {
               await AsyncStorage.setItem('coupleId', String(normalized.coupleId));
             }
-          }
-
-          if (normalized.coupleId) {
-            try {
-              const missions = await authedFetch('/api/couples/missions/today');
-              if (Array.isArray(missions) && missions.length > 0) {
-                if (isActive) setTodayMissionTitle(missions[0].title);
+            
+            if (finalCoupleId) {
+              // 3. 오늘의 미션 가져오기
+              try {
+                const missions = await authedFetch('/api/couples/missions/today');
+                if (Array.isArray(missions) && missions.length > 0) {
+                  if (isActive) setTodayMissionTitle(missions[0].title);
+                }
+              } catch (e) {
+                console.warn('[Home] 미션 로드 실패', e);
               }
-            } catch (e) {
-              console.warn('[Home] 미션 로드 실패', e);
+
+              // 4. D-Day 동기화
+              try {
+                const mainData = await authedFetch('/user/main');
+                if (mainData && typeof mainData.dday === 'number') {
+                  if (isActive) setDDay(mainData.dday);
+                }
+              } catch (e) {
+                console.warn('[Home] 메인 정보(D-Day) 로드 실패', e);
+              }
             }
           }
 
@@ -105,10 +130,6 @@ export default function HomeScreen() {
       };
     }, [])
   );
-
-  const dDay = startDate 
-    ? differenceInCalendarDays(new Date(), parseISO(startDate)) + 1 
-    : 1;
 
   // --- 네비게이션 핸들러 ---
   const handlePressCamera = () => {
@@ -153,17 +174,14 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      {/* 1. 배경 이미지 & 그라데이션  */}
       <View style={styles.backgroundLayer}>
         <ImageBackground
           source={bgImage ? { uri: bgImage } : require('../../assets/images/default_bg.jpeg')} 
           style={styles.backgroundImage}
           resizeMode="cover"
         >
-          {/* 이미지 위 어두운 필터 */}
           <View style={styles.dimOverlay} />
           
-          {/* 그라데이션*/}
           <LinearGradient
             colors={['transparent', '#FFFCF5']}
             style={styles.gradientOverlay}
@@ -172,10 +190,8 @@ export default function HomeScreen() {
         </ImageBackground>
       </View>
 
-      {/* 2. 메인 컨텐츠 (z-index 상위) */}
       <View style={styles.contentContainer}>
         
-        {/* 상단 영역 */}
         <View style={styles.headerContainer}>
           <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
             <View style={styles.tabSwitch}>
@@ -207,15 +223,12 @@ export default function HomeScreen() {
             </View>
           </View>
 
-        {/* 하단 대시보드 (카드 영역) */}
         <View style={[styles.dashboard, { paddingBottom: insets.bottom + 20 }]}>
           
-          {/* 카메라 (오늘의 미션) 카드 */}
           <Pressable 
             style={({ pressed }) => [
               styles.missionCard, 
               pressed && styles.pressedCard,
-              // ✅ 3. 디자인상 비활성화 처리 (반투명 + 회색조)
               !coupleId && styles.disabledMissionCard 
             ]} 
             onPress={handlePressCamera}
@@ -239,15 +252,13 @@ export default function HomeScreen() {
             </View>
           </Pressable>
 
-          {/* 하단 2분할 버튼 (캘린더 / 채팅) */}
           <View style={styles.bottomRow}>
-            {/* 캘린더 버튼 */}
             <Pressable 
               style={({ pressed }) => [
                 styles.squareCard, 
                 styles.calendarCard, 
                 pressed && styles.pressedCard,
-                !coupleId && styles.disabledCard // 비활성화 스타일
+                !coupleId && styles.disabledCard 
               ]}
               onPress={handlePressCalendar}
             >
@@ -255,13 +266,12 @@ export default function HomeScreen() {
               <Ionicons name="calendar" size={32} color="rgba(255,255,255,0.8)" style={styles.cardIcon} />
             </Pressable>
 
-            {/* 채팅 버튼 */}
             <Pressable 
               style={({ pressed }) => [
                 styles.squareCard, 
                 styles.chatCard, 
                 pressed && styles.pressedCard,
-                !coupleId && styles.disabledCard // 비활성화 스타일
+                !coupleId && styles.disabledCard 
               ]}
               onPress={handlePressChat}
             >
@@ -285,16 +295,15 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: '#FFFCF5', // 메인 배경색
+    backgroundColor: '#FFFCF5', 
   },
   
-  // 1. 배경 레이어 (화면 뒤에 고정)
   backgroundLayer: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: '60%', // 화면의 75%까지만 이미지가 옴
+    height: '60%', 
     zIndex: 0,
   },
   backgroundImage: {
@@ -303,24 +312,22 @@ const styles = StyleSheet.create({
   },
   dimOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.2)', // 전체적으로 살짝 어둡게
+    backgroundColor: 'rgba(0,0,0,0.2)', 
   },
   gradientOverlay: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    height: '30%', // 이미지 하단 30% 영역에 그라데이션 적용
+    height: '30%',
   },
 
-  // 2. 컨텐츠 컨테이너 (위로 쌓임)
   contentContainer: {
     flex: 1,
     zIndex: 1,
     justifyContent: 'space-between', 
   },
 
-  // 헤더
   headerContainer:{
     paddingTop:'7%',
     paddingHorizontal:20,
@@ -329,7 +336,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
   },
   tabSwitch: {
     flexDirection: 'row',
@@ -362,7 +368,6 @@ const styles = StyleSheet.create({
     padding: 4,
   },
 
-  // 상단 정보
   infoSection: {
     paddingHorizontal: 24,
     marginTop: 14,
@@ -408,10 +413,9 @@ const styles = StyleSheet.create({
     opacity: 0.9,
     transform: [{ scale: 0.98 }],
   },
-  // ✅디자인상 비활성화 
   disabledCard: {
-    opacity: 0.5, // 전체적으로 흐리게
-    backgroundColor: '#DDD', // 배경색을 회색으로 덮음 (선택 사항)
+    opacity: 0.5, 
+    backgroundColor: '#DDD', 
   },
   disabledMissionCard: {
     opacity: 0.7,
@@ -419,7 +423,6 @@ const styles = StyleSheet.create({
     color: '#353535ff',
   },
 
-  // 카메라(미션) 카드
   missionCard: {
     backgroundColor: 'rgba(247,245,241,0.8)', 
     borderRadius: 12,
@@ -449,7 +452,6 @@ const styles = StyleSheet.create({
     color: '#000',
   },
 
-  // 하단 버튼들
   bottomRow: {
     flexDirection: 'row',
     gap: 12,

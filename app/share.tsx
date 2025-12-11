@@ -1,4 +1,4 @@
-// app/(tabs)/share.tsx
+// app/share.tsx
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImageManipulator from 'expo-image-manipulator';

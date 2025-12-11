@@ -1,7 +1,6 @@
 // app/signup.tsx
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
-// ✅ [수정] useRef, useEffect 추가
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
@@ -30,14 +29,22 @@ async function authedFetch(path: string, init: RequestInit = {}) {
   };
 
   const url = `${BASE}${path}`;
+  
+  // ✅ [로그 추가] 요청 URL 확인
+  console.log('[REQ]', init.method || 'GET', url);
+  if (init.body) console.log('[REQ BODY]', init.body);
+
   const res = await fetch(url, { ...init, headers });
   const text = await res.text();
 
-  if (!res.ok) throw new Error(`${path} 실패 (HTTP ${res.status})`);
+  // ✅ [로그 추가] 응답 결과 확인 (너무 길면 잘라서)
+  console.log('[RES]', res.status, text.slice(0, 300));
+
+  if (!res.ok) throw new Error(`${path} 실패 (HTTP ${res.status}) ${text.slice(0, 100)}`);
   try { return JSON.parse(text); } catch { return text; }
 }
 
-// API 함수들 (기존 유지)
+// API 함수들
 export const postName = (name: string) =>
   authedFetch(`/user/name?name=${encodeURIComponent(name)}`, { method: 'POST' });
 
@@ -91,7 +98,7 @@ const InputField = React.memo(({
   placeholder: string;
   onChangeText: (text: string) => void;
   keyboardType?: TextInputProps['keyboardType'];
-  accentColor: string; // 색상 타입 정의
+  accentColor: string;
 }) => {
   const inputColor = value.length > 0 ? '#4D5053' : '#9CA3AF';
   return (
@@ -119,7 +126,6 @@ export default function Signup() {
   const [step, setStep] = useState<number>(0);
   const [isPosting, setIsPosting] = useState(false);
 
-  // 기본 입력값
   const [values, setValues] = useState({
     name: '',
     birthday: '',
@@ -127,7 +133,6 @@ export default function Signup() {
     partnerCode: '',
   });
 
-  // 취향 선택값 (다중 선택 가능)
   const [selectedHobbies, setSelectedHobbies] = useState<string[]>([]);
   const [selectedDateStyles, setSelectedDateStyles] = useState<string[]>([]);
 
@@ -154,16 +159,13 @@ export default function Signup() {
   }, [current.key, values, selectedHobbies, selectedDateStyles]);
 
   const progressPercent = ((step + 1) / steps.length) * 100;
-
-  // ✅ [추가] 애니메이션 값 초기화
   const progressAnim = useRef(new Animated.Value(progressPercent)).current;
 
-  // ✅ [추가] step이 변경될 때마다 애니메이션 실행
   useEffect(() => {
     Animated.timing(progressAnim, {
       toValue: progressPercent,
-      duration: 300, // 0.3초 동안 부드럽게 이동
-      useNativeDriver: false, // width 속성 변경을 위해 false 설정
+      duration: 300,
+      useNativeDriver: false,
     }).start();
   }, [progressPercent]);
 
@@ -182,33 +184,74 @@ export default function Signup() {
       setIsPosting(true);
 
       if (current.key === 'name') {
+        console.log('👉 [onNext] Name:', values.name); // 로그 추가
         await postName(values.name.trim());
+
       } else if (current.key === 'birthday') {
+        console.log('👉 [onNext] Birthday:', values.birthday); // 로그 추가
         await postBirthday(toIsoDate(values.birthday));
+
       } else if (current.key === 'anniversary') {
+        // 1) test/go 호출
         await postTestGo();
+        console.log('✅ [signup] test/go 호출 성공'); // 로그 복구
+
+        // 2) 기념일 저장
+        console.log('👉 [onNext] Anniversary:', values.anniversary);
         const coupleCode = await postAnniversary(toIsoDate(values.anniversary));
+        console.log('✅ [signup] Anniversary Result (coupleCode):', coupleCode); // 로그 복구
+
         if (coupleCode) {
           await AsyncStorage.setItem('coupleCode', coupleCode);
         }
+
+        // 3) 보정: /user/getuser 호출
+        try {
+          const me: any = await authedFetch('/user/getuser', { method: 'GET' });
+          console.log('🔍 [signup] /user/getuser Me:', me); // 로그 복구
+
+          const userId   = me?.userId   ?? me?.id        ?? me?.memberId ?? null;
+          const coupleId = me?.coupleId ?? me?.couple_id ?? null;
+
+          const sets: [string, string][] = [];
+          if (userId   != null) sets.push(['userId', String(userId)]);
+          if (coupleId != null) sets.push(['coupleId', String(coupleId)]);
+          if (sets.length) await AsyncStorage.multiSet(sets);
+        } catch (e) {
+          console.warn('[signup] /user/getuser 실패:', (e as Error)?.message);
+        }
+
       } else if (current.key === 'preferences') {
-        console.log('Selected Hobbies:', selectedHobbies);
-        console.log('Selected Date Styles:', selectedDateStyles);
+        console.log('👉 [onNext] Preferences Hobbies:', selectedHobbies); // 로그 추가
+        console.log('👉 [onNext] Preferences DateStyles:', selectedDateStyles); // 로그 추가
+
       } else if (current.key === 'partnerCode') {
         const code = values.partnerCode.trim();
+        console.log('👉 [onNext] PartnerCode:', code); // 로그 추가
+
         if (code) {
           const resp: any = await postCouple(code);
+          console.log('✅ [postCouple] Response:', resp); // 로그 복구
+
           const rawCid = resp?.memberName ?? resp?.coupleId ?? resp?.couple_id ?? null;
           const cidNum = rawCid != null ? Number(rawCid) : NaN;
 
           if (Number.isFinite(cidNum)) {
             await AsyncStorage.setItem('coupleId', String(cidNum));
+            console.log('💾 [signup] Saved coupleId:', cidNum);
           } else {
+            // fallback
             try {
               const me: any = await authedFetch('/user/getuser', { method: 'GET' });
+              console.log('🔍 [fallback] /user/getuser Me:', me);
               const fallbackCid = me?.coupleId ?? me?.couple_id ?? null;
-              if (fallbackCid != null) await AsyncStorage.setItem('coupleId', String(fallbackCid));
-            } catch {}
+              if (fallbackCid != null) {
+                await AsyncStorage.setItem('coupleId', String(fallbackCid));
+                console.log('💾 [fallback] Saved coupleId:', fallbackCid);
+              }
+            } catch (e) {
+              console.warn('[fallback] failed', e);
+            }
           }
         }
       }
@@ -219,6 +262,7 @@ export default function Signup() {
         router.replace('/signup-finish');
       }
     } catch (e: any) {
+      console.warn('[signup error]', e); // 에러 로그
       Alert.alert('오류', e?.message ?? '다시 시도해 주세요.');
     } finally {
       setIsPosting(false);
@@ -238,9 +282,7 @@ export default function Signup() {
         <View style={styles.headerContainer}>
           <View style={styles.iconRow}>
             <Image source={HEART_ICON} style={[styles.heartImage, { tintColor: current.accent }]} />
-            {/* 진행 바 */}
             <View style={styles.progressBarBg}>
-              {/* ✅ [수정] Animated.View 적용 */}
               <Animated.View 
                 style={[
                   styles.progressBarFill, 
@@ -263,7 +305,6 @@ export default function Signup() {
         {/* 메인 컨텐츠 영역 */}
         <View>
           {current.key === 'preferences' ? (
-            // === 취향 선택 UI ===
             <View>
               <AppText type="bold" style={styles.questionTitle}>평소 즐기는 활동은?</AppText>
               <View style={styles.chipContainer}>
@@ -303,9 +344,7 @@ export default function Signup() {
             </View>
 
           ) : current.key === 'partnerCode' ? (
-            // === 커플 코드 입력 UI ===
             <View style={[styles.codeStepContainer, { borderColor: current.accent }]}>
-              {/* 나의 코드 박스 */}
               <View style={{ marginBottom: 50 }}>
                 <AppText type="bold" style={styles.inputLabel}>나의 코드</AppText>
                 <View style={styles.grayInputBox}>
@@ -313,7 +352,6 @@ export default function Signup() {
                 </View>
               </View>
 
-              {/* 상대방 코드 입력 박스 */}
               <View>
                 <AppText type="bold" style={styles.inputLabel}>상대방 코드 입력</AppText>
                 <TextInput
@@ -329,7 +367,6 @@ export default function Signup() {
             </View>
 
           ) : (
-            // === 일반 입력 UI (이름, 생일, 기념일) ===
             <View style={[styles.currentCardBase, { borderColor: current.accent }]}>
               <InputField
                 label={current.key === 'name' ? '이름' : current.key === 'birthday' ? '생년월일' : '기념일'}
@@ -403,7 +440,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 18, marginBottom: 6, marginLeft:4 },
   hintText: { color: '#4D5053', fontSize: 11, lineHeight: 18 },
 
-  // 기본 입력 카드 (테두리 있는 버전)
+  // 기본 입력 카드
   currentCardBase: { borderWidth: 2, borderRadius: 16, padding: 20, backgroundColor: 'transparent' },
 
   // 과거 카드
@@ -411,7 +448,7 @@ const styles = StyleSheet.create({
     borderWidth: 2, borderColor: '#D1D5DB', borderRadius: 16,
     paddingHorizontal: 20, paddingVertical: 14,
     marginTop: 10, justifyContent: 'center', overflow: 'hidden',
-    backgroundColor: 'transparate'
+    backgroundColor: '#FAFAFA'
   },
   pastCardLabel: { fontSize: 11, color: '#75787B', marginBottom: 4 },
   pastCardValue: { fontSize: 13, color: '#CECECE' },

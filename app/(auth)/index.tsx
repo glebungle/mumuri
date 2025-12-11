@@ -15,14 +15,12 @@ const { width, height } = Dimensions.get('window');
 
 export default function StartScreen() {
   const handleSkipLogin = () => {
-    router.replace('/(tabs)/camera');
+    router.replace('/camera');
   };
   const handleOnboarding = () => {
     router.replace('/onboarding/intro');
   };
-  const handleMypage = () => {
-    router.replace('/(tabs)/mypage');
-  };
+
   return (
     
     <SafeAreaView style={s.wrap}>
@@ -41,9 +39,6 @@ export default function StartScreen() {
         </Pressable>
         <Pressable onPress={handleOnboarding} style={s.onboardingButton}>
             <AppText type='regular' style={s.skipButtonText}>온보딩 보기 (임시)</AppText>
-        </Pressable>
-        <Pressable onPress={handleMypage} style={s.mypageButton}>
-            <AppText type='regular' style={s.skipButtonText}>마이페이지 (임시)</AppText>
         </Pressable>
 
       <View style={s.bottom}>

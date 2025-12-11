@@ -1,4 +1,4 @@
-// app/(tabs)/chat.tsx
+// app/chat.tsx
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -49,10 +49,9 @@ const CACHE_VERSION = 'v1';
 // 채팅 캐시 저장
 async function saveChatCache(roomId: string, messages: ChatMessage[]) {
   try {
-    // 1. 상태가 failed인 것만 제외하고, sent나 sending은 모두 저장
     const toSave = messages
       .filter(m => m.status !== 'failed') 
-      .slice(-100); // 최근 100개
+      .slice(-100); 
 
     await AsyncStorage.setItem(
       CHAT_CACHE_KEY(roomId),
@@ -379,14 +378,11 @@ export default function ChatScreen() {
     return () => { s1.remove(); s2.remove(); };
   }, []);
 
-  // ✅ [수정] STOMP 메시지 수신 핸들러 (내용 기반 중복 제거 추가)
+  // STOMP 메시지 수신
   const onIncoming = useCallback((p: ChatIncoming) => {
     setMessages(prev => {
-      // 1. 이미 똑같은 서버 ID를 가진 메시지가 있으면 무시 (완전 중복 방지)
       if (p.id != null && prev.some(x => String(x.id) === String(p.id))) return prev;
 
-      // 2. [기존 로직] clientMsgId가 일치하는 로컬 메시지 찾기
-      // (백엔드가 clientMsgId를 안 돌려주면 여기서 못 찾고 넘어감)
       if (p.clientMsgId) {
         const ix = prev.findIndex(x => x.clientMsgId === p.clientMsgId);
         if (ix >= 0) {
@@ -407,9 +403,7 @@ export default function ChatScreen() {
 
       const isMine = String(p.senderId) === String(userId ?? '');
       
-      // ✅ [신규 추가] clientMsgId가 없어도, "내용"과 "보낸 사람"이 같으면 같은 메시지로 간주 (방어 로직)
       if (isMine && p.message) {
-        // 내 로컬 메시지 중, 내용이 같고 아직 'sending' 상태이거나 id가 'local_'로 시작하는 녀석을 찾음
         const matchIndex = prev.findIndex(m => 
           m.id.startsWith('local_') && 
           m.text === p.message &&
@@ -417,14 +411,13 @@ export default function ChatScreen() {
         );
 
         if (matchIndex >= 0) {
-          // 찾았다! 로컬 메시지를 서버 메시지로 교체 (중복 생성 X)
           const updated = [...prev];
           const cur = updated[matchIndex];
           updated[matchIndex] = {
-            ...cur, // 기존 로컬 속성 유지
-            id: String(p.id ?? cur.id), // ID는 서버 ID로 교체
-            status: 'sent', // 전송 완료 처리
-            createdAt: p.createdAt ?? cur.createdAt, // 시간 서버 시간으로 동기화
+            ...cur, 
+            id: String(p.id ?? cur.id), 
+            status: 'sent', 
+            createdAt: p.createdAt ?? cur.createdAt, 
           } as ChatMessage;
 
           if (ROOM_KEY) saveChatCache(ROOM_KEY, updated);
@@ -432,7 +425,6 @@ export default function ChatScreen() {
         }
       }
 
-      // 3. 일치하는 로컬 메시지가 없으면 "새 메시지"로 추가 (상대방 메시지 등)
       const add: ChatMessage = {
         id: String(p.id ?? `${Date.now()}`),
         text: p.message ?? undefined,
@@ -443,7 +435,6 @@ export default function ChatScreen() {
         status: 'sent',
       };
       
-      // 혹시라도 ID가 겹치는지 마지막 확인
       if (prev.some(x => x.id === add.id)) return prev;
 
       const newMessages = [...prev, add];
@@ -452,10 +443,8 @@ export default function ChatScreen() {
     });
   }, [userId, ROOM_KEY]);
 
-  // ✅ useFocusEffect (onIncoming 선언 후 사용)
   useFocusEffect(
     useCallback(() => {
-      // 1. 포커스 얻었을 때 (Mount/Focus)
       if (!USE_STOMP || !token || !ROOM_KEY || !userId) return;
 
       console.log('[useFocusEffect] Mounted/Focused - Connecting STOMP');
@@ -465,7 +454,7 @@ export default function ChatScreen() {
         token,
         roomId: ROOM_KEY,
         handlers: {
-          onMessage: onIncoming, // 이제 에러 안 남
+          onMessage: onIncoming,
           onReadUpdate: (_u: ChatReadUpdate) => { },
           onConnected: () => {
             chatRef.current?.markAsRead(ROOM_KEY, userId, latestVisibleMsgId.current ?? undefined);
@@ -478,14 +467,10 @@ export default function ChatScreen() {
       chatRef.current = chat;
       chat.activate();
 
-      // 2. 포커스 잃었을 때 (Unmount/Blur)
       return () => {
         console.log('[useFocusEffect] Unmounted/Blurred - Disconnecting & Saving');
-        
         chat.deactivate();
         chatRef.current = null;
-
-        // 다른 탭 갈 때 반드시 저장!
         if (ROOM_KEY) {
             saveChatCache(ROOM_KEY, latestMessages.current);
             saveMissionCache(latestPerformedMissions.current);
@@ -494,105 +479,88 @@ export default function ChatScreen() {
     }, [token, ROOM_KEY, userId, onIncoming]) 
   );
 
+  useEffect(() => {
+    if (!ROOM_KEY || !token) return;
 
-  // ✅ 채팅 캐시 로드 + 히스토리 API 로드 (중복 제거 로직 강화)
-    useEffect(() => {
-      if (!ROOM_KEY || !token) return;
+    const loadData = async () => {
+      let cachedMsgs: ChatMessage[] = [];
+      let historyMsgs: ChatMessage[] = [];
 
-      const loadData = async () => {
-        let cachedMsgs: ChatMessage[] = [];
-        // [Correction 1] Initialize as empty array first. Do not map 'rows' here.
-        let historyMsgs: ChatMessage[] = []; 
+      try {
+        cachedMsgs = await loadChatCache(ROOM_KEY);
+      } catch (e: any) {
+        console.warn('[chat cache] load failed:', e?.message);
+      }
 
-        // 1. 캐시 로드
-        try {
-          cachedMsgs = await loadChatCache(ROOM_KEY);
-        } catch (e: any) {
-          console.warn('[chat cache] load failed:', e?.message);
+      try {
+        const res: any = await authedFetch(`/chat/${ROOM_KEY}/history?size=50`, { method: 'GET' });
+        
+        let rows = [];
+        if (Array.isArray(res)) {
+          rows = res;
+        } else if (res && Array.isArray(res.messages)) {
+          rows = res.messages;
+        } else if (res && Array.isArray(res.content)) {
+          rows = res.content;
         }
 
-        // 2. 히스토리 API 로드
-        try {
-          const res: any = await authedFetch(`/chat/${ROOM_KEY}/history?size=50`, { method: 'GET' });
-          
-          let rows = [];
-          if (Array.isArray(res)) {
-            rows = res;
-          } else if (res && Array.isArray(res.messages)) {
-            rows = res.messages;
-          } else if (res && Array.isArray(res.content)) {
-            rows = res.content;
+        historyMsgs = rows.map((r: any) => {
+          let timeString = r.sentAt;
+          if (timeString && !timeString.endsWith('Z')) {
+            timeString += 'Z'; 
           }
 
-          // [Correction 2] Move the mapping logic INSIDE here, after 'rows' is defined
-          historyMsgs = rows.map((r: any) => {
-            // ✅ 시간 보정 로직 (moved inside)
-            let timeString = r.sentAt;
-            if (timeString && !timeString.endsWith('Z')) {
-              timeString += 'Z'; 
-            }
+          return {
+            id: String(r.id),
+            text: r.message ?? undefined,
+            imageUrl: r.imageUrl ?? undefined,
+            mine: String(r.senderId) === String(userId ?? ''),
+            createdAt: timeString 
+              ? new Date(timeString).getTime() 
+              : (r.createdAt ? new Date(r.createdAt).getTime() : Date.now()),
+            type: r.imageUrl ? 'image' : 'text',
+            status: 'sent',
+          };
+        }) as ChatMessage[];
+        
+      } catch (e: any) {
+        console.warn('[chat history] load failed:', e?.message);
+      }
 
-            return {
-              id: String(r.id),
-              text: r.message ?? undefined,
-              imageUrl: r.imageUrl ?? undefined,
-              mine: String(r.senderId) === String(userId ?? ''),
-              // ✅ 수정된 timeString 사용
-              createdAt: timeString 
-                ? new Date(timeString).getTime() 
-                : (r.createdAt ? new Date(r.createdAt).getTime() : Date.now()),
-              type: r.imageUrl ? 'image' : 'text',
-              status: 'sent',
-            };
-          }) as ChatMessage[];
-          
-        } catch (e: any) {
-          console.warn('[chat history] load failed:', e?.message);
+      setMessages(prev => {
+        const serverMsgs = historyMsgs.filter(m => !m.id.startsWith('local_'));
+        const latestServerTime = serverMsgs.length > 0 
+          ? Math.max(...serverMsgs.map(m => m.createdAt)) 
+          : 0;
+
+        const allMsgs = [...prev, ...cachedMsgs, ...historyMsgs];
+        const idMap = new Map<string, ChatMessage>();
+
+        for (const m of allMsgs) {
+          if (!m.id.startsWith('local_') && !m.id.startsWith('mission_')) {
+            idMap.set(m.id, m);
+            continue;
+          }
+          if (m.id.startsWith('mission_')) {
+            idMap.set(m.id, m);
+            continue;
+          }
+          if (m.id.startsWith('local_')) {
+            if (m.createdAt <= latestServerTime + 1000) {
+              continue; 
+            }
+            idMap.set(m.id, m);
+          }
         }
 
-        // 3. 병합 및 똑똑한 중복 제거 (Dedup Logic)
-        setMessages(prev => {
-          // (1) 서버에서 온 메시지들 중 가장 최신 시간 구하기
-          const serverMsgs = historyMsgs.filter(m => !m.id.startsWith('local_'));
-          const latestServerTime = serverMsgs.length > 0 
-            ? Math.max(...serverMsgs.map(m => m.createdAt)) 
-            : 0;
+        const merged = Array.from(idMap.values());
+        return merged.sort((a, b) => a.createdAt - b.createdAt);
+      });
+    };
 
-          // (2) 모든 메시지 합치기
-          const allMsgs = [...prev, ...cachedMsgs, ...historyMsgs];
-          const idMap = new Map<string, ChatMessage>();
+    loadData();
+  }, [ROOM_KEY, token, userId]);
 
-          for (const m of allMsgs) {
-            // A. 서버 메시지(숫자 ID)는 무조건 저장
-            if (!m.id.startsWith('local_') && !m.id.startsWith('mission_')) {
-              idMap.set(m.id, m);
-              continue;
-            }
-
-            // B. 미션 메시지는 유지
-            if (m.id.startsWith('mission_')) {
-              idMap.set(m.id, m);
-              continue;
-            }
-
-            // C. 로컬 메시지('local_') 처리:
-            if (m.id.startsWith('local_')) {
-              if (m.createdAt <= latestServerTime + 1000) {
-                continue; 
-              }
-              idMap.set(m.id, m);
-            }
-          }
-
-          const merged = Array.from(idMap.values());
-          return merged.sort((a, b) => a.createdAt - b.createdAt);
-        });
-      };
-
-      loadData();
-    }, [ROOM_KEY, token, userId]);
-
-  // 미션 캐시 로드 + 오늘 미션 API 병합
   useEffect(() => {
     if (!token || !userId) return;
 
@@ -669,7 +637,6 @@ export default function ChatScreen() {
     fetchAndMergeMissions();
   }, [token, userId]);
 
-  // 미션 완료 후 처리
   const appendedOnceRef = useRef(false);
   useEffect(() => {
     if (appendedOnceRef.current) return;
@@ -736,7 +703,6 @@ export default function ChatScreen() {
     requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
   }, [justCompletedMissionId, justCompletedMissionText, justCompletedPhotoUrl, justCompletedAt, ROOM_KEY]);
 
-  // 텍스트 전송
   const sendMessage = useCallback(async () => {
     if (!ROOM_KEY || !userId) {
       Alert.alert('안내', '커플 정보가 아직 준비되지 않았어요.');
@@ -795,7 +761,6 @@ export default function ChatScreen() {
     }
   }, [ROOM_KEY, userId, sending, text]);
 
-  // 렌더링 데이터 생성
   const listData = useMemo<(ChatMessage | DateMarker)[]>(() => {
     const baseMsgs = [...messages];
     const missionMsgs: ChatMessage[] = [];
@@ -920,12 +885,20 @@ export default function ChatScreen() {
 
     return (
       <View style={[styles.row, mine ? styles.rowMine : styles.rowOther]}>
-        <View style={styles.msgCol}>
+        <View style={[styles.msgCol, mine ? { flexDirection: 'row', justifyContent: 'flex-end' } : { flexDirection: 'row', justifyContent: 'flex-start' }]}>
+          {/* 내 메시지일 때: 시간 - 말풍선 */}
+          {mine && showTime && (
+            <ChatText style={styles.timeTextMine}>
+              {formatTime(m.createdAt)}
+            </ChatText>
+          )}
+
           <View style={contentContainerStyle}>
             {isMissionText ? (
-              <ChatText style={[styles.msgText, mine ? styles.msgTextMine : styles.msgTextOther]}>
+              // ✅ [요청 1] 폰트 변경
+              <AppText style={[styles.msgText, { fontFamily: 'Paperlogy-7Bold' }]}>
                 {m.text}
-              </ChatText>
+              </AppText>
             ) : m.type === 'image' ? (
               <Image
                 source={{ uri: m.imageUrl! }}
@@ -937,9 +910,9 @@ export default function ChatScreen() {
                 }}
               />
             ) : (
-              <ChatText style={[styles.msgText, mine ? styles.msgTextMine : styles.msgTextOther]}>
+              <AppText style={[styles.msgText, mine ? styles.msgTextMine : styles.msgTextOther, { fontFamily: 'Paperlogy-7Bold' }]}>
                 {m.text}
-              </ChatText>
+              </AppText>
             )}
             {m.alt ? (
               <ChatText style={[styles.msgText, { marginTop: 6, color: mine ? '#FCECEC' : '#C00' }]}>
@@ -947,8 +920,10 @@ export default function ChatScreen() {
               </ChatText>
             ) : null}
           </View>
-          {showTime && (
-            <ChatText style={[styles.timeTextLeft, mine ? { alignSelf: 'flex-end', marginRight: 6 } : { alignSelf: 'flex-start', marginLeft: 6 }]}>
+
+          {/* 상대 메시지일 때: 말풍선 - 시간 */}
+          {!mine && showTime && (
+            <ChatText style={styles.timeTextOther}>
               {formatTime(m.createdAt)}
             </ChatText>
           )}
@@ -958,7 +933,7 @@ export default function ChatScreen() {
           {m.status === 'failed' ? (
             <Ionicons name="alert-circle" size={14} color="#FF4D4F" />
           ) : m.status === 'sending' ? (
-            <Ionicons name="time-outline" size={12} color="#999" />
+            <Ionicons name="time-outline" size={12} color="#1622ffff" />
           ) : null}
         </View>
       </View>
@@ -980,11 +955,16 @@ export default function ChatScreen() {
       keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + HEADER_HEIGHT : 0}
     >
       <View style={[styles.header, { paddingTop: insets.top }]}>
+        {/* ✅ [요청 3] 헤더 좌측: 뒤로가기 */}
         <Pressable style={{ paddingHorizontal: 8 }} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={24} color="#111" />
         </Pressable>
+        {/* 헤더 중앙: 타이틀 */}
         <AppText style={styles.headerTitle}>애인</AppText>
-        <View style={{ width: 30 }} />
+        {/* ✅ [요청 3] 헤더 우측: 카메라 버튼 */}
+        <Pressable onPress={() => router.push('/camera')} style={{ paddingHorizontal: 8 }}>
+           <Ionicons name="camera-outline" size={24} color="#111" />
+        </Pressable>
       </View>
 
       <FlatList<ChatMessage | DateMarker>
@@ -1006,7 +986,8 @@ export default function ChatScreen() {
             onLayout={(e) => setInputBarHeight(e.nativeEvent.layout.height)}
           >
             <TextInput
-              style={styles.input}
+              // ✅ [요청 2] 입력창 폰트 변경
+              style={[styles.input, { fontFamily: 'Pretendard-Medium' }]}
               placeholder="대화를 입력하세요"
               value={text}
               onChangeText={(t) => t.length <= MAX_TEXT_LEN && setText(t)}
@@ -1027,7 +1008,8 @@ export default function ChatScreen() {
           onLayout={(e) => setInputBarHeight(e.nativeEvent.layout.height)}
         >
           <TextInput
-            style={styles.input}
+            // ✅ [요청 2] 입력창 폰트 변경
+            style={[styles.input, { fontFamily: 'Pretendard-Medium' }]}
             placeholder="대화를 입력하세요"
             value={text}
             onChangeText={(t) => t.length <= MAX_TEXT_LEN && setText(t)}
@@ -1052,23 +1034,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 6,
+    justifyContent: 'space-between', // 헤더 요소 양 끝 정렬
   },
-  headerTitle: { flex: 1, textAlign: 'center', fontSize: 16, color: '#111' },
+  headerTitle: { fontSize: 16, color: '#111' },
 
   row: {
     width: '100%',
     marginVertical: 6,
-    flexDirection: 'row',
-    alignItems: 'flex-end',
+    // alignItems 제거 (내부 컨테이너에서 처리)
   },
-  rowMine: { justifyContent: 'flex-end' },
-  rowOther: { justifyContent: 'flex-start' },
+  rowMine: { alignItems: 'flex-end' }, // 전체 행을 우측 정렬
+  rowOther: { alignItems: 'flex-start' }, // 전체 행을 좌측 정렬
 
-  msgCol: { maxWidth: '80%' },
+  // msgCol의 동작 변경: 내부 요소(시간, 말풍선)를 가로로 배치
+  msgCol: { 
+    maxWidth: '80%', 
+    alignItems: 'flex-end', // 기본 정렬 (시간 텍스트 정렬용)
+  },
 
   bubble: { paddingHorizontal: 12, paddingVertical: 10, borderRadius: 16 },
-  bubbleMine: { backgroundColor: '#6198FF' },
-  bubbleOther: { backgroundColor: '#fff', borderWidth: StyleSheet.hairlineWidth, borderColor: '#e5e7eb' },
+  bubbleMine: { backgroundColor: '#BED5FF', borderTopRightRadius: 2 },
+  bubbleOther: { backgroundColor: '#FFADAD', borderWidth: StyleSheet.hairlineWidth, borderTopLeftRadius: 2 },
 
   imageBoxMine: {
     borderRadius: 18,
@@ -1081,19 +1067,20 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
 
-  bubbleMissionMine: { backgroundColor: '#6198FF' },
+  bubbleMissionMine: { backgroundColor: '#6198FF', },
   bubbleMissionOther: {
-    backgroundColor: '#FFE8D2',
+    backgroundColor: '#FFADAD',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#F7CBA7',
   },
   missionImage: {
     width: STICKER_SIZE * 1.6,
-    height: STICKER_SIZE * 1.6,
+    height: STICKER_SIZE * 2.5,
     borderRadius: 0, 
     backgroundColor: '#DDE7FF', 
   },
   bubbleMissionText: {
+    fontSize: 10, 
+    color: '#fff',
     paddingHorizontal: 12,
     paddingTop: 10,
     paddingBottom: 10,
@@ -1104,22 +1091,37 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
 
-  msgText: { fontSize: 14, lineHeight: 20 },
-  msgTextMine: { color: '#fff' },
-  msgTextOther: { color: '#111' },
+  msgText: { fontSize: 14, lineHeight: 20, color: '#fff' },
+  msgTextMine: { color: '#3F3F3F' },
+  msgTextOther: { color: '#3F3F3F' },
 
-  timeTextLeft: { marginTop: 4, fontSize: 10, color: '#888' },
+  // ✅ 시간 텍스트 스타일 분리 (바깥쪽 배치용)
+  timeTextMine: { 
+    marginRight: 6, 
+    marginBottom: 0, 
+    fontSize: 10, 
+    color: '#75787B',
+    alignSelf: 'flex-end' 
+  },
+  timeTextOther: { 
+    marginLeft: 6, 
+    marginBottom: 0, 
+    fontSize: 10, 
+    color: '#75787B',
+    alignSelf: 'flex-end'
+  },
+  
 
   metaWrapRight: { marginLeft: 6, alignItems: 'center', justifyContent: 'flex-end' },
 
-  dateWrap: { alignItems: 'center', marginVertical: 6 },
+  dateWrap: { alignItems: 'center', marginVertical: 26 },
   dateText: {
     fontSize: 12,
-    color: '#888',
-    backgroundColor: '#EDEDED',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
+    color: '#4D5053',
+    backgroundColor: '#F8F4EA',
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    borderRadius: 100,
   },
 
   inputBar: {

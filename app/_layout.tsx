@@ -41,7 +41,7 @@ const handleDeepLink = async (url: string) => {
       // 사용자 상태에 따라 라우팅 (NEW면 /signup으로 이동)
       if (status === 'NEW' || status === 'NEED_INFO') {
         console.log('➡️ New user detected, routing to /signup');
-        router.replace('/signup');
+        router.replace('/onboarding/intro');
       } else {
         console.log('➡️ Existing user, routing to /(tabs)');
         router.replace('/(tabs)/home');

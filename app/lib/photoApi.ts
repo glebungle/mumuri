@@ -1,7 +1,7 @@
 // lib/photoApi.ts
 import * as ImageManipulator from 'expo-image-manipulator';
 
-const API_BASE = 'https://mumuri.shop'; //수정
+const API_BASE = 'https://mumuri.shop'; 
 
 export type Photo = {
   id: string;

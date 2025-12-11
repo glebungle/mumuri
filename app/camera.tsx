@@ -1,4 +1,4 @@
-// app/(tabs)/camera.tsx
+// app/camera.tsx
 import { Feather, Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CameraCapturedPicture, CameraView, useCameraPermissions } from 'expo-camera';
@@ -309,13 +309,27 @@ export default function CameraHome() {
         />
       )}
 
-      {/* 상단 디데이 (왼쪽 정렬, 회색 배경) */}
+      {/* ================= 상단 버튼 그룹 (수정됨) ================= */}
       {!previewUri && (
-        <View style={styles.ddayBadge}>
-          <Ionicons name="heart-outline" size={18} color="#fff" />
-          <AppText style={styles.ddayText}>{dday}</AppText>
+        <View style={styles.topHeaderContainer}>
+          {/* 1. 뒤로가기 버튼 */}
+          <Pressable style={styles.headerBtn} onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={24} color="#6198FF" />
+          </Pressable>
+
+          {/* 2. 디데이 뱃지 (가운데 or 왼쪽 정렬, 디자인 시안 참고) */}
+          <View style={styles.ddayBadge}>
+            <Ionicons name="heart-outline" size={18} color="#fff" />
+            <AppText style={styles.ddayText}>{dday}</AppText>
+          </View>
+
+          {/* 3. 우측 상단 버튼 (앨범 등) */}
+          <Pressable style={styles.headerBtn} onPress={() => Alert.alert('준비중')}>
+            <Feather name="book" size={20} color="#6198FF" />
+          </Pressable>
         </View>
       )}
+      {/* ========================================================== */}
 
       {/* 오늘의 미션 캐러셀 (화살표 포함 말풍선) */}
       {!previewUri && missions.length > 0 && (
@@ -340,8 +354,8 @@ export default function CameraHome() {
                 >
                   <Ionicons
                     name="caret-forward"
-                    size={16}
-                    color="#3279FF"
+                    size={20}
+                    color='rgba(50,121,255,0.7)'
                     style={{ transform: [{ rotate: '180deg' }] }}
                   />
                 </Pressable>
@@ -367,8 +381,8 @@ export default function CameraHome() {
                 >
                   <Ionicons
                     name="caret-forward"
-                    size={16}
-                    color="#3279FF"
+                    size={20}
+                    color='rgba(50,121,255,0.7)'
                   />
                 </Pressable>
               ) : (
@@ -376,15 +390,6 @@ export default function CameraHome() {
               )}
             </View>
           </View>
-        </View>
-      )}
-
-      {/* 오른쪽 상단 버튼 그룹 */}
-      {!previewUri && (
-        <View style={styles.floatingTopButtonsGroupCamera}>
-          <Pressable style={styles.floatBtn} onPress={() => Alert.alert('준비중')}>
-            <Feather name="book" size={20} color="#6198FF" />
-          </Pressable>
         </View>
       )}
 
@@ -463,33 +468,33 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
 
-  // D-DAY (왼쪽 상단, 회색 배경)
-  ddayBadge: {
+  topHeaderContainer: {
     position: 'absolute',
     top: 18,
-    left: 18,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    zIndex: 10,
+  },
+
+  ddayBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     paddingVertical: 8,
-    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    backgroundColor: 'rgba(77, 80, 83, 0.6)', // 진한 회색 반투명
     borderRadius: 20,
   },
-  ddayText: { marginLeft: 6, color: '#fff', fontSize: 13, fontWeight: '600' },
+  ddayText: { marginLeft: 6, color: '#fff', fontSize: 16,},
 
-  // 상단 오른쪽 버튼
-  floatingTopButtonsGroupCamera: {
-    position: 'absolute',
-    top: 18,
-    right: 18,
-    flexDirection: 'row',
-    zIndex: 2,
-  },
-  floatBtn: {
+  headerBtn: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.7)',
+    backgroundColor: '#D9D9D9',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -497,7 +502,7 @@ const styles = StyleSheet.create({
   // 미션 말풍선 영역
   hintBubbleWrap: {
     position: 'absolute',
-    top: screenHeight * 0.1,
+    top: screenHeight * 0.1, // 위치 살짝 조정
     width: '100%',
     alignItems: 'center',
     paddingHorizontal: 24,
@@ -514,15 +519,15 @@ const styles = StyleSheet.create({
 
   hintRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
 
-  // 첨부 이미지 스타일에 맞춘 말풍선
+  // 말풍선 스타일
   hintBubble: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 11,
     paddingVertical: 12,
     backgroundColor: 'rgba(255,255,255,0.7)',
-    borderRadius: 22,
-    maxWidth: '80%',
+    borderRadius: 12,
+    maxWidth: '85%',
   },
   innerArrowArea: {
     width: 32,
@@ -536,8 +541,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   hintText: {
-    color: '#3279FF',
-    fontSize: 13,
+    color: '#444444',
+    fontSize: 12, // 폰트 크기 살짝 키움
     textAlign: 'center',
     fontWeight: '600',
   },
@@ -575,10 +580,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 4,
+    borderWidth: 12,
     borderColor: '#FF9191',
   },
-  shutterInner: { width: 66, height: 66, borderRadius: 33, backgroundColor: '#FF9191' },
+  shutterInner: { width: 48, height: 48, borderRadius: 33, backgroundColor: '#FF9191' },
   flipBtn: {
     width: 56,
     height: 56,
