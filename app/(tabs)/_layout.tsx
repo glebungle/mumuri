@@ -16,9 +16,6 @@ export default function TabsLayout() {
     >
       <TopTabs.Screen name="home" options={{ title: '홈' }} />
       <TopTabs.Screen name="gallery" options={{ title: '갤러리' }} />
-      {/* <TopTabs.Screen name="chat" options={{ title: '채팅' }} /> */}
-      {/* <TopTabs.Screen name="index" options={{ title: '임시' }} /> */}
-      {/* <TopTabs.Screen name="share" options={{ href: null }} /> */}
     </TopTabs>
   );
 }

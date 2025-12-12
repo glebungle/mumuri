@@ -22,6 +22,9 @@ import AppText from '../components/AppText';
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 const BASE_URL = 'https://mumuri.shop';
+const heartImg = require('../assets/images/Heart.png');
+const galleryImg = require('../assets/images/gallery.png');
+const rotateImg = require('../assets/images/camera-rotate.png');
 
 // ================== 공통 authedFetch ==================
 async function authedFetch(path: string, init: RequestInit = {}) {
@@ -319,7 +322,7 @@ export default function CameraHome() {
 
           {/* 2. 디데이 뱃지  */}
           <View style={styles.ddayBadge}>
-            <Ionicons name="heart-outline" size={18} color="#fff" />
+            <Image source={heartImg} style={[styles.heartImage]} />
             <AppText style={styles.ddayText}>{dday}</AppText>
           </View>
 
@@ -403,7 +406,8 @@ export default function CameraHome() {
           <View style={styles.bottomButtonsRow}>
             {/* 갤러리 버튼 */}
             <Pressable style={styles.galleryBtn} onPress={pickFromGallery}>
-              <Ionicons name="images-outline" size={28} color="#fff" />
+              {/* <Ionicons name="images-outline" size={28} color="#fff" /> */}
+              <Image source={galleryImg} style={[styles.galleryImage]} />
             </Pressable>
 
             {/* 촬영 버튼 */}
@@ -417,7 +421,8 @@ export default function CameraHome() {
 
             {/* 카메라 전환 버튼 */}
             <Pressable style={styles.flipBtn} onPress={toggleCameraFacing}>
-              <Ionicons name="camera-reverse-outline" size={28} color="#fff" />
+              {/* <Ionicons name="camera-reverse-outline" size={28} color="#fff" /> */}
+              <Image source={rotateImg} style={[styles.rotateImage]} />
             </Pressable>
           </View>
         )}
@@ -564,14 +569,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
   },
   galleryBtn: {
-    width: 56,
-    height: 56,
+    width: 50,
+    height: 50,
     borderRadius: 28,
-    backgroundColor: 'rgba(117, 117, 117, 0.9)',
     alignItems: 'center',
     justifyContent: 'center',
     position: 'absolute',
     left: 40,
+  },
+  galleryImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'absolute',
   },
   shutterOuter: {
     width: 86,
@@ -585,14 +597,22 @@ const styles = StyleSheet.create({
   },
   shutterInner: { width: 48, height: 48, borderRadius: 33, backgroundColor: '#FF9191' },
   flipBtn: {
-    width: 56,
-    height: 56,
+    width: 50,
+    height: 50,
     borderRadius: 28,
-    backgroundColor: 'rgba(117, 117, 117, 0.9)',
     alignItems: 'center',
     justifyContent: 'center',
     position: 'absolute',
     right: 40,
+  },
+
+  rotateImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'absolute',
   },
 
   topBarPreview: {
@@ -626,4 +646,11 @@ const styles = StyleSheet.create({
   permissionTitle: { fontSize: 18, marginBottom: 16, fontWeight: 'bold' },
   permBtn: { paddingHorizontal: 20, paddingVertical: 12, backgroundColor: '#6198FF', borderRadius: 12 },
   permBtnText: { color: '#fff', fontWeight: '700' },
+
+  heartImage: {
+    width: 20,
+    height: 20,
+    tintColor: '#ffffffff',
+  }
+
 });

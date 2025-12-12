@@ -84,10 +84,12 @@ export default function SettingScreen() {
             <AppText type='semibold' style={styles.sectionTitle}>커플 연결</AppText>
             <Ionicons name="chevron-forward" size={18} color="#000" />
           </View>
-          <View style={styles.itemGroup}>
-            {/* <Pressable onPress={handleCopyCode}> */}
-              <AppText type='medium' style={styles.itemText}>커플코드 복사</AppText>
-            {/* </Pressable> */}
+          <View>
+            <View style={styles.itemGroup}>
+              <Pressable onPress={() => router.push('./couple-connect')}>
+                <AppText type='medium' style={styles.itemText}>커플 연결하기</AppText>
+              </Pressable>
+            </View>
           </View>
         </View>
 
@@ -195,18 +197,18 @@ const styles = StyleSheet.create({
   
   // 섹션 하위 아이템 (우측 정렬 텍스트)
   itemGroup: {
-    gap: 4, // 아이템 간 간격
+    gap: 4, 
   },
   itemRow: {
-    // 터치 영역 확보 등을 위해 Row로 감쌈
+
   },
   itemText: {
     fontSize: 15,
-    color: '#666', // 약간 연한 회색
-    textAlign: 'right', // 우측 정렬
+    color: '#666', 
+    textAlign: 'right', 
   },
 
-  // 여유공간 섹션 (디자인 특화)
+  // 여유공간 섹션 
   storageSection: {
     marginTop: 32,
     

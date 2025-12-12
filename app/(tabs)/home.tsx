@@ -1,11 +1,12 @@
-// app/(tabs)/home.tsx
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
-import React, { useCallback, useState } from 'react';
+// useEffect 추가
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
+  Image,
   ImageBackground,
   Modal,
   Pressable,
@@ -17,6 +18,8 @@ import AppText from '../../components/AppText';
 import { useUser } from '../context/UserContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+const heartImg = require('../../assets/images/Heart.png');
 
 // 모달 컴포넌트
 const AlertModal = ({
@@ -49,11 +52,22 @@ const AlertModal = ({
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
 
-  const { userData, refreshUserData } = useUser(); // ✅ 전역 상태 사용
+  const { userData, refreshUserData } = useUser(); // 전역 상태 
   
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [modalMessage, setModalMessage] = useState('');
+
+  // ✅ [디버깅] userData가 변경될 때마다 로그 출력
+  useEffect(() => {
+    if (userData) {
+      console.log('====================================');
+      console.log('📢 [HOME] 수신된 UserData:', JSON.stringify(userData, null, 2));
+      console.log('====================================');
+    } else {
+      console.log('📢 [HOME] UserData가 아직 없습니다 (null/undefined)');
+    }
+  }, [userData]);
 
   // 배경 이미지
   const bgImage = null;
@@ -63,8 +77,15 @@ export default function HomeScreen() {
       let isActive = true;
       
       const load = async () => {
-        await refreshUserData(); // /home/main 호출
-        if (isActive) setLoading(false);
+        try {
+          console.log('🔄 [HOME] 데이터 새로고침 시작...');
+          await refreshUserData(); // /home/main 호출
+          console.log('✅ [HOME] 데이터 새로고침 완료');
+        } catch (error) {
+          console.error('❌ [HOME] 데이터 로드 실패:', error);
+        } finally {
+          if (isActive) setLoading(false);
+        }
       };
       
       load();
@@ -73,7 +94,7 @@ export default function HomeScreen() {
     }, [])
   );
 
-  // ✅ [수정됨] 커플 연결 여부 판단 로직 변경
+  // ✅커플 연결 여부 판단 로직
   // 기념일(anniversary)은 솔로도 입력하므로, 채팅방 ID(roomId)가 생성되었는지(0보다 큰지)로 판단
   const isCoupled = !!(userData && userData.roomId && userData.roomId > 0);
   
@@ -190,12 +211,7 @@ export default function HomeScreen() {
           </View>
           <View style={styles.Divider} />
           <View style={styles.dDayBadge}>
-            <Ionicons
-              name="heart-outline"
-              size={16}
-              color="#FFF"
-              style={{ marginRight: 4 }}
-            />
+            <Image source={heartImg} style={[styles.heartImage]} />
             <AppText type="bold" style={styles.dDayText}>
               {isCoupled ? `${dDay}일째` : '연결 대기중'}
             </AppText>
@@ -403,7 +419,6 @@ const styles = StyleSheet.create({
   dateText: {
     color: '#EEE',
     fontSize: 13,
-    fontWeight: '500',
   },
 
   dashboard: {
@@ -527,4 +542,10 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 13,
   },
+  heartImage: {
+    width: 20,
+    height: 20,
+    tintColor: '#ffffffff',
+    margin:5,
+  }
 });
