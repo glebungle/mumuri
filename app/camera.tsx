@@ -317,14 +317,14 @@ export default function CameraHome() {
             <Ionicons name="chevron-back" size={24} color="#6198FF" />
           </Pressable>
 
-          {/* 2. 디데이 뱃지 (가운데 or 왼쪽 정렬, 디자인 시안 참고) */}
+          {/* 2. 디데이 뱃지  */}
           <View style={styles.ddayBadge}>
             <Ionicons name="heart-outline" size={18} color="#fff" />
             <AppText style={styles.ddayText}>{dday}</AppText>
           </View>
 
           {/* 3. 우측 상단 버튼 (앨범 등) */}
-          <Pressable style={styles.headerBtn} onPress={() => Alert.alert('준비중')}>
+          <Pressable style={styles.headerBtn} onPress={() => router.push('/(tabs)/gallery')}>
             <Feather name="book" size={20} color="#6198FF" />
           </Pressable>
         </View>
@@ -483,12 +483,12 @@ const styles = StyleSheet.create({
   ddayBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
     backgroundColor: 'rgba(77, 80, 83, 0.6)', // 진한 회색 반투명
     borderRadius: 20,
   },
-  ddayText: { marginLeft: 6, color: '#fff', fontSize: 16,},
+  ddayText: { marginLeft: 6, color: '#fff', fontSize: 14,},
 
   headerBtn: {
     width: 44,

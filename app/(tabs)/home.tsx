@@ -1,3 +1,4 @@
+// app/(tabs)/home.tsx
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -5,9 +6,9 @@ import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Dimensions,
   ImageBackground,
+  Modal,
   Pressable,
   StyleSheet,
   View,
@@ -16,7 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppText from '../../components/AppText';
 
 const BASE_URL = 'https://mumuri.shop';
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // API 호출 유틸
 async function authedFetch(path: string, method: string = 'GET') {
@@ -28,7 +29,7 @@ async function authedFetch(path: string, method: string = 'GET') {
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
-  
+
   const res = await fetch(`${BASE_URL}${path}`, { method, headers });
   if (!res.ok) {
     const text = await res.text();
@@ -43,9 +44,37 @@ function normalizeUser(raw: any) {
   return {
     name: raw.name || raw.nickname || '알 수 없음',
     coupleId: raw.coupleId ?? raw.couple_id ?? raw.coupleID ?? null,
-    startDate: raw.startDate ?? raw.start_date ?? raw.anniversary ?? null, 
+    startDate: raw.startDate ?? raw.start_date ?? raw.anniversary ?? null,
   };
 }
+
+// 모달 컴포넌트
+const AlertModal = ({
+  visible,
+  message,
+  onClose,
+}: {
+  visible: boolean;
+  message: string;
+  onClose: () => void;
+}) => {
+  return (
+    <Modal visible={visible} transparent animationType="fade">
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <View style={styles.modalIconBox}>
+            <Ionicons name="information-circle" size={32} color="#6198FF" />
+          </View>
+          <AppText style={styles.modalTitle}>알림</AppText>
+          <AppText type='medium' style={styles.modalMessage}>{message}</AppText>
+          <Pressable style={styles.modalButton} onPress={onClose}>
+            <AppText style={styles.modalButtonText}>확인</AppText>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  );
+};
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -55,12 +84,14 @@ export default function HomeScreen() {
   const [userName, setUserName] = useState('');
   const [startDate, setStartDate] = useState<string | null>(null);
   const [todayMissionTitle, setTodayMissionTitle] = useState<string | null>(null);
-  
-  // ✅ [수정] D-Day를 State로 관리 (API에서 받아오기 위해)
-  const [dDay, setDDay] = useState<number>(1); 
-  
+
+  const [dDay, setDDay] = useState<number>(1);
+
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalMessage, setModalMessage] = useState('');
+
   // 배경 이미지
-  const bgImage = null; 
+  const bgImage = null;
 
   useFocusEffect(
     useCallback(() => {
@@ -73,7 +104,7 @@ export default function HomeScreen() {
           const storedCidNum = storedCid ? Number(storedCid) : null;
 
           // 2. 유저 정보 API 호출
-          let userData = null;
+          let userData: any = null;
           try {
             userData = await authedFetch('/user/getuser');
           } catch (e) {
@@ -81,18 +112,38 @@ export default function HomeScreen() {
           }
 
           const normalized = normalizeUser(userData);
-          
+
           if (isActive) {
-            const finalCoupleId = normalized.coupleId || storedCidNum;
+            // 서버 응답에 coupleId가 있으면 그것을 신뢰
+            const hasServerCoupleId =
+              normalized.coupleId !== null && normalized.coupleId !== undefined;
+
+            let finalCoupleId: number | null = null;
+
+            if (hasServerCoupleId) {
+              finalCoupleId = Number(normalized.coupleId);
+              if (!Number.isNaN(finalCoupleId)) {
+                await AsyncStorage.setItem('coupleId', String(finalCoupleId));
+              } else {
+                finalCoupleId = null;
+                await AsyncStorage.removeItem('coupleId');
+              }
+            } else {
+              // 서버가 "커플 없음"이라고 말한 경우: 로컬 캐시도 제거
+              await AsyncStorage.removeItem('coupleId');
+
+              // 서버 호출 자체가 실패했을 때만 이전 캐시를 fallback으로 사용
+              if (!userData && storedCidNum) {
+                finalCoupleId = storedCidNum;
+              } else {
+                finalCoupleId = null;
+              }
+            }
 
             setCoupleId(finalCoupleId);
             setUserName(normalized.name || '사용자');
             setStartDate(normalized.startDate);
-            
-            if (normalized.coupleId) {
-              await AsyncStorage.setItem('coupleId', String(normalized.coupleId));
-            }
-            
+
             if (finalCoupleId) {
               // 3. 오늘의 미션 가져오기
               try {
@@ -113,9 +164,12 @@ export default function HomeScreen() {
               } catch (e) {
                 console.warn('[Home] 메인 정보(D-Day) 로드 실패', e);
               }
+            } else {
+              // 커플이 아예 없으면 D-Day는 의미 없으니 초기화 정도만
+              setDDay(1);
+              setTodayMissionTitle(null);
             }
           }
-
         } catch (e) {
           console.warn('[Home] 데이터 로드 실패', e);
         } finally {
@@ -131,10 +185,15 @@ export default function HomeScreen() {
     }, [])
   );
 
+  const showModal = (msg: string) => {
+    setModalMessage(msg);
+    setModalVisible(true);
+  };
+
   // --- 네비게이션 핸들러 ---
   const handlePressCamera = () => {
     if (!coupleId) {
-      Alert.alert('알림', '커플 연결 후 미션을 수행할 수 있어요!');
+      showModal('커플 연결 후 미션을 수행할 수 있어요!'); 
       return;
     }
     router.push('/camera');
@@ -142,7 +201,7 @@ export default function HomeScreen() {
 
   const handlePressCalendar = () => {
     if (!coupleId) {
-      Alert.alert('알림', '커플 연결 후 캘린더를 사용할 수 있어요!');
+      showModal('커플 연결 후 캘린더를 사용할 수 있어요!');
       return;
     }
     router.push('/calendar');
@@ -150,7 +209,7 @@ export default function HomeScreen() {
 
   const handlePressChat = () => {
     if (!coupleId) {
-      Alert.alert('알림', '커플 연결 후 채팅을 할 수 있어요!');
+      showModal('커플 연결 후 채팅을 할 수 있어요!'); 
       return;
     }
     router.push('/chat');
@@ -174,24 +233,33 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
+      <AlertModal
+        visible={modalVisible}
+        message={modalMessage}
+        onClose={() => setModalVisible(false)}
+      />
+
       <View style={styles.backgroundLayer}>
         <ImageBackground
-          source={bgImage ? { uri: bgImage } : require('../../assets/images/default_bg.jpeg')} 
+          source={
+            bgImage
+              ? { uri: bgImage }
+              : require('../../assets/images/default_bg.jpeg')
+          }
           style={styles.backgroundImage}
           resizeMode="cover"
         >
           <View style={styles.dimOverlay} />
-          
+
           <LinearGradient
             colors={['transparent', '#FFFCF5']}
             style={styles.gradientOverlay}
-            locations={[0.2, 1]} 
+            locations={[0.2, 1]}
           />
         </ImageBackground>
       </View>
 
       <View style={styles.contentContainer}>
-        
         <View style={styles.headerContainer}>
           <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
             <View style={styles.tabSwitch}>
@@ -199,52 +267,75 @@ export default function HomeScreen() {
                 <AppText style={styles.activeTabText}>   홈   </AppText>
                 <View style={styles.activeIndicator} />
               </Pressable>
-              <Pressable onPress={handlePressGalleryTab} style={styles.inactiveTab}>
-                <AppText type='medium' style={styles.inactiveTabText}>갤러리</AppText>
+              <Pressable
+                onPress={handlePressGalleryTab}
+                style={styles.inactiveTab}
+              >
+                <AppText type="medium" style={styles.inactiveTabText}>
+                  갤러리
+                </AppText>
               </Pressable>
             </View>
-            
-            <Pressable onPress={handlePressMyPage} style={styles.profileButton}>
-              <Ionicons name="person-circle-outline" size={32} color="#FFF" />
+
+            <Pressable
+              onPress={handlePressMyPage}
+              style={styles.profileButton}
+            >
+              <Ionicons
+                name="person-circle-outline"
+                size={32}
+                color="#FFF"
+              />
             </Pressable>
           </View>
-            <View style={styles.Divider} />
-            <View style={styles.dDayBadge}>
-              <Ionicons name="heart-outline" size={16} color="#FFF" style={{ marginRight: 4 }} />
-              <AppText type='bold' style={styles.dDayText}>{coupleId ? `${dDay}일째` : '연결 대기중'}</AppText>
-            </View>
-        </View>
-          <View style={styles.infoSection}>
-            <View style={styles.nameDateContainer}>
-              <AppText style={styles.userName}>{userName}</AppText>
-              <AppText style={styles.dateText}>
-                {coupleId && startDate ? `📅 ${startDate.replace(/-/g, '. ')}.` : '📅 시작일을 설정해주세요'}
-              </AppText>
-            </View>
+          <View style={styles.Divider} />
+          <View style={styles.dDayBadge}>
+            <Ionicons
+              name="heart-outline"
+              size={16}
+              color="#FFF"
+              style={{ marginRight: 4 }}
+            />
+            <AppText type="bold" style={styles.dDayText}>
+              {coupleId ? `${dDay}일째` : '연결 대기중'}
+            </AppText>
           </View>
+        </View>
+        <View style={styles.infoSection}>
+          <View style={styles.nameDateContainer}>
+            <AppText style={styles.userName}>{userName}</AppText>
+            <AppText style={styles.dateText}>
+              {coupleId && startDate
+                ? `📅 ${startDate.replace(/-/g, '. ')}.`
+                : '📅 시작일을 설정해주세요'}
+            </AppText>
+          </View>
+        </View>
 
         <View style={[styles.dashboard, { paddingBottom: insets.bottom + 20 }]}>
-          
-          <Pressable 
+          <Pressable
             style={({ pressed }) => [
-              styles.missionCard, 
+              styles.missionCard,
               pressed && styles.pressedCard,
-              !coupleId && styles.disabledMissionCard 
-            ]} 
+              !coupleId && styles.disabledMissionCard,
+            ]}
             onPress={handlePressCamera}
           >
             <View style={styles.missionHeader}>
-              <AppText type='semibold' style={styles.cardTitle}>오늘의 미션</AppText>
+              <AppText type="semibold" style={styles.cardTitle}>
+                오늘의 미션
+              </AppText>
             </View>
-            <AppText 
-              type='regular' style={[
-                styles.missionContent, 
-                !coupleId && { color: '#FF6B6B', fontSize: 13 }
-              ]} 
+            <AppText
+              type="regular"
+              style={[
+                styles.missionContent,
+                !coupleId && { color: '#FF6B6B', fontSize: 13 },
+              ]}
               numberOfLines={2}
             >
-              {coupleId 
-                ? (todayMissionTitle || '오늘의 미션을 불러오는 중...') 
+              {coupleId
+                ? todayMissionTitle || '오늘의 미션을 불러오는 중...'
                 : '커플을 연결해주세요.'}
             </AppText>
             <View style={styles.cameraLabelBox}>
@@ -253,33 +344,42 @@ export default function HomeScreen() {
           </Pressable>
 
           <View style={styles.bottomRow}>
-            <Pressable 
+            <Pressable
               style={({ pressed }) => [
-                styles.squareCard, 
-                styles.calendarCard, 
+                styles.squareCard,
+                styles.calendarCard,
                 pressed && styles.pressedCard,
-                !coupleId && styles.disabledCard 
+                !coupleId && styles.disabledCard,
               ]}
               onPress={handlePressCalendar}
             >
               <AppText style={styles.cardLabelWhite}>캘린더</AppText>
-              <Ionicons name="calendar" size={32} color="rgba(255,255,255,0.8)" style={styles.cardIcon} />
+              <Ionicons
+                name="calendar"
+                size={32}
+                color="rgba(255,255,255,0.8)"
+                style={styles.cardIcon}
+              />
             </Pressable>
 
-            <Pressable 
+            <Pressable
               style={({ pressed }) => [
-                styles.squareCard, 
-                styles.chatCard, 
+                styles.squareCard,
+                styles.chatCard,
                 pressed && styles.pressedCard,
-                !coupleId && styles.disabledCard 
+                !coupleId && styles.disabledCard,
               ]}
               onPress={handlePressChat}
             >
               <AppText style={styles.cardLabelBlack}>채팅</AppText>
-              <Ionicons name="chatbubble-ellipses" size={32} color="#4A4A4A" style={styles.cardIcon} />
+              <Ionicons
+                name="chatbubble-ellipses"
+                size={32}
+                color="#4A4A4A"
+                style={styles.cardIcon}
+              />
             </Pressable>
           </View>
-
         </View>
       </View>
     </View>
@@ -295,15 +395,16 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: '#FFFCF5', 
+    backgroundColor: '#FFFCF5',
   },
-  
+
+  // ... (기존 배경 관련 스타일) ...
   backgroundLayer: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: '60%', 
+    height: '60%',
     zIndex: 0,
   },
   backgroundImage: {
@@ -312,7 +413,7 @@ const styles = StyleSheet.create({
   },
   dimOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.2)', 
+    backgroundColor: 'rgba(0,0,0,0.2)',
   },
   gradientOverlay: {
     position: 'absolute',
@@ -325,12 +426,12 @@ const styles = StyleSheet.create({
   contentContainer: {
     flex: 1,
     zIndex: 1,
-    justifyContent: 'space-between', 
+    justifyContent: 'space-between',
   },
 
-  headerContainer:{
-    paddingTop:'7%',
-    paddingHorizontal:20,
+  headerContainer: {
+    paddingTop: '7%',
+    paddingHorizontal: 20,
   },
   header: {
     flexDirection: 'row',
@@ -378,11 +479,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#E2E2E2',
   },
   dDayBadge: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      alignSelf: 'flex-start',
-      borderRadius: 20,
-      marginTop: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    borderRadius: 20,
+    marginTop: 14,
   },
   dDayText: {
     color: '#FFF',
@@ -414,8 +515,8 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.98 }],
   },
   disabledCard: {
-    opacity: 0.5, 
-    backgroundColor: '#DDD', 
+    opacity: 0.5,
+    backgroundColor: '#DDD',
   },
   disabledMissionCard: {
     opacity: 0.7,
@@ -424,15 +525,13 @@ const styles = StyleSheet.create({
   },
 
   missionCard: {
-    backgroundColor: 'rgba(247,245,241,0.8)', 
+    backgroundColor: 'rgba(247,245,241,0.8)',
     borderRadius: 12,
     padding: 20,
     minHeight: 220,
     justifyContent: 'space-between',
   },
-  missionHeader: {
-
-  },
+  missionHeader: {},
   cardTitle: {
     fontSize: 13,
     color: '#000',
@@ -462,9 +561,9 @@ const styles = StyleSheet.create({
     padding: 20,
     justifyContent: 'space-between',
   },
-  
+
   calendarCard: {
-    flex: 1.7, 
+    flex: 1.7,
     backgroundColor: '#3E3C3C',
   },
   chatCard: {
@@ -482,5 +581,49 @@ const styles = StyleSheet.create({
   },
   cardIcon: {
     alignSelf: 'flex-end',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)', // 배경 
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: SCREEN_WIDTH * 0.8,
+    backgroundColor: '#FFFCF5', 
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+    // 그림자
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  modalIconBox: {
+    marginBottom: 0,
+  },
+  modalTitle: {
+    fontSize: 18,
+    color: '#666',
+    marginBottom: 8,
+  },
+  modalMessage: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  modalButton: {
+    backgroundColor: '#6198FF', 
+    paddingVertical: 12,
+    paddingHorizontal: 40,
+    borderRadius: 12,
+  },
+  modalButtonText: {
+    color: '#FFF',
+    fontSize: 13,
   },
 });

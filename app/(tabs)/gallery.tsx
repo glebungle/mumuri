@@ -2,11 +2,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { format, parseISO } from 'date-fns';
-// [수정됨] 에러 해결을 위해 legacy 경로로 변경
 import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
 import { router, useFocusEffect } from 'expo-router';
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useState } from 'react'; // useRef 제거
 import {
   ActivityIndicator,
   Alert,
@@ -26,7 +25,7 @@ const BASE_URL = 'https://mumuri.shop';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 /** ========= FileSystem 안전 사용 래퍼 ========= */
-const FS = FileSystem as any; // 타입 오류 우회
+const FS = FileSystem as any;
 function getWritableDir(): string {
   const base = FS.documentDirectory ?? FS.cacheDirectory ?? '';
   if (!base) return '';
@@ -45,7 +44,7 @@ type Photo = {
 function normalizePhoto(raw: any): Photo | null {
   if (!raw || typeof raw !== 'object') return null;
   const id = raw.id ?? raw.photo_id ?? raw.photoId;
-  const url = raw.photoUrl ?? raw.url ?? raw.presignedUrl; // 필드명 호환성 체크
+  const url = raw.photoUrl ?? raw.url ?? raw.presignedUrl;
   const createdAt = raw.createdAt ?? raw.created_at;
 
   if (!id || !url || !createdAt) return null;
@@ -71,61 +70,73 @@ export default function GalleryScreen() {
   const [isMenuVisible, setIsMenuVisible] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const tokenRef = useRef<string | null>(null);
-  const coupleIdRef = useRef<number | null>(null);
-
-  // --- 인증 및 API 유틸 ---
-  const ensureAuthBasics = useCallback(async () => {
-    if (!tokenRef.current) tokenRef.current = await AsyncStorage.getItem('token');
-    if (!coupleIdRef.current) {
-      const cid = await AsyncStorage.getItem('coupleId');
-      if (cid) coupleIdRef.current = Number(cid);
-    }
-  }, []);
-
-  const authedFetch = useCallback(async (path: string, method: string = 'GET') => {
-    await ensureAuthBasics();
-    const headers: any = {
-      Accept: 'application/json',
-      'ngrok-skip-browser-warning': 'true',
-    };
-    if (tokenRef.current) headers.Authorization = `Bearer ${tokenRef.current}`;
-    
-    const res = await fetch(`${BASE_URL}${path}`, { method, headers });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.json();
-  }, [ensureAuthBasics]);
-
-  // --- 데이터 로드 ---
+  // --- 데이터 로드 (Ref 제거하고 직접 조회) ---
   const loadPhotos = useCallback(async () => {
     try {
-      await ensureAuthBasics();
-      const cid = coupleIdRef.current;
-      setCoupleId(cid);
+      // 1. AsyncStorage에서 직접 최신 값 조회 (로그 출력)
+      const token = await AsyncStorage.getItem('token');
+      const cidStr = await AsyncStorage.getItem('coupleId');
+      
+      console.log('============== [Gallery Debug] ==============');
+      console.log('🔑 현재 토큰:', token ? `${token.slice(0, 10)}...` : '없음');
+      console.log('❤️ 현재 커플ID:', cidStr);
 
-      if (!cid) {
+      if (!token || !cidStr) {
+        console.log('❌ 토큰이나 커플ID가 없어서 초기화합니다.');
         setPhotos([]);
+        setCoupleId(null);
+        setLoading(false);
         return;
       }
 
-      const data = await authedFetch(`/photo/${cid}/all`, 'GET');
+      const cid = Number(cidStr);
+      setCoupleId(cid);
+
+      // 2. 서버 요청
+      const url = `${BASE_URL}/photo/${cid}/all`;
+      console.log('🚀 요청 URL:', url);
+
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+          'ngrok-skip-browser-warning': 'true',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      console.log('📡 응답 상태:', res.status);
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      // console.log('📦 응답 데이터(요약):', JSON.stringify(data).slice(0, 100));
+
       const rawList = Array.isArray(data) ? data : (data.items || []);
       const parsed = rawList.map(normalizePhoto).filter(Boolean) as Photo[];
       
       // 최신순 정렬
       parsed.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       
+      console.log(`📸 로드된 사진 개수: ${parsed.length}장`);
       setPhotos(parsed);
+
     } catch (e) {
       console.warn('[Gallery] Load failed:', e);
+      setPhotos([]); 
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [authedFetch, ensureAuthBasics]);
+  }, []);
 
+  // 화면 포커스 될 때마다 무조건 실행
   useFocusEffect(
     useCallback(() => {
+      // 화면 진입 시 로딩 표시를 잠깐 보여주거나, 기존 데이터를 일단 비워주는 게 확실함
+      // setPhotos([]); // (원하면 주석 해제: 깜빡임이 생기지만 확실히 비워짐)
       loadPhotos();
     }, [loadPhotos])
   );
@@ -151,7 +162,6 @@ export default function GalleryScreen() {
       const filename = `mumuri_${photo.id}.jpg`;
       const fileUri = `${getWritableDir()}${filename}`;
 
-      // [수정됨] legacy API 사용으로 에러 해결
       const { uri } = await FileSystem.downloadAsync(photo.url, fileUri);
       await MediaLibrary.saveToLibraryAsync(uri);
       

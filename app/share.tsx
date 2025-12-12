@@ -202,7 +202,7 @@ export default function ShareScreen() {
       } catch {}
 
       await MediaLibrary.createAssetAsync(toSaveUri);
-      Alert.alert('저장 완료', '편집본이 앨범에 저장되었어요.');
+      Alert.alert('저장 완료', '사진이 앨범에 저장되었어요.');
     } catch (e) {
       console.error(e);
       Alert.alert('저장 실패', '사진 저장 중 문제가 발생했습니다.');

@@ -63,7 +63,7 @@ type ProfileState = {
   startDay: Date; // 사귄 날
   partnerName: string;
   partnerBirthString: string; // "MM.DD" 등
-  currentDayCount: number; // 오늘 기준 D-day(몇 일째인지)
+  currentDayCount: number; // 오늘 기준 D-day(몇 일째인지), 0이면 커플 미연결
 };
 
 export default function MyPage() {
@@ -156,7 +156,7 @@ export default function MyPage() {
           console.warn('[mypage] /user/getuser error', e?.message);
         }
 
-        // 2) /user/main : dday 등(이미 카메라에서 쓰던 API)
+        // 2) /user/main : dday 등
         let ddayCount = 0;
         let startDayFromMain: Date | null = null;
 
@@ -176,7 +176,7 @@ export default function MyPage() {
               data = JSON.parse(text);
             } catch {}
 
-            // dday 숫자 (몇 일째인지) 
+            // dday 숫자 (몇 일째인지)
             if (typeof data.dday === 'number') {
               ddayCount = data.dday;
             }
@@ -206,13 +206,15 @@ export default function MyPage() {
           // dday가 없다면 startDay 기준으로 계산
           if (!finalDday) {
             const diffMs = today.getTime() - finalStartDay.getTime();
-            const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1; // 1일차부터
+            const diffDays =
+              Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1; // 1일차부터
             finalDday = diffDays;
           }
         } else if (coupleStartFromUser) {
           finalStartDay = coupleStartFromUser;
           const diffMs = today.getTime() - finalStartDay.getTime();
-          const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1;
+          const diffDays =
+            Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1;
           finalDday = finalDday || diffDays;
         } else if (finalDday) {
           // startDay가 없고 dday만 있을 때: 오늘에서 (dday - 1)일을 뺀 날을 시작일로
@@ -228,9 +230,8 @@ export default function MyPage() {
           base.setDate(base.getDate() - (finalDday - 1));
           finalStartDay = base;
         } else {
-          // 둘 다 없으면 오늘을 기준으로 1일차 처리
-          finalStartDay = today;
-          finalDday = 1;
+          finalStartDay = today;// -> 오늘을 임시 시작일로 두되, D-Day는 0으로 세팅
+          finalDday = 0;
         }
 
         setProfile({
@@ -239,7 +240,7 @@ export default function MyPage() {
           startDay: finalStartDay,
           partnerName: partnerName || '',
           partnerBirthString: partnerBirth || '',
-          currentDayCount: finalDday,
+          currentDayCount: finalDday, // 0이면 미연결
         });
       } finally {
         setLoading(false);
@@ -324,7 +325,9 @@ export default function MyPage() {
                   {formatDate(profile.startDay)}
                 </AppText>
                 <AppText type="pretendard-m" style={styles.bigNumberText}>
-                  {profile.currentDayCount}일째
+                  {profile.currentDayCount > 0
+                    ? `${profile.currentDayCount}일째`
+                    : '연결 대기중'}
                 </AppText>
                 <AppText
                   type="pretendard-m"
@@ -389,7 +392,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 20,
-    marginBottom:'12%',
+    marginBottom: '12%',
   },
   profileSection: {
     alignItems: 'center',

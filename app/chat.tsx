@@ -351,8 +351,8 @@ export default function ChatScreen() {
     })();
   }, []);
 
-  // const ROOM_KEY: string | null = (coupleId != null ? String(coupleId) : null);
-  const ROOM_KEY = "902";
+  const ROOM_KEY: string | null = (coupleId != null ? String(coupleId) : null);
+  // const ROOM_KEY = "902";
 
   // ✅ 화면이 종료(Unmount)될 때 최신 데이터 저장
   useEffect(() => {

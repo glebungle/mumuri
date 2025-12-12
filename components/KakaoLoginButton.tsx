@@ -10,17 +10,14 @@ const REST_API_KEY = process.env.EXPO_PUBLIC_KAKAO_REST_KEY || '';
 const BACKEND_CALLBACK_URL = 'https://mumuri.shop/api/auth/kakao/callback';
 const REDIRECT_URI = BACKEND_CALLBACK_URL;
 
-// Kakao authorize URL
 const KAKAO_AUTH_URL =
   'https://kauth.kakao.com/oauth/authorize'
   + `?response_type=code`
   + `&client_id=${encodeURIComponent(REST_API_KEY)}`
   + `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
 
-// 서버 API
 const API_BASE = 'https://mumuri.shop';
 
-// 공통 헤더
 async function withHeaders() {
   const token = await AsyncStorage.getItem('token');
   return {
@@ -30,7 +27,6 @@ async function withHeaders() {
   };
 }
 
-// 🔹 로그인 직후 /user/getuser 로 데이터를 동기화
 async function fetchAndSyncUserInfo() {
   try {
     const token = await AsyncStorage.getItem('token');
@@ -45,71 +41,57 @@ async function fetchAndSyncUserInfo() {
       },
     });
 
-    const raw = await res.text();
-    if (!res.ok) {
-      console.warn('[login] /user/getuser error', raw);
+    if (res.status === 429) {
+      console.warn('🚨 [429 Error] 요청이 너무 많습니다. 잠시 후 시도하세요.');
       return;
     }
 
-    // 🔽 여기만 이렇게 수정
+    const raw = await res.text();
+    if (!res.ok) return;
+
     let data: any = {};
     try { data = JSON.parse(raw); } catch {}
 
-    const userId =
-      data.userId ??
-      data.id ??
-      data.memberId ??
-      null;
-
-    const coupleId =
-      data.coupleId ??
-      data.couple_id ??
-      null;
-
-    const coupleCode =
-      data.coupleCode ??
-      data.couple_code ??
-      null;
+    const userId = data.userId ?? data.id ?? data.memberId ?? null;
+    const coupleId = data.coupleId ?? data.couple_id ?? null;
+    const coupleCode = data.coupleCode ?? data.couple_code ?? null;
 
     const kv: [string, string][] = [];
     if (userId != null) kv.push(['userId', String(userId)]);
     if (coupleId != null) kv.push(['coupleId', String(coupleId)]);
     if (coupleCode) kv.push(['coupleCode', String(coupleCode)]);
 
-    if (kv.length) {
-      await AsyncStorage.multiSet(kv);
-      console.log('[login] synced user info:', { userId, coupleId, coupleCode });
-    }
+    if (kv.length) await AsyncStorage.multiSet(kv);
   } catch (err) {
     console.warn('[login] user sync failed:', err);
   }
 }
 
-
-// 커플 상태 확인
 async function checkCoupleAlready(): Promise<string> {
   const res = await fetch(`${API_BASE}/user/couple/already`, {
     method: 'GET',
     headers: await withHeaders(),
   });
+  
+  if (res.status === 429) {
+    throw new Error('요청이 너무 많습니다. 5분 뒤 다시 시도해주세요.');
+  }
 
   const text = await res.text();
   if (!res.ok) throw new Error(text);
-
   return text;
 }
 
-// 딥링크 파싱
 function parseDeepLink(url: string) {
   const parsed = Linking.parse(url);
   const q = parsed.queryParams ?? {};
 
   return {
-    token: typeof q.token === 'string' ? q.token : '',
+    token: typeof q.accessToken === 'string' ? q.accessToken : (typeof q.token === 'string' ? q.token : ''),
     userId: typeof q.userId === 'string' ? q.userId : '',
     coupleId: typeof q.coupleId === 'string' ? q.coupleId : '',
     coupleCode: typeof q.coupleCode === 'string' ? q.coupleCode : '',
-    isNew: String(q.isNew ?? '').toLowerCase() === 'true',
+    isNew: String(q.isNew ?? '').toLowerCase() === 'true' || q.status === 'solo',
   };
 }
 
@@ -117,70 +99,87 @@ export default function KakaoLoginButton() {
   const [webViewVisible, setWebViewVisible] = useState(false);
   const isHandlingRef = useRef(false);
 
-  // 🔥 딥링크 이벤트는 여기서만 처리함 (중복 금지‼)
   useEffect(() => {
     const onLink = async ({ url }: { url: string }) => {
-      if (!url.startsWith('mumuri://auth')) return;
+      if (!url.startsWith('mumuri:')) return;
 
-      // 중복 실행 방지
+      // 🔥 [중복 방지] 이미 처리 중이면 무시
       if (isHandlingRef.current) return;
       isHandlingRef.current = true;
 
       setWebViewVisible(false);
 
       try {
-        const { token, userId, coupleId, coupleCode, isNew } = parseDeepLink(url);
-        if (!token) throw new Error('로그인 토큰이 없습니다.');
+        const parsedData = parseDeepLink(url);
+        const { token, isNew } = parsedData;
 
-        // ① 기본 저장
-        const kv: [string, string][] = [['token', token]];
-        if (userId) kv.push(['userId', userId]);
-        if (coupleId) kv.push(['coupleId', coupleId]);
-        if (coupleCode) kv.push(['coupleCode', coupleCode]);
-        await AsyncStorage.multiSet(kv);
-
-        // ② 서버 값 다시 받아 최신화
-        await fetchAndSyncUserInfo();
-
-        // ③ 신규 회원이면 signup으로
-        if (isNew) {
-          router.replace('/signup');
+        if (!token) {
+          console.log('⚠️ 토큰 없음 (무시):', url);
+          // 실패했더라도 바로 풀지 않고 약간 딜레이를 둠
+          setTimeout(() => { isHandlingRef.current = false; }, 1000);
           return;
         }
 
-        // ④ 커플 여부 확인
+        console.log('🔑 토큰 획득 성공! API 호출 시작...');
+
+        const kv: [string, string][] = [['token', token]];
+        if (parsedData.userId) kv.push(['userId', parsedData.userId]);
+        if (parsedData.coupleId) kv.push(['coupleId', parsedData.coupleId]);
+        if (parsedData.coupleCode) kv.push(['coupleCode', parsedData.coupleCode]);
+        await AsyncStorage.multiSet(kv);
+
+        // API 호출들
+        await fetchAndSyncUserInfo();
+
+        if (isNew) {
+           router.replace('/signup');
+           return;
+        }
+
         let status = '';
         try {
           status = await checkCoupleAlready();
-        } catch {
-          router.replace('/signup');
+          console.log('🔍 커플 상태:', status);
+        } catch (e: any) {
+          console.log('⚠️ 상태 확인 실패:', e.message);
+          // 429 에러면 여기서 멈춤
+          if (e.message.includes('요청이 너무 많습니다')) {
+             Alert.alert('잠시만요!', '로그인 요청이 너무 많습니다. 5분 뒤 다시 시도해주세요.');
+             return;
+          }
+          // 그 외 에러는 일단 홈으로
+          router.replace('/(tabs)/home');
           return;
         }
 
-        if (/COUPLED|OK|DONE/i.test(status)) {
+        if (/COUPLED|OK|DONE|SOLO|NOT COUPLE|NOT_COUPLE/i.test(status)) {
           router.replace('/(tabs)/home');
         } else {
           router.replace('/signup');
         }
+
       } catch (err: any) {
         Alert.alert('로그인 실패', err?.message ?? '다시 시도해주세요.');
       } finally {
+        // 🔥 [중요] 처리 완료 후 3초 동안은 재진입 금지 (API 난사 방지)
         setTimeout(() => {
           isHandlingRef.current = false;
-        }, 700);
+        }, 3000);
       }
     };
 
     const sub = Linking.addEventListener('url', onLink);
-
     return () => {
       sub.remove();
     };
   }, []);
 
   const startLogin = () => {
+    // 버튼 눌렀을 때도 처리 중이면 막음
+    if (isHandlingRef.current) return;
+    
     if (!REST_API_KEY) {
-      Alert.alert('⚙️ 설정 필요', 'EXPO_PUBLIC_KAKAO_REST_KEY 환경변수를 설정하세요.');
+      Alert.alert('오류', '카카오 키 설정 확인 필요');
       return;
     }
     setWebViewVisible(true);
@@ -208,13 +207,22 @@ export default function KakaoLoginButton() {
             sharedCookiesEnabled
             thirdPartyCookiesEnabled
             domStorageEnabled
+            originWhitelist={['*']}
+            
             onShouldStartLoadWithRequest={(req) => {
-              if (req.url.startsWith('mumuri://auth')) {
+              if (req.url.startsWith('mumuri:')) {
                 Linking.openURL(req.url);
                 setWebViewVisible(false);
                 return false;
               }
               return true;
+            }}
+
+            onNavigationStateChange={(e) => {
+              if (e.url.startsWith('mumuri:')) {
+                setWebViewVisible(false);
+                Linking.openURL(e.url);
+              }
             }}
           />
         </View>

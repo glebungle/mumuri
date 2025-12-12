@@ -30,14 +30,12 @@ async function authedFetch(path: string, init: RequestInit = {}) {
 
   const url = `${BASE}${path}`;
   
-  // ✅ [로그 추가] 요청 URL 확인
   console.log('[REQ]', init.method || 'GET', url);
   if (init.body) console.log('[REQ BODY]', init.body);
 
   const res = await fetch(url, { ...init, headers });
   const text = await res.text();
 
-  // ✅ [로그 추가] 응답 결과 확인 (너무 길면 잘라서)
   console.log('[RES]', res.status, text.slice(0, 300));
 
   if (!res.ok) throw new Error(`${path} 실패 (HTTP ${res.status}) ${text.slice(0, 100)}`);
@@ -117,7 +115,6 @@ const InputField = React.memo(({
   );
 });
 
-// 취향 선택용 데이터
 const HOBBIES = ['운동/스포츠', '예술/창작', '문화생활', '게임/오락', '여행/탐험', '맛집/카페', '집콕/힐링', '학습/자기계발'];
 const DATE_STYLES = ['활동적인', '문화/감성', '미식/카페', '휴식/힐링', '체험/창작', '홈데이트', '여행/탐험'];
 
@@ -143,7 +140,7 @@ export default function Signup() {
     { key: 'birthday',    title: '생일 입력',   hint: '생년월일을 입력해주세요. 생일은 나중에 변경할 수 있어요!', accent: '#49DC95', placeholder: '0000. 00. 00.' },
     { key: 'anniversary', title: '기념일 입력', hint: '우리의 사랑이 시작된 날! 기념일을 입력해주세요.', accent: '#FF9191', placeholder: '0000. 00. 00.' },
     { key: 'preferences', title: '질문에 답해주세요!', hint: '더 나은 서비스를 제공하기 위해,\n사용자님의 취향을 파악하는 질문을 몇가지 준비했어요.', accent: '#3B82F6', placeholder: '' },
-    { key: 'partnerCode', title: '코드 입력',   hint: '연인을 초대하고 함께 시작해봐요!', accent: '#FF9191', placeholder: '' },
+    { key: 'partnerCode', title: '코드 입력',   hint: '연인을 초대하고 함께 시작해봐요!', accent: '#FF9191', placeholder: '상대방의 코드를 입력해주세요' },
   ], []);
 
   const current = steps[step];
@@ -154,7 +151,8 @@ export default function Signup() {
       case 'birthday':    return isDate(values.birthday);
       case 'anniversary': return isDate(values.anniversary);
       case 'preferences': return selectedHobbies.length > 0 && selectedDateStyles.length > 0;
-      case 'partnerCode': return true;
+      // [수정] 다시 입력값이 있어야만 버튼이 활성화되도록 변경
+      case 'partnerCode': return values.partnerCode.trim().length > 0;
     }
   }, [current.key, values, selectedHobbies, selectedDateStyles]);
 
@@ -177,6 +175,27 @@ export default function Signup() {
     }
   };
 
+  // ✅ [추가] 건너뛰기 전용 핸들러
+  const onSkip = useCallback(async () => {
+    try {
+      console.log('⏭ [onSkip] 커플 연결 건너뜀');
+      // 백엔드에서 자동 매칭되었을 수도 있으니 확인 차원에서만 호출 (실패해도 무관)
+      try {
+        const me: any = await authedFetch('/user/getuser', { method: 'GET' });
+        const fallbackCid = me?.coupleId ?? me?.couple_id ?? null;
+        if (fallbackCid != null) {
+          await AsyncStorage.setItem('coupleId', String(fallbackCid));
+          console.log('💾 [onSkip] Auto-matched coupleId saved:', fallbackCid);
+        }
+      } catch {}
+
+      router.replace('/signup-finish');
+    } catch (e) {
+      console.warn(e);
+      router.replace('/signup-finish');
+    }
+  }, []);
+
   const onNext = useCallback(async () => {
     if (!canNext || isPosting) return;
 
@@ -184,32 +203,24 @@ export default function Signup() {
       setIsPosting(true);
 
       if (current.key === 'name') {
-        console.log('👉 [onNext] Name:', values.name); // 로그 추가
+        console.log('👉 [onNext] Name:', values.name); 
         await postName(values.name.trim());
 
       } else if (current.key === 'birthday') {
-        console.log('👉 [onNext] Birthday:', values.birthday); // 로그 추가
+        console.log('👉 [onNext] Birthday:', values.birthday); 
         await postBirthday(toIsoDate(values.birthday));
 
       } else if (current.key === 'anniversary') {
-        // 1) test/go 호출
         await postTestGo();
-        console.log('✅ [signup] test/go 호출 성공'); // 로그 복구
-
-        // 2) 기념일 저장
         console.log('👉 [onNext] Anniversary:', values.anniversary);
         const coupleCode = await postAnniversary(toIsoDate(values.anniversary));
-        console.log('✅ [signup] Anniversary Result (coupleCode):', coupleCode); // 로그 복구
-
+        
         if (coupleCode) {
           await AsyncStorage.setItem('coupleCode', coupleCode);
         }
 
-        // 3) 보정: /user/getuser 호출
         try {
           const me: any = await authedFetch('/user/getuser', { method: 'GET' });
-          console.log('🔍 [signup] /user/getuser Me:', me); // 로그 복구
-
           const userId   = me?.userId   ?? me?.id        ?? me?.memberId ?? null;
           const coupleId = me?.coupleId ?? me?.couple_id ?? null;
 
@@ -222,37 +233,29 @@ export default function Signup() {
         }
 
       } else if (current.key === 'preferences') {
-        console.log('👉 [onNext] Preferences Hobbies:', selectedHobbies); // 로그 추가
-        console.log('👉 [onNext] Preferences DateStyles:', selectedDateStyles); // 로그 추가
+        console.log('👉 [onNext] Preferences Saved');
 
       } else if (current.key === 'partnerCode') {
         const code = values.partnerCode.trim();
-        console.log('👉 [onNext] PartnerCode:', code); // 로그 추가
+        console.log('👉 [onNext] PartnerCode:', code); 
 
-        if (code) {
-          const resp: any = await postCouple(code);
-          console.log('✅ [postCouple] Response:', resp); // 로그 복구
+        // 여기서는 코드가 있을 때만 실행됨 (canNext 덕분)
+        const resp: any = await postCouple(code);
+        console.log('✅ [postCouple] Response:', resp); 
 
-          const rawCid = resp?.memberName ?? resp?.coupleId ?? resp?.couple_id ?? null;
-          const cidNum = rawCid != null ? Number(rawCid) : NaN;
+        const rawCid = resp?.memberName ?? resp?.coupleId ?? resp?.couple_id ?? null;
+        const cidNum = rawCid != null ? Number(rawCid) : NaN;
 
-          if (Number.isFinite(cidNum)) {
-            await AsyncStorage.setItem('coupleId', String(cidNum));
-            console.log('💾 [signup] Saved coupleId:', cidNum);
-          } else {
-            // fallback
-            try {
-              const me: any = await authedFetch('/user/getuser', { method: 'GET' });
-              console.log('🔍 [fallback] /user/getuser Me:', me);
-              const fallbackCid = me?.coupleId ?? me?.couple_id ?? null;
-              if (fallbackCid != null) {
-                await AsyncStorage.setItem('coupleId', String(fallbackCid));
-                console.log('💾 [fallback] Saved coupleId:', fallbackCid);
-              }
-            } catch (e) {
-              console.warn('[fallback] failed', e);
+        if (Number.isFinite(cidNum)) {
+          await AsyncStorage.setItem('coupleId', String(cidNum));
+        } else {
+          try {
+            const me: any = await authedFetch('/user/getuser', { method: 'GET' });
+            const fallbackCid = me?.coupleId ?? me?.couple_id ?? null;
+            if (fallbackCid != null) {
+              await AsyncStorage.setItem('coupleId', String(fallbackCid));
             }
-          }
+          } catch {}
         }
       }
 
@@ -262,7 +265,7 @@ export default function Signup() {
         router.replace('/signup-finish');
       }
     } catch (e: any) {
-      console.warn('[signup error]', e); // 에러 로그
+      console.warn('[signup error]', e); 
       Alert.alert('오류', e?.message ?? '다시 시도해 주세요.');
     } finally {
       setIsPosting(false);
@@ -363,6 +366,14 @@ export default function Signup() {
                   style={[styles.grayInputBox, { fontFamily: 'Paperlogy-7Bold', fontSize: 12, color: '#4D5053' }]}
                 />
               </View>
+              
+              {/* 건너뛰기 텍스트 링크 */}
+              <TouchableOpacity onPress={onSkip} activeOpacity={0.7} style={{ marginTop: 16, alignItems:'center' }}>
+                <AppText style={{ color: '#9CA3AF', fontSize: 12 }}>
+                  아직 커플코드가 없으신가요? <AppText style={{ textDecorationLine: 'underline', color: '#6B7280' }}>건너뛰기</AppText>
+                </AppText>
+              </TouchableOpacity>
+
               {isPosting && <AppText style={{ color: '#6B7280', marginTop: 10, textAlign:'center' }}>연결 중...</AppText>}
             </View>
 
@@ -425,7 +436,7 @@ const styles = StyleSheet.create({
   iconRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   heartImage: { width: 24, height: 24, resizeMode: 'contain', marginRight: 10 },
   
-  // 진행바 스타일
+  // 진행바 
   progressBarBg: {
     flex: 1,
     height: 6,
@@ -473,7 +484,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderWidth: 1,
     borderColor: '#6B7280',
-    borderRadius: 16, // 둥근 버튼
+    borderRadius: 16, 
     alignItems: 'center',
     marginBottom: 4,
     backgroundColor: 'transparent',
@@ -499,7 +510,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   grayInputBox: {
-    backgroundColor: '#E5E7EB', // 옅은 회색 배경
+    backgroundColor: '#E5E7EB', 
     borderRadius: 12,
     paddingVertical: 14,
     paddingHorizontal: 16,
