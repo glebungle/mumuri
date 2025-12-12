@@ -1,9 +1,15 @@
-// app/onboarding/detail.tsx
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppText from '../../components/AppText';
+// 'Image'를 중괄호 안에 추가해주세요
+import { Animated, Image, Pressable, StyleSheet, View } from 'react-native';
+
+// 이미지 경로를 실제 프로젝트에 맞게 수정해주세요.
+const onboardingImg = require('../../assets/images/onboarding.png');
+const onboardingWinkImg = require('../../assets/images/onboarding_wink.png');
+const onboardingBgImg = require('../../assets/images/onboardingbg.png');
+const arrowImg = require('../../assets/images/Arrow.png');
 
 export default function OnboardingDetail() {
   const router = useRouter();
@@ -32,6 +38,7 @@ export default function OnboardingDetail() {
   const [overlayVisible, setOverlayVisible] = useState(true);
   const [isPage3, setIsPage3] = useState(false);
 
+  // 메인 애니메이션 값 (0 -> 1)
   const step = useRef(new Animated.Value(0)).current;
   const overlay = useRef(new Animated.Value(1)).current;
 
@@ -43,14 +50,14 @@ export default function OnboardingDetail() {
     }).start(() => setOverlayVisible(false));
   };
 
-  // 2 → 3 페이지
+  // 2 → 3 페이지 전환 액션
   const goToPage3 = () => {
     setIsPage3(true);
     Animated.spring(step, {
       toValue: 1,
       useNativeDriver: true,
-      speed: 14,
-      bounciness: 9,
+      speed: 12,
+      bounciness: 8,
     }).start();
   };
 
@@ -61,30 +68,89 @@ export default function OnboardingDetail() {
     });
   };
 
-  // 애니메이션 파생값 (캐릭터는 삭제)
+  // --- 애니메이션 인터폴레이션 ---
+
+  // 1. 캐릭터 관련
+  const charRotate = step.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '8deg'], // 약간 기울어짐
+  });
+  const charNormalOpacity = step.interpolate({
+    inputRange: [0, 0.2],
+    outputRange: [1, 0],
+  });
+  const charWinkOpacity = step.interpolate({
+    inputRange: [0, 0.2],
+    outputRange: [0, 1],
+  });
+
+  // 2. 배경/사각형 관련
+  const bgOpacity = step.interpolate({
+    inputRange: [0, 0.3],
+    outputRange: [0, 1],
+  });
+  const bgScale = step.interpolate({
+    inputRange: [0, 0.3],
+    outputRange: [0.9, 1],
+  });
+
+  // 3. 초록 점 튕김 효과 (이미지처럼 8방향으로 분산)
+  
+  // 1. 좌상단 (왼쪽 위)
+  const dot1X = step.interpolate({ inputRange: [0, 1], outputRange: [0, -70] });
+  const dot1Y = step.interpolate({ inputRange: [0, 1], outputRange: [0, -110] });
+
+  // 2. 상단 중앙 (위)
+  const dot2X = step.interpolate({ inputRange: [0, 1], outputRange: [0, 0] });
+  const dot2Y = step.interpolate({ inputRange: [0, 1], outputRange: [0, -140] });
+
+  // 3. 우상단 (오른쪽 위)
+  const dot3X = step.interpolate({ inputRange: [0, 1], outputRange: [0, 80] });
+  const dot3Y = step.interpolate({ inputRange: [0, 1], outputRange: [0, -100] });
+
+  // 4. 우측 (오른쪽)
+  const dot4X = step.interpolate({ inputRange: [0, 1], outputRange: [0, 110] });
+  const dot4Y = step.interpolate({ inputRange: [0, 1], outputRange: [0, -30] });
+
+  // 5. 우하단 (오른쪽 아래)
+  const dot5X = step.interpolate({ inputRange: [0, 1], outputRange: [0, 70] });
+  const dot5Y = step.interpolate({ inputRange: [0, 1], outputRange: [0, 60] });
+
+  // 6. 하단 (아래)
+  const dot6X = step.interpolate({ inputRange: [0, 1], outputRange: [0, -20] });
+  const dot6Y = step.interpolate({ inputRange: [0, 1], outputRange: [0, 100] });
+
+  // 7. 좌하단 (왼쪽 아래)
+  const dot7X = step.interpolate({ inputRange: [0, 1], outputRange: [0, -80] });
+  const dot7Y = step.interpolate({ inputRange: [0, 1], outputRange: [0, 50] });
+
+  // 8. 좌측 (왼쪽)
+  const dot8X = step.interpolate({ inputRange: [0, 1], outputRange: [0, -100] });
+  const dot8Y = step.interpolate({ inputRange: [0, 1], outputRange: [0, -40] });
+
+  // 점 크기 (공통)
+  const dotScale = step.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [0, 1.2, 1], 
+  });
+  
+  // 4. 기타 UI 요소
   const bubbleOpacity = step.interpolate({
     inputRange: [0, 0.4, 1],
-    outputRange: [1, 1, 0],
+    // outputRange: [1, 1, 0],  <-- 기존: 마지막에 0(투명)이 되어서 사라짐
+    outputRange: [1, 1, 1],   // <-- 수정: 마지막까지 1(불투명) 유지
   });
-
   const bottomBoxOpacity = step.interpolate({
-    inputRange: [0, 0.4, 1],
-    outputRange: [0, 0, 1],
+    inputRange: [0.3, 1],
+    outputRange: [0, 1],
   });
-
-  const confettiOpacity = step.interpolate({
-    inputRange: [0, 0.2, 1],
-    outputRange: [0, 0, 1],
-  });
-
   const shotBtnOpacity = step.interpolate({
-    inputRange: [0, 0.4, 1],
-    outputRange: [1, 1, 0],
+    inputRange: [0, 0.2],
+    outputRange: [1, 0],
   });
-
   const nextBtnOpacity = step.interpolate({
-    inputRange: [0, 0.4, 1],
-    outputRange: [0, 0, 1],
+    inputRange: [0.3, 1],
+    outputRange: [0, 1],
   });
 
   return (
@@ -94,15 +160,53 @@ export default function OnboardingDetail() {
         <Animated.View style={[styles.progressBarFill, { width: progressWidth }]} />
       </View>
 
-      {/* 2페이지 말풍선 */}
+      <View style={styles.contentContainer}>
+        {/* 초록 점 레이어 (캐릭터 뒤에서 튕겨나감) */}
+        {/* 초록 점 레이어 (캐릭터 뒤에서 8방향으로 튕겨나감) */}
+        <View style={styles.confettiContainer}>
+          <Animated.View style={[styles.dot, { transform: [{ translateX: dot1X }, { translateY: dot1Y }, { scale: dotScale }] }]} />
+          <Animated.View style={[styles.dot, { transform: [{ translateX: dot2X }, { translateY: dot2Y }, { scale: dotScale }] }]} />
+          <Animated.View style={[styles.dot, { transform: [{ translateX: dot3X }, { translateY: dot3Y }, { scale: dotScale }] }]} />
+          <Animated.View style={[styles.dot, { transform: [{ translateX: dot4X }, { translateY: dot4Y }, { scale: dotScale }] }]} />
+          <Animated.View style={[styles.dot, { transform: [{ translateX: dot5X }, { translateY: dot5Y }, { scale: dotScale }] }]} />
+          <Animated.View style={[styles.dot, { transform: [{ translateX: dot6X }, { translateY: dot6Y }, { scale: dotScale }] }]} />
+          <Animated.View style={[styles.dot, { transform: [{ translateX: dot7X }, { translateY: dot7Y }, { scale: dotScale }] }]} />
+          <Animated.View style={[styles.dot, { transform: [{ translateX: dot8X }, { translateY: dot8Y }, { scale: dotScale }] }]} />
+        </View>
+
+        {/* 배경 및 사각형 이미지 */}
+        <Animated.Image
+          source={onboardingBgImg}
+          style={[styles.bgImage, { opacity: bgOpacity, transform: [{ scale: bgScale }] }]}
+          resizeMode="contain"
+        />
+
+        {/* 캐릭터 컨테이너 (기울어짐 적용) */}
+        <Animated.View style={[styles.characterContainer, { transform: [{ rotate: charRotate }] }]}>
+          {/* 기본 캐릭터 */}
+          <Animated.Image
+            source={onboardingImg}
+            style={[styles.characterImage, { opacity: charNormalOpacity }]}
+            resizeMode="contain"
+          />
+          {/* 윙크 캐릭터 (기본 캐릭터 위에 겹침) */}
+          <Animated.Image
+            source={onboardingWinkImg}
+            style={[styles.characterImage, styles.absoluteFill, { opacity: charWinkOpacity }]}
+            resizeMode="contain"
+          />
+        </Animated.View>
+      </View>
+
       <Animated.View
         pointerEvents="none"
+        // 스타일은 그냥 bubbleOpacity만 연결하면 됩니다.
         style={[styles.bubble, { opacity: bubbleOpacity }]}
       >
         <AppText style={styles.bubbleText}>지금 보여주고 싶은 표정은?</AppText>
       </Animated.View>
 
-      {/* 3페이지 설명 */}
+      {/* 3페이지 설명 텍스트 */}
       <Animated.View
         pointerEvents="none"
         style={[styles.bottomBox, { opacity: bottomBoxOpacity }]}
@@ -118,16 +222,6 @@ export default function OnboardingDetail() {
         </AppText>
       </Animated.View>
 
-      {/* 점 레이어 */}
-      <Animated.View
-        pointerEvents="none"
-        style={[styles.confettiLayer, { opacity: confettiOpacity }]}
-      >
-        <View style={[styles.dot, { top: 40, left: 40 }]} />
-        <View style={[styles.dot, { top: 80, right: 50 }]} />
-        <View style={[styles.dot, { top: 160, left: 120 }]} />
-      </Animated.View>
-
       {/* 2페이지 버튼 (찰칵) */}
       <Pressable
         onPress={goToPage3}
@@ -140,6 +234,21 @@ export default function OnboardingDetail() {
           </AppText>
         </Animated.View>
       </Pressable>
+
+      {/* 2페이지 화살표 (Arrow) */}
+      <Animated.View
+        pointerEvents="none" // View에서는 사용 가능
+        style={[
+          styles.arrow, 
+          { opacity: shotBtnOpacity } // 투명도 애니메이션은 컨테이너에 적용
+        ]}
+      >
+        <Image
+          source={arrowImg}
+          style={{ width: '100%', height: '100%' }} // 이미지는 컨테이너를 가득 채움
+          resizeMode="contain"
+        />
+      </Animated.View>
 
       {/* 3페이지 버튼 (다음) */}
       <Pressable
@@ -154,7 +263,7 @@ export default function OnboardingDetail() {
         </Animated.View>
       </Pressable>
 
-      {/* 첫 오버레이 */}
+      {/* 첫 오버레이 (변경 없음) */}
       {overlayVisible && (
         <Animated.View style={[styles.overlay, { opacity: overlay }]}>
           <Pressable style={StyleSheet.absoluteFill} onPress={hideOverlay} />
@@ -185,17 +294,66 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     marginTop: 54,
     alignSelf: 'center',
+    zIndex: 10,
   },
   progressBarFill: {
     height: 4,
     backgroundColor: '#6198FF',
     borderRadius: 999,
   },
+  // 메인 컨텐츠 영역
+  contentContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: -60, // 위치 조정을 위한 마진
+  },
+  characterContainer: {
+    width: 500,
+    height: 700,
+    alignItems: 'center',
+    justifyContent: 'center',
+    left:-70,
+    bottom:-50,
+    zIndex: 5,
+  },
+  characterImage: {
+    width: '100%',
+    height: '100%',
+  },
+  bgImage: {
+    position: 'absolute',
+    width: '90%',
+    height: '100%',
+    top: -10,
+    zIndex: 6, // 캐릭터 바로 뒤
+  },
+  absoluteFill: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+  },
+  // 초록 점 컨테이너
+  confettiContainer: {
+    position: 'absolute',
+    width: 100,
+    height: 100,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 3, // 배경 이미지 뒤
+  },
+  dot: {
+    position: 'absolute',
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#49DC95',
+  },
   bubble: {
     position: 'absolute',
-    top: 330,
-    left: '50%',
-    transform: [{ translateX: -110 }],
+    top: '60%', 
+    right:'10%',
+    alignSelf: 'center',
     paddingHorizontal: 18,
     paddingVertical: 10,
     backgroundColor: '#000',
@@ -204,12 +362,14 @@ const styles = StyleSheet.create({
   },
   bubbleText: {
     color: '#fff',
+    fontSize: 14,
   },
   bottomBox: {
     position: 'absolute',
-    bottom: 140,
+    bottom: 170,
     width: '100%',
     alignItems: 'center',
+    zIndex: 10,
   },
   title: {
     fontSize: 20,
@@ -218,60 +378,61 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   desc: {
-    fontSize: 15,
+    fontSize: 13,
     color: '#000',
     textAlign: 'center',
-  },
-  confettiLayer: {
-    position: 'absolute',
-    top: 120,
-    width: '100%',
-    height: 240,
-  },
-  dot: {
-    position: 'absolute',
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: '#49DC95',
+    lineHeight: 22,
   },
   bottomPressable: {
     position: 'absolute',
     width: '100%',
     alignItems: 'center',
-    zIndex: 9999,
+    zIndex: 30,
   },
   shotBtn: {
     backgroundColor: '#000',
-    paddingHorizontal: 40,
-    paddingVertical: 14,
+    paddingHorizontal: 48,
+    paddingVertical: 12,
     borderRadius: 999,
+    marginBottom:20
   },
   nextBtn: {
     backgroundColor: '#6198FF',
-    paddingHorizontal: 50,
-    paddingVertical: 14,
+    paddingHorizontal: 48,
+    paddingVertical: 12,
     borderRadius: 999,
+    marginBottom:20
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255,255,255,0.85)',
+    backgroundColor: 'rgba(255,255,255,0.92)',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 10000,
+    zIndex: 100,
   },
   overlayContent: {
     alignItems: 'center',
     paddingHorizontal: 32,
   },
   ovTitle: {
-    fontSize: 48,
+    fontSize: 40,
+    lineHeight: 50,
     textAlign: 'center',
     color: '#333',
   },
   ovDesc: {
-    marginTop: 14,
-    fontSize: 12,
-    color: '#777',
+    marginTop: 20,
+    fontSize: 13,
+    color: '#888',
+  },
+  arrow: {
+    position: 'absolute',
+    // 위치 조정: 말풍선(top:330) 아래, 버튼(bottom:약 50) 위쪽
+    bottom: 150, 
+    right:100,
+    alignSelf: 'center',
+    width: 80, 
+    height: 170,
+    zIndex: 19, 
   },
 });

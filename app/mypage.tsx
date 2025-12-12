@@ -1,261 +1,106 @@
-// app/mypage.tsx
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
+import React, { useCallback, useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppText from '../components/AppText';
 
-const API_BASE = 'https://mumuri.shop';
+// 백엔드 API 명세에 맞춘 타입 정의
+interface MyPageResponse {
+  name: string;           // 내 이름
+  birthday: string;       // 내 생일 (YYYY-MM-DD)
+  anniversary: string;    // 기념일 (YYYY-MM-DD)
+  birthdayCouple: string; // 상대방 생일 (YYYY-MM-DD)
+  dDay: number;          // 며칠째인지
+}
 
-const handlePressSetting = () => {
-  router.push('/setting');
-};
+const BASE_URL = 'https://mumuri.shop'; // API 주소
 
-// 날짜 포맷 헬퍼 함수 (YYYY. MM. DD)
-const formatDate = (date: Date) => {
+// --- 날짜 포맷 헬퍼 함수들 ---
+const formatDate = (dateString?: string) => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return dateString;
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}. ${month}. ${day}`;
 };
 
-// 문자열(YYYY-MM-DD / YYYY.MM.DD 등)을 Date로 파싱
-const parseToDate = (value?: string | null): Date | null => {
-  if (!value) return null;
-
-  // 2025.11.29 같은 케이스를 2025-11-29로 치환
-  const normalized = value.replace(/\./g, '-').replace(/\s/g, '');
-  const d = new Date(normalized);
-  if (Number.isNaN(d.getTime())) return null;
-  return d;
-};
-
-// 생일 문자열 포맷: YYYY. MM. DD / MM. DD 로 맞춰주기
+// 생일 문자열 포맷팅 (YYYY. MM. DD)
 const formatBirthString = (raw?: string | null): string => {
-  if (!raw) return '';
-  const s = raw.trim();
-
-  // 이미 "YYYY. MM. DD" 형식이면 그대로 사용
-  if (/^\d{4}\.\s?\d{2}\.\s?\d{2}$/.test(s)) return s;
-
-  // "YYYY-MM-DD" 또는 "YYYY.MM.DD"
-  if (/^\d{4}[-.]\d{2}[-.]\d{2}$/.test(s)) {
-    const [y, m, d] = s.split(/[-.]/);
-    return `${y}. ${m}. ${d}`;
-  }
-
-  // "MM-DD" 또는 "MM.DD"
-  if (/^\d{2}[-.]\d{2}$/.test(s)) {
-    const [m, d] = s.split(/[-.]/);
-    return `${m}.${d}`;
-  }
-
-  // 그 외는 일단 그대로
-  return s;
-};
-
-type ProfileState = {
-  name: string;
-  birthDate: string; // "YYYY. MM. DD"
-  startDay: Date; // 사귄 날
-  partnerName: string;
-  partnerBirthString: string; // "MM.DD" 등
-  currentDayCount: number; // 오늘 기준 D-day(몇 일째인지), 0이면 커플 미연결
+  if (!raw) return '--. --. --';
+  return formatDate(raw); // 서버가 YYYY-MM-DD로 준다고 가정하고 재사용
 };
 
 export default function MyPage() {
-  const [profile, setProfile] = useState<ProfileState>({
-    name: '',
-    birthDate: '',
-    startDay: new Date(),
-    partnerName: '',
-    partnerBirthString: '',
-    currentDayCount: 0,
-  });
-
+  const [myPageData, setMyPageData] = useState<MyPageResponse | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // 서버에서 내 정보 + 커플 정보 가져오기
-  useEffect(() => {
-    (async () => {
-      try {
-        setLoading(true);
-        const token = await AsyncStorage.getItem('token');
-        if (!token) {
-          console.warn('[mypage] no token');
-          return;
-        }
+  // ✅ 마이페이지 전용 데이터 가져오기 함수
+  const fetchMyPageData = async () => {
+    try {
+      setLoading(true);
+      const token = await AsyncStorage.getItem('token');
+      if (!token) return;
 
-        // 1) /user/getuser : 이름, 생일, 상대 정보 등
-        let myName = '';
-        let myBirth = '';
-        let partnerName = '';
-        let partnerBirth = '';
-        let coupleStartFromUser: Date | null = null;
+      const res = await fetch(`${BASE_URL}/api/mypage`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
+      });
 
-        try {
-          const res = await fetch(`${API_BASE}/user/getuser`, {
-            method: 'GET',
-            headers: {
-              Accept: 'application/json',
-              Authorization: `Bearer ${token}`,
-              'ngrok-skip-browser-warning': 'true',
-            },
-          });
-
-          const text = await res.text();
-          if (res.ok) {
-            let data: any = {};
-            try {
-              data = JSON.parse(text);
-            } catch {}
-
-            // 내 이름 후보 키
-            myName = data.name ?? data.nickname ?? data.username ?? '';
-
-            // 내 생일 후보 키 (YYYY-MM-DD / YYYY.MM.DD 등)
-            const myBirthRaw =
-              data.birthDate ??
-              data.birth_day ??
-              data.birthday ??
-              data.birth ??
-              null;
-            myBirth = myBirthRaw ? formatBirthString(String(myBirthRaw)) : '';
-
-            // 상대 이름 / 생일 후보 키
-            const partner = data.partner ?? data.couplePartner ?? {};
-            partnerName =
-              partner.name ??
-              partner.nickname ??
-              partner.username ??
-              data.partnerName ??
-              '';
-
-            const partnerBirthRaw =
-              partner.birthDate ??
-              partner.birth ??
-              partner.birthday ??
-              data.partnerBirth ??
-              null;
-            partnerBirth = partnerBirthRaw
-              ? formatBirthString(String(partnerBirthRaw))
-              : '';
-
-            // 사귄 날(커플 시작일) 정보가 있다면 사용
-            const startRaw =
-              data.coupleStartDate ?? data.startDate ?? data.firstDate ?? null;
-            const parsedStart = startRaw ? parseToDate(String(startRaw)) : null;
-            if (parsedStart) coupleStartFromUser = parsedStart;
-          } else {
-            console.warn('[mypage] /user/getuser failed', text);
-          }
-        } catch (e: any) {
-          console.warn('[mypage] /user/getuser error', e?.message);
-        }
-
-        // 2) /user/main : dday 등
-        let ddayCount = 0;
-        let startDayFromMain: Date | null = null;
-
-        try {
-          const res = await fetch(`${API_BASE}/user/main`, {
-            method: 'GET',
-            headers: {
-              Accept: 'application/json',
-              Authorization: `Bearer ${token}`,
-              'ngrok-skip-browser-warning': 'true',
-            },
-          });
-          const text = await res.text();
-          if (res.ok) {
-            let data: any = {};
-            try {
-              data = JSON.parse(text);
-            } catch {}
-
-            // dday 숫자 (몇 일째인지)
-            if (typeof data.dday === 'number') {
-              ddayCount = data.dday;
-            }
-
-            // 시작일이 따로 오면 사용
-            const startRaw =
-              data.startDay ?? data.coupleStartDay ?? data.firstDate ?? null;
-            const parsedStart = startRaw ? parseToDate(String(startRaw)) : null;
-            if (parsedStart) {
-              startDayFromMain = parsedStart;
-            }
-          } else {
-            console.warn('[mypage] /user/main failed', text);
-          }
-        } catch (e: any) {
-          console.warn('[mypage] /user/main error', e?.message);
-        }
-
-        // 3) 최종 startDay / dday 계산
-        const today = new Date();
-
-        let finalDday = ddayCount;
-        let finalStartDay: Date;
-
-        if (startDayFromMain) {
-          finalStartDay = startDayFromMain;
-          // dday가 없다면 startDay 기준으로 계산
-          if (!finalDday) {
-            const diffMs = today.getTime() - finalStartDay.getTime();
-            const diffDays =
-              Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1; // 1일차부터
-            finalDday = diffDays;
-          }
-        } else if (coupleStartFromUser) {
-          finalStartDay = coupleStartFromUser;
-          const diffMs = today.getTime() - finalStartDay.getTime();
-          const diffDays =
-            Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1;
-          finalDday = finalDday || diffDays;
-        } else if (finalDday) {
-          // startDay가 없고 dday만 있을 때: 오늘에서 (dday - 1)일을 뺀 날을 시작일로
-          const base = new Date(
-            today.getFullYear(),
-            today.getMonth(),
-            today.getDate(),
-            0,
-            0,
-            0,
-            0
-          );
-          base.setDate(base.getDate() - (finalDday - 1));
-          finalStartDay = base;
-        } else {
-          finalStartDay = today;// -> 오늘을 임시 시작일로 두되, D-Day는 0으로 세팅
-          finalDday = 0;
-        }
-
-        setProfile({
-          name: myName || '이름',
-          birthDate: myBirth || '',
-          startDay: finalStartDay,
-          partnerName: partnerName || '',
-          partnerBirthString: partnerBirth || '',
-          currentDayCount: finalDday, // 0이면 미연결
-        });
-      } finally {
-        setLoading(false);
+      if (!res.ok) {
+        console.error('마이페이지 조회 실패:', res.status);
+        return;
       }
-    })();
-  }, []);
 
-  // 미래 기념일 계산 함수
-  const getAnniversaryDate = (days: number) => {
-    const targetDate = new Date(profile.startDay);
-    targetDate.setDate(targetDate.getDate() + (days - 1)); // 1일차부터 시작하므로 days-1
-    return formatDate(targetDate);
+      const data = await res.json();
+      // console.log('마이페이지 데이터:', data); // 디버깅용
+      setMyPageData(data);
+    } catch (e) {
+      console.error('마이페이지 에러:', e);
+    } finally {
+      setLoading(false);
+    }
   };
 
+  // ✅ 화면에 들어올 때마다 데이터 갱신
+  useFocusEffect(
+    useCallback(() => {
+      fetchMyPageData();
+    }, [])
+  );
+
+  const handlePressSetting = () => {
+    router.push('/setting');
+  };
+
+  // --- 데이터 바인딩 (이제 로직이 필요 없습니다!) ---
+  const myName = myPageData?.name || '사용자';
+  const myBirth = formatBirthString(myPageData?.birthday);
+
+  const partnerName = '애인'; 
+  const partnerBirth = formatBirthString(myPageData?.birthdayCouple);
+  
+  const dDayCount = myPageData?.dDay ?? 0;
+  const anniversaryDate = formatDate(myPageData?.anniversary);
+
+  // 미래 기념일 계산 (기존 로직 유지)
   const upcomingAnniversaries = useMemo(() => [50, 100, 200, 300], []);
+  
+  const getAnniversaryDate = (days: number) => {
+    if (!myPageData?.anniversary) return '';
+    const start = new Date(myPageData.anniversary);
+    if (isNaN(start.getTime())) return '';
+    
+    const target = new Date(start);
+    target.setDate(target.getDate() + (days - 1));
+    return formatDate(target.toISOString());
+  };
 
   return (
     <LinearGradient
@@ -269,7 +114,7 @@ export default function MyPage() {
           contentContainerStyle={{ flexGrow: 1 }}
           showsVerticalScrollIndicator={false}
         >
-          {/* 1. 상단 헤더 (설정 아이콘) */}
+          {/* 1. 상단 헤더 */}
           <View style={styles.header}>
             <View style={{ width: 24 }} />
             <Pressable onPress={handlePressSetting}>
@@ -277,101 +122,84 @@ export default function MyPage() {
             </Pressable>
           </View>
 
-          {/* 2. 프로필 섹션 */}
-          <View style={styles.profileSection}>
-            <View style={styles.avatarContainer}>
-              <View style={styles.avatarPlaceholder}>
-                <Ionicons name="person" size={40} color="#FF9E9E" />
-              </View>
-            </View>
+          {loading && !myPageData ? (
+             <View style={{flex:1, justifyContent:'center', alignItems:'center'}}>
+                <ActivityIndicator size="large" color="#FF9E9E" />
+             </View>
+          ) : (
+            <>
+              {/* 2. 프로필 섹션 */}
+              <View style={styles.profileSection}>
+                <View style={styles.avatarContainer}>
+                  <View style={styles.avatarPlaceholder}>
+                    <Ionicons name="person" size={40} color="#FF9E9E" />
+                  </View>
+                </View>
 
-            <AppText type="pretendard-b" style={styles.nameText}>
-              {profile.name || (loading ? '불러오는 중...' : '이름 미등록')}
-            </AppText>
-            {!!profile.birthDate && (
-              <AppText style={styles.birthText}>{profile.birthDate}</AppText>
-            )}
-
-            <Pressable style={styles.editButton}>
-              <AppText type="pretendard-m" style={styles.editButtonText}>
-                프로필 편집
-              </AppText>
-            </Pressable>
-          </View>
-
-          {/* 3. 흰색 카드 영역 (정보 및 리스트) */}
-          <View style={styles.whiteCard}>
-            {/* 상단: 생일 및 현재 기념일수 */}
-            <View style={styles.dashboardRow}>
-              {/* 왼쪽: 생일 */}
-              <View style={styles.dashboardItem}>
-                <AppText type="pretendard-m" style={styles.bigNumberText}>
-                  {profile.partnerBirthString || '--.--'}
+                <AppText type="pretendard-b" style={styles.nameText}>
+                  {myName}
                 </AppText>
-                <AppText
-                  type="pretendard-m"
-                  style={styles.subLabelText}
-                >
-                  {profile.partnerName || '상대방'}님의 생일
-                </AppText>
+                <AppText style={styles.birthText}>{myBirth}</AppText>
+
+                <Pressable style={styles.editButton}>
+                  <AppText type="pretendard-m" style={styles.editButtonText}>
+                    프로필 편집
+                  </AppText>
+                </Pressable>
               </View>
 
-              {/* 구분선 */}
-              <View style={styles.verticalDivider} />
-
-              {/* 오른쪽: 기념일 */}
-              <View style={styles.dashboardItem}>
-                <AppText type="pretendard-m" style={styles.smallDateText}>
-                  {formatDate(profile.startDay)}
-                </AppText>
-                <AppText type="pretendard-m" style={styles.bigNumberText}>
-                  {profile.currentDayCount > 0
-                    ? `${profile.currentDayCount}일째`
-                    : '연결 대기중'}
-                </AppText>
-                <AppText
-                  type="pretendard-m"
-                  style={styles.subLabelText}
-                >
-                  기념일
-                </AppText>
-              </View>
-            </View>
-
-            {/* 하단: 기념일 리스트 */}
-            <View style={styles.listContainer}>
-              {upcomingAnniversaries.map((days) => (
-                <View key={days} style={styles.listItem}>
-                  <View style={styles.listItemLeft}>
-                    <Ionicons name="heart-outline" size={20} color="#FF9E9E" />
-                    <AppText type="pretendard-b" style={styles.dayLabel}>
-                      {days}일
+              {/* 3. 흰색 카드 영역 */}
+              <View style={styles.whiteCard}>
+                {/* 상단: 대시보드 */}
+                <View style={styles.dashboardRow}>
+                  {/* 왼쪽: 상대방 생일 */}
+                  <View style={styles.dashboardItem}>
+                    <AppText type="pretendard-m" style={styles.bigNumberText}>
+                      {partnerBirth}
+                    </AppText>
+                    <AppText type="pretendard-m" style={styles.subLabelText}>
+                      {partnerName}님의 생일
                     </AppText>
                   </View>
-                  <AppText
-                    type="pretendard-m"
-                    style={styles.dateValue}
-                  >
-                    {getAnniversaryDate(days)}
-                  </AppText>
-                </View>
-              ))}
 
-              {/* 1주년
-              <View style={styles.listItem}>
-                <View style={styles.listItemLeft}>
-                  <Ionicons name="heart-outline" size={20} color="#FF9E9E" />
-                  <AppText style={styles.dayLabel}>1주년</AppText>
+                  <View style={styles.verticalDivider} />
+
+                  {/* 오른쪽: 기념일 */}
+                  <View style={styles.dashboardItem}>
+                    <AppText type="pretendard-m" style={styles.smallDateText}>
+                      {anniversaryDate || '---. --. --'}
+                    </AppText>
+                    <AppText type="pretendard-m" style={styles.bigNumberText}>
+                       {/* dDay가 0이면 연결 대기중으로 표시 */}
+                      {dDayCount > 0 ? `${dDayCount}일째` : 'D-Day'}
+                    </AppText>
+                    <AppText type="pretendard-m" style={styles.subLabelText}>
+                      기념일
+                    </AppText>
+                  </View>
                 </View>
-                <AppText
-                  type="pretendard-m"
-                  style={styles.dateValue}
-                >
-                  {getAnniversaryDate(365)}
-                </AppText>
-              </View> */}
-            </View>
-          </View>
+
+                {/* 하단: 기념일 리스트 */}
+                {dDayCount > 0 && (
+                  <View style={styles.listContainer}>
+                    {upcomingAnniversaries.map((days) => (
+                      <View key={days} style={styles.listItem}>
+                        <View style={styles.listItemLeft}>
+                          <Ionicons name="heart-outline" size={20} color="#FF9E9E" />
+                          <AppText type="pretendard-b" style={styles.dayLabel}>
+                            {days}일
+                          </AppText>
+                        </View>
+                        <AppText type="pretendard-m" style={styles.dateValue}>
+                          {getAnniversaryDate(days)}
+                        </AppText>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+            </>
+          )}
         </ScrollView>
       </SafeAreaView>
     </LinearGradient>
@@ -392,11 +220,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 20,
-    marginBottom: '12%',
+    marginBottom: '5%',
   },
   profileSection: {
     alignItems: 'center',
-    marginVertical: 30,
+    marginVertical: 20,
   },
   avatarContainer: {
     marginBottom: 12,
@@ -423,7 +251,7 @@ const styles = StyleSheet.create({
   },
   editButton: {
     backgroundColor: '#FFF',
-    marginTop: 15,
+    marginTop: 10,
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 8,
@@ -441,6 +269,7 @@ const styles = StyleSheet.create({
     paddingTop: 40,
     paddingHorizontal: 24,
     paddingBottom: 40,
+    marginTop: 20,
   },
   dashboardRow: {
     flexDirection: 'row',
@@ -455,18 +284,19 @@ const styles = StyleSheet.create({
   },
   verticalDivider: {
     width: 2,
-    height: '100%',
+    height: 50,
     backgroundColor: '#E2E2E2',
     marginHorizontal: 10,
   },
   bigNumberText: {
-    fontSize: 28,
+    fontSize: 24,
     color: '#444',
     marginBottom: 4,
   },
   smallDateText: {
     fontSize: 12,
     color: '#A8A8A8',
+    marginBottom: 2,
   },
   subLabelText: {
     fontSize: 14,

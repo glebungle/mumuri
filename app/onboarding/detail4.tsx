@@ -226,7 +226,7 @@ const styles = StyleSheet.create({
   },
   desc: {
     marginTop: 6,
-    fontSize: 15,
+    fontSize: 13,
     textAlign: 'center',
   },
   btnWrap: {

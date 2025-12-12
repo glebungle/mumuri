@@ -40,7 +40,6 @@ export default function OnboardingDetail2() {
 
   useEffect(() => {
     const t = setTimeout(() => {
-      // '확.확.' 바뀌는 느낌을 위해 spring 애니메이션 사용 유지
       Animated.spring(prog, {
         toValue: 1,
         useNativeDriver: false,
@@ -59,14 +58,14 @@ export default function OnboardingDetail2() {
   // prog가 0에서 1로 갈 때 -11deg로 회전 (확실히 기울어짐)
   const cardRotate = prog.interpolate({
     inputRange: [0, 1],
-    outputRange: ['0deg', '-11deg'],
+    outputRange: ['0deg', '11deg'],
   });
   const cardScale = prog.interpolate({
     inputRange: [0, 1],
     outputRange: [0.8, 1],
   });
 
-  // 텍스트 색상 애니메이션
+  // 텍스트 색상 애니메이션 (유지)
   const titleShootColor = prog.interpolate({
     inputRange: [0, 1],
     outputRange: ['#C8C8C8', '#FF7777'],
@@ -94,7 +93,7 @@ export default function OnboardingDetail2() {
     outputRange: ['#fff', '#fff'],
   });
 
-  // --- 편지지 좌우 기울기 애니메이션 ---
+  // --- 편지지 좌우 기울기 애니메이션 (수정) ---
   // prog 값에 따라 편지지가 카드와 반대 방향으로 기울어지게 조정
   const letterRotate = prog.interpolate({
     inputRange: [0, 1],
@@ -105,7 +104,7 @@ export default function OnboardingDetail2() {
     router.push('./detail3');
   };
 
-  // prog 값에 따라 편지 이미지 크기가 커지는 애니메이션
+  // prog 값에 따라 편지 이미지 크기가 커지는 애니메이션 (유지)
   const letterScale = prog.interpolate({
     inputRange: [0, 1],
     outputRange: [0.8, 1], // 카드가 0.8 -> 1로 커지는 비율과 동일하게
@@ -119,49 +118,45 @@ export default function OnboardingDetail2() {
       </View>
 
       {/* 가운데 카드 + 편지 세트 */}
-      <Animated.View
-        style={[
-          styles.card,
-          {
-            backgroundColor: cardBg,
-            // 카드 회전 및 스케일 적용
-            transform: [{ rotate: cardRotate }, { scale: cardScale }],
-          },
-        ]}
-      >
-        {/* 편지봉투 뒤 (회색) - 회전, 스케일만 애니메이션 적용 */}
-        <Animated.Image
-          source={require('../../assets/images/letterback.png')}
-          style={[styles.letterBack, { transform: [{ scale: letterScale }] }]}
-          resizeMode="contain"
-        />
-        {/* 편지지 (노란 종이) : prog 값에 따라 '확.확.' 좌우 회전 */}
-        <Animated.Image
-          source={require('../../assets/images/letter.png')}
+      <View>
+        <Animated.View
           style={[
-            styles.letterPaper,
+            styles.card,
             {
-              // 편지지 회전 및 스케일 적용
-              transform: [{ rotate: letterRotate }, { scale: letterScale }],
+              backgroundColor: cardBg,
+              // 카드 회전 및 스케일 적용
+              transform: [{ rotate: cardRotate }, { scale: cardScale }],
             },
           ]}
-          resizeMode="contain"
-        />
-        {/* 봉투 앞 (흰색) - 회전, 스케일만 애니메이션 적용 */}
-        <Animated.Image
-          source={require('../../assets/images/letterfront.png')}
-          style={[styles.letterFront, { transform: [{ scale: letterScale }] }]}
-          resizeMode="contain"
-        />
-        {/* 하트 스티커 - 회전, 스케일만 애니메이션 적용 */}
-        <Animated.Image
-          source={require('../../assets/images/letterheart.png')}
-          style={[styles.letterHeart, { transform: [{ scale: letterScale }] }]}
-          resizeMode="contain"
-        />
-      </Animated.View>
+        >
+          {/* 편지봉투 뒤 (회색) - 회전, 스케일만 애니메이션 적용 */}
+          <Animated.Image
+            source={require('../../assets/images/letterback.png')}
+            style={[styles.letterBack, { transform: [{ scale: letterScale }] }]}
+            resizeMode="contain"
+          />
+          {/* 편지지 (노란 종이) : prog 값에 따라 '확.확.' 좌우 회전 */}
+          <Animated.Image
+            source={require('../../assets/images/letter.png')}
+            style={[
+              styles.letterPaper,
+              {
+                // 편지지 회전 및 스케일 적용
+                transform: [{ rotate: letterRotate }, { scale: letterScale }],
+              },
+            ]}
+            resizeMode="contain"
+          />
+          {/* 봉투 앞 (흰색) - 회전, 스케일만 애니메이션 적용 */}
+          <Animated.Image
+            source={require('../../assets/images/letterfront.png')}
+            style={[styles.letterFront, { transform: [{ scale: letterScale }] }]}
+            resizeMode="contain"
+          />
+        </Animated.View>
+      </View>
 
-      {/* 텍스트 영역 */}
+      {/* 텍스트 영역 (유지) */}
       <View style={styles.textBox}>
         <AppText style={styles.titleLine}>
           <Animated.Text style={[styles.bold20, { color: titleShootColor }]}>
@@ -192,13 +187,13 @@ export default function OnboardingDetail2() {
         </AnimatedAppText>
       </View>
 
-      {/* 버튼 */}
+      {/* 버튼 (유지) */}
       <Pressable
         onPress={goNext}
         style={[styles.btnWrap, { bottom: insets.bottom + 32 }]}
       >
         <Animated.View style={[styles.btn, { backgroundColor: btnBg }]}>
-          <Animated.Text style={[styles.btnText, { color: btnTextColor }]}>
+          <Animated.Text style={[styles.btnText, { color: btnTextColor , fontFamily: 'Paperlogy-7Bold'}]}>
             다음
           </Animated.Text>
         </Animated.View>
@@ -230,7 +225,7 @@ const styles = StyleSheet.create({
   card: {
     width: CARD_SIZE,
     height: CARD_SIZE,
-    marginTop: 80,
+    marginTop: 150,
     borderRadius: 32,
     alignItems: 'center',
     justifyContent: 'center',
@@ -242,35 +237,23 @@ const styles = StyleSheet.create({
   letterBack: {
     marginBottom:85,
     position: 'absolute',
-    width: CARD_SIZE * 1.1,
+    width: CARD_SIZE * 0.8,
     height: CARD_SIZE * 1.1,
-    // transform은 Animated.Image의 style에 적용됨
   },
   letterPaper: {
     position: 'absolute',
     width: CARD_SIZE * 0.8,
     height: CARD_SIZE * 0.8,
     top: CARD_SIZE * 0.02,
-    // transform은 Animated.Image의 style에 적용됨
   },
   letterFront: {
     position: 'absolute',
-    width: CARD_SIZE * 0.9,
+    width: CARD_SIZE * 0.8,
     height: CARD_SIZE * 0.9,
     bottom: CARD_SIZE * 0.02,
-    // transform은 Animated.Image의 style에 적용됨
   },
-  letterHeart: {
-    marginBottom:40,
-    position: 'absolute',
-    width: CARD_SIZE * 0.2,
-    height: CARD_SIZE * 0.2,
-    bottom: CARD_SIZE * 0.08,
-    // transform은 Animated.Image의 style에 적용됨
-  },
-
   textBox: {
-    marginTop: 250,
+    marginTop: 200,
     alignItems: 'center',
     paddingHorizontal: 20,
     marginBottom: 8,
@@ -299,7 +282,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   btnText: {
-    fontWeight: '700',
     fontSize: 17,
   },
 });

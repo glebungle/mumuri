@@ -1,6 +1,5 @@
 // app/(tabs)/home.tsx
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useState } from 'react';
@@ -15,38 +14,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppText from '../../components/AppText';
+import { useUser } from '../context/UserContext';
 
-const BASE_URL = 'https://mumuri.shop';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
-// API 호출 유틸
-async function authedFetch(path: string, method: string = 'GET') {
-  const token = await AsyncStorage.getItem('token');
-  const headers: any = {
-    Accept: 'application/json',
-    'ngrok-skip-browser-warning': 'true',
-  };
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
-
-  const res = await fetch(`${BASE_URL}${path}`, { method, headers });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(text || `HTTP ${res.status}`);
-  }
-  return res.json();
-}
-
-// 유저 데이터 정규화
-function normalizeUser(raw: any) {
-  if (!raw) return { name: '', coupleId: null, startDate: null };
-  return {
-    name: raw.name || raw.nickname || '알 수 없음',
-    coupleId: raw.coupleId ?? raw.couple_id ?? raw.coupleID ?? null,
-    startDate: raw.startDate ?? raw.start_date ?? raw.anniversary ?? null,
-  };
-}
 
 // 모달 컴포넌트
 const AlertModal = ({
@@ -79,14 +49,9 @@ const AlertModal = ({
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
 
+  const { userData, refreshUserData } = useUser(); // ✅ 전역 상태 사용
+  
   const [loading, setLoading] = useState(true);
-  const [coupleId, setCoupleId] = useState<number | null>(null);
-  const [userName, setUserName] = useState('');
-  const [startDate, setStartDate] = useState<string | null>(null);
-  const [todayMissionTitle, setTodayMissionTitle] = useState<string | null>(null);
-
-  const [dDay, setDDay] = useState<number>(1);
-
   const [modalVisible, setModalVisible] = useState(false);
   const [modalMessage, setModalMessage] = useState('');
 
@@ -96,94 +61,29 @@ export default function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       let isActive = true;
-
-      const fetchData = async () => {
-        try {
-          // 1. 로컬 스토리지 확인
-          const storedCid = await AsyncStorage.getItem('coupleId');
-          const storedCidNum = storedCid ? Number(storedCid) : null;
-
-          // 2. 유저 정보 API 호출
-          let userData: any = null;
-          try {
-            userData = await authedFetch('/user/getuser');
-          } catch (e) {
-            console.warn('[Home] 유저 정보 로드 실패, 로컬 값 사용');
-          }
-
-          const normalized = normalizeUser(userData);
-
-          if (isActive) {
-            // 서버 응답에 coupleId가 있으면 그것을 신뢰
-            const hasServerCoupleId =
-              normalized.coupleId !== null && normalized.coupleId !== undefined;
-
-            let finalCoupleId: number | null = null;
-
-            if (hasServerCoupleId) {
-              finalCoupleId = Number(normalized.coupleId);
-              if (!Number.isNaN(finalCoupleId)) {
-                await AsyncStorage.setItem('coupleId', String(finalCoupleId));
-              } else {
-                finalCoupleId = null;
-                await AsyncStorage.removeItem('coupleId');
-              }
-            } else {
-              // 서버가 "커플 없음"이라고 말한 경우: 로컬 캐시도 제거
-              await AsyncStorage.removeItem('coupleId');
-
-              // 서버 호출 자체가 실패했을 때만 이전 캐시를 fallback으로 사용
-              if (!userData && storedCidNum) {
-                finalCoupleId = storedCidNum;
-              } else {
-                finalCoupleId = null;
-              }
-            }
-
-            setCoupleId(finalCoupleId);
-            setUserName(normalized.name || '사용자');
-            setStartDate(normalized.startDate);
-
-            if (finalCoupleId) {
-              // 3. 오늘의 미션 가져오기
-              try {
-                const missions = await authedFetch('/api/couples/missions/today');
-                if (Array.isArray(missions) && missions.length > 0) {
-                  if (isActive) setTodayMissionTitle(missions[0].title);
-                }
-              } catch (e) {
-                console.warn('[Home] 미션 로드 실패', e);
-              }
-
-              // 4. D-Day 동기화
-              try {
-                const mainData = await authedFetch('/user/main');
-                if (mainData && typeof mainData.dday === 'number') {
-                  if (isActive) setDDay(mainData.dday);
-                }
-              } catch (e) {
-                console.warn('[Home] 메인 정보(D-Day) 로드 실패', e);
-              }
-            } else {
-              // 커플이 아예 없으면 D-Day는 의미 없으니 초기화 정도만
-              setDDay(1);
-              setTodayMissionTitle(null);
-            }
-          }
-        } catch (e) {
-          console.warn('[Home] 데이터 로드 실패', e);
-        } finally {
-          if (isActive) setLoading(false);
-        }
+      
+      const load = async () => {
+        await refreshUserData(); // /home/main 호출
+        if (isActive) setLoading(false);
       };
+      
+      load();
 
-      fetchData();
-
-      return () => {
-        isActive = false;
-      };
+      return () => { isActive = false; };
     }, [])
   );
+
+  // ✅ [수정됨] 커플 연결 여부 판단 로직 변경
+  // 기념일(anniversary)은 솔로도 입력하므로, 채팅방 ID(roomId)가 생성되었는지(0보다 큰지)로 판단
+  const isCoupled = !!(userData && userData.roomId && userData.roomId > 0);
+  
+  const userName = userData?.name || '사용자';
+  // 솔로여도 기념일은 보여줄 수 있음
+  const startDate = userData?.anniversary || null;
+  const dDay = userData?.date ?? 1; 
+  
+  // 미션 제목 추출
+  const todayMissionTitle = userData?.coupleMission?.[0]?.mission?.title || null;
 
   const showModal = (msg: string) => {
     setModalMessage(msg);
@@ -192,7 +92,7 @@ export default function HomeScreen() {
 
   // --- 네비게이션 핸들러 ---
   const handlePressCamera = () => {
-    if (!coupleId) {
+    if (!isCoupled) {
       showModal('커플 연결 후 미션을 수행할 수 있어요!'); 
       return;
     }
@@ -200,7 +100,7 @@ export default function HomeScreen() {
   };
 
   const handlePressCalendar = () => {
-    if (!coupleId) {
+    if (!isCoupled) {
       showModal('커플 연결 후 캘린더를 사용할 수 있어요!');
       return;
     }
@@ -208,7 +108,7 @@ export default function HomeScreen() {
   };
 
   const handlePressChat = () => {
-    if (!coupleId) {
+    if (!isCoupled) {
       showModal('커플 연결 후 채팅을 할 수 있어요!'); 
       return;
     }
@@ -297,7 +197,7 @@ export default function HomeScreen() {
               style={{ marginRight: 4 }}
             />
             <AppText type="bold" style={styles.dDayText}>
-              {coupleId ? `${dDay}일째` : '연결 대기중'}
+              {isCoupled ? `${dDay}일째` : '연결 대기중'}
             </AppText>
           </View>
         </View>
@@ -305,7 +205,8 @@ export default function HomeScreen() {
           <View style={styles.nameDateContainer}>
             <AppText style={styles.userName}>{userName}</AppText>
             <AppText style={styles.dateText}>
-              {coupleId && startDate
+              {/* 솔로일 때도 기념일은 보여주려면 isCoupled 체크를 빼거나, 문구를 다르게 처리 */}
+              {startDate
                 ? `📅 ${startDate.replace(/-/g, '. ')}.`
                 : '📅 시작일을 설정해주세요'}
             </AppText>
@@ -317,7 +218,7 @@ export default function HomeScreen() {
             style={({ pressed }) => [
               styles.missionCard,
               pressed && styles.pressedCard,
-              !coupleId && styles.disabledMissionCard,
+              !isCoupled && styles.disabledMissionCard,
             ]}
             onPress={handlePressCamera}
           >
@@ -330,11 +231,11 @@ export default function HomeScreen() {
               type="regular"
               style={[
                 styles.missionContent,
-                !coupleId && { color: '#FF6B6B', fontSize: 13 },
+                !isCoupled && { color: '#FF6B6B', fontSize: 13 },
               ]}
               numberOfLines={2}
             >
-              {coupleId
+              {isCoupled
                 ? todayMissionTitle || '오늘의 미션을 불러오는 중...'
                 : '커플을 연결해주세요.'}
             </AppText>
@@ -349,7 +250,7 @@ export default function HomeScreen() {
                 styles.squareCard,
                 styles.calendarCard,
                 pressed && styles.pressedCard,
-                !coupleId && styles.disabledCard,
+                !isCoupled && styles.disabledCard,
               ]}
               onPress={handlePressCalendar}
             >
@@ -367,7 +268,7 @@ export default function HomeScreen() {
                 styles.squareCard,
                 styles.chatCard,
                 pressed && styles.pressedCard,
-                !coupleId && styles.disabledCard,
+                !isCoupled && styles.disabledCard,
               ]}
               onPress={handlePressChat}
             >

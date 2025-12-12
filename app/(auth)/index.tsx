@@ -43,7 +43,7 @@ export default function StartScreen() {
 
       <View style={s.bottom}>
         <KakaoLoginButton />
-        <Pressable onPress={() => router.push('/signup')} style={{ marginTop: 14 }}>
+          <Pressable onPress={() => router.push('/signup')} style={{ marginTop: 0 }}>
           <AppText type='regular'style={s.signupLink}>회원가입</AppText>
         </Pressable>
       </View>
@@ -95,12 +95,5 @@ const s = StyleSheet.create({
         borderRadius: 8,
         backgroundColor: '#75787B',
     },
-    mypageButton: {
-        margin: 10,
-        paddingHorizontal: 8,
-        paddingVertical: 8,
-        borderRadius: 8,
-        backgroundColor: '#75787B',
-    },
-  signupLink: { color: '#606060', fontSize: 10 , },
+  signupLink: { color: '#606060', fontSize: 10 , marginTop:14},
 });
