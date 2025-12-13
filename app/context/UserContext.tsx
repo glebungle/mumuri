@@ -62,12 +62,8 @@ export const useUser = () => useContext(UserContext);
 
 async function fetchHomeMain() {
   const token = await AsyncStorage.getItem('token');
-  console.log("Current Token:", token); // 1. 토큰이 제대로 있는지 확인
-
-  if (!token) {
-    console.log("토큰이 없습니다.");
-    return null;
-  }
+  
+  if (!token) return null;
   
   try {
     const res = await fetch(`${BASE_URL}/home/main`, {
@@ -77,17 +73,17 @@ async function fetchHomeMain() {
       },
     });
 
-    // 2. 서버 응답 상태 확인 (가장 중요)
-    console.log("Server Response Status:", res.status); 
-
     if (!res.ok) {
-      // 3. 서버가 보낸 에러 메시지 확인
-      const errorText = await res.text();
-      console.error('❌ 서버 에러 내용:', errorText);
       throw new Error(`Failed to fetch home data (Status: ${res.status})`);
     }
 
-    return res.json();
+    // [변경] res.json() 대신 text로 먼저 받아서 확인
+    const textData = await res.text();
+    console.log("Raw Server Response:", textData.substring(0, 500) + "..."); // 너무 기니까 앞부분만 출력
+
+    // 여기서 에러가 난다면 백엔드 데이터가 확실히 순환참조임
+    return JSON.parse(textData); 
+
   } catch (error) {
     console.error("Network or Logic Error:", error);
     throw error;

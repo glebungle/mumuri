@@ -1040,7 +1040,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 6,
-    justifyContent: 'space-between', // 헤더 요소 양 끝 정렬
+    justifyContent: 'space-between', 
     marginVertical: 25,
   },
   headerTitle: { fontSize: 16, color: '#111' },

@@ -114,7 +114,6 @@ export default function MyPage() {
           <View style={styles.header}>
             <View style={{ width: 24 }} />
             <Pressable onPress={handlePressSetting}>
-              {/* ✅ [수정 2] 이미지 컴포넌트 사용 및 resizeMode 추가 */}
               <Image 
                 source={settingsImg} 
                 style={styles.settingsImage} 
@@ -133,7 +132,6 @@ export default function MyPage() {
               <View style={styles.profileSection}>
                 <View style={styles.avatarContainer}>
                   <View style={styles.avatarPlaceholder}>
-                     {/* ✅ [수정 3] 프로필 이미지 스타일 적용 */}
                     <Image 
                         source={profileImg} 
                         style={styles.profileImage} 
