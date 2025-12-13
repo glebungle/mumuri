@@ -10,11 +10,10 @@ export interface HomeData {
   date: number;
   roomId: number;
   userId: number; 
-  coupleId: number; // ✅ 백엔드 추가사항 반영
+  coupleId: number;
 }
 
 // [2] 오늘의 미션 데이터
-// (Home API에서 주는 정보가 간소화되었으므로, 필수 필드 위주로 사용)
 export interface TodayMission {
   missionId: number;
   title: string;
@@ -32,13 +31,16 @@ interface UserContextType {
   userData: HomeData | null;
   todayMissions: TodayMission[];
   setUserData: (data: HomeData | null) => void;
+  setTodayMissions: (missions: TodayMission[]) => void; // ✅ [수정] 이 줄이 추가되어야 합니다!
   refreshUserData: () => Promise<void>;
 }
 
+// 초기값 설정
 const UserContext = createContext<UserContextType>({
   userData: null,
   todayMissions: [],
   setUserData: () => {},
+  setTodayMissions: () => {}, // ✅ [수정] 초기값 추가
   refreshUserData: async () => {},
 });
 
@@ -94,7 +96,6 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
       let mergedData: HomeData | null = null;
       let extractedUserId = null;
 
-      // 유저 ID 추출 로직
       if (typeof userInfo === 'number') {
         extractedUserId = userInfo;
       } else if (typeof userInfo === 'object' && userInfo !== null) {
@@ -107,7 +108,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
           name: homeResponse.name,
           date: homeResponse.date,
           roomId: homeResponse.roomId,
-          coupleId: homeResponse.coupleId, // ✅ 추가됨
+          coupleId: homeResponse.coupleId, 
           userId: Number(extractedUserId),
         };
         setUserData(mergedData);
@@ -117,17 +118,15 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       // 3️⃣ [STEP 3] 홈 데이터에 포함된 미션 정보를 상태로 변환
-      // API 응답의 coupleMission 배열을 TodayMission 형식으로 매핑
       if (homeResponse && Array.isArray(homeResponse.coupleMission)) {
         const mappedMissions: TodayMission[] = homeResponse.coupleMission.map((m: any) => ({
           missionId: m.id,
           title: m.title || '오늘의 미션',
           status: m.status || 'NOT_STARTED',
-          // --- 아래는 홈 메인 API에 없을 경우 기본값 처리 ---
           description: m.description || null,
           difficulty: m.difficulty || 'NORMAL',
           reward: m.reward || 0,
-          missionDate: new Date().toISOString().split('T')[0], // 오늘 날짜
+          missionDate: new Date().toISOString().split('T')[0],
           progresses: [], 
           myDone: false,
           myCompletedAt: null
@@ -145,7 +144,8 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <UserContext.Provider value={{ userData, todayMissions, setUserData, refreshUserData }}>
+    // ✅ [수정] setTodayMissions를 Provider 값에 포함
+    <UserContext.Provider value={{ userData, todayMissions, setUserData, setTodayMissions, refreshUserData }}>
       {children}
     </UserContext.Provider>
   );

@@ -275,7 +275,6 @@ export default function ChatScreen() {
 
   // ✅ [수정] Context 데이터에서 ID 추출 (타입 안전성 고려)
   const userId = userData?.userId || null;
-  console.log(userId);
   const ROOM_KEY = userData?.roomId ? String(userData.roomId) : null;
 
   const { justCompletedMissionId, justCompletedMissionText, justCompletedPhotoUrl, justCompletedAt } =
@@ -965,7 +964,7 @@ export default function ChatScreen() {
             onLayout={(e) => setInputBarHeight(e.nativeEvent.layout.height)}
           >
             <TextInput
-              style={[styles.input, { fontFamily: 'Pretendard-Medium' }]}
+              style={[styles.input, { fontFamily: 'Pretendard-Bold' }]}
               placeholder="대화를 입력하세요"
               value={text}
               onChangeText={(t) => t.length <= MAX_TEXT_LEN && setText(t)}
@@ -1097,6 +1096,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   input: {
+    fontFamily:'Pretendard-Medium',
     flex: 1,
     minHeight: 40,
     maxHeight: 120,

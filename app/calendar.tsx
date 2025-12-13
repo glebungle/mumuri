@@ -231,8 +231,11 @@ export default function CalendarScreen() {
       {/* 3. 캘린더 */}
       <View style={styles.CalenderContainer}>
         <Calendar
+          // ✅ [수정] key 속성의 주석을 해제하세요!
+          // key가 바뀌면 컴포넌트가 강제로 새로고침되어 달력이 바뀝니다.
+          key={currentMonth} 
+          
           current={currentMonth}
-          // key={currentMonth}  // 필요하면 유지, 월 바뀔 때만 리마운트
           renderHeader={() => null}
           hideArrows={true}
           theme={{

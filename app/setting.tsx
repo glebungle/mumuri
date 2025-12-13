@@ -95,8 +95,12 @@ export default function SettingScreen() {
             </Pressable>
           </View>
           <View style={styles.itemGroup}>
-            <AppText type='medium' style={styles.itemText}>로그아웃</AppText>
-            <AppText type='medium' style={styles.itemText}>회원 탈퇴</AppText>
+            <Pressable onPress={() => router.push('/logout')}>
+                <AppText type='medium' style={styles.itemText}>로그아웃</AppText>
+              </Pressable>
+              <Pressable onPress={() => router.push('/withdraw')}>
+                <AppText type='medium' style={styles.itemText}>회원 탈퇴</AppText>
+              </Pressable>
           </View>
         </View>
 
