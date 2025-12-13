@@ -86,7 +86,7 @@ export default function SettingScreen() {
           </View>
           <View>
             <View style={styles.itemGroup}>
-              <Pressable onPress={() => router.push('./couple-connect')}>
+              <Pressable onPress={() => router.push('/couple-connect')}>
                 <AppText type='medium' style={styles.itemText}>커플 연결하기</AppText>
               </Pressable>
             </View>

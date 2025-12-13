@@ -1,7 +1,9 @@
+// app/(tabs)/home.tsx
+
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
-// useEffect 추가
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -51,19 +53,40 @@ const AlertModal = ({
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-
   const { userData, refreshUserData } = useUser(); // 전역 상태 
   
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [modalMessage, setModalMessage] = useState('');
+  
+  // ✅ 커플 ID 상태 관리
+  const [cidStr, setCidStr] = useState<string | null>(null);
 
-  // ✅ [디버깅] userData가 변경될 때마다 로그 출력
+  // ✅ [중요] 좀비 데이터 청소기 (Stale Data Cleaner)
+  // 서버에서는 솔로(roomId 없음)라고 하는데, 로컬엔 커플ID가 남아있다면 삭제!
+  useEffect(() => {
+    const cleanUpStaleData = async () => {
+      if (userData) {
+        // 백엔드: "너 커플 아니야" (roomId가 0이거나 없음)
+        if (!userData.roomId || userData.roomId === 0) {
+          const zombieId = await AsyncStorage.getItem('coupleId');
+          
+          if (zombieId) {
+            console.log(`🧹 [Cleanup] 이전 계정의 커플ID(${zombieId}) 발견! 삭제합니다.`);
+            await AsyncStorage.removeItem('coupleId');
+            await AsyncStorage.removeItem('roomId'); 
+            setCidStr(null); // 화면 상태도 즉시 솔로로 갱신
+          }
+        }
+      }
+    };
+    cleanUpStaleData();
+  }, [userData]);
+
+  // ✅ [디버깅] userData 확인용
   useEffect(() => {
     if (userData) {
-      console.log('====================================');
       console.log('📢 [HOME] 수신된 UserData:', JSON.stringify(userData, null, 2));
-      console.log('====================================');
     } else {
       console.log('📢 [HOME] UserData가 아직 없습니다 (null/undefined)');
     }
@@ -79,7 +102,12 @@ export default function HomeScreen() {
       const load = async () => {
         try {
           console.log('🔄 [HOME] 데이터 새로고침 시작...');
-          await refreshUserData(); // /home/main 호출
+          await refreshUserData(); // API 호출
+
+          // 스토리지의 coupleId도 최신 상태로 읽어오기
+          const id = await AsyncStorage.getItem('coupleId');
+          if (isActive) setCidStr(id);
+
           console.log('✅ [HOME] 데이터 새로고침 완료');
         } catch (error) {
           console.error('❌ [HOME] 데이터 로드 실패:', error);
@@ -94,16 +122,12 @@ export default function HomeScreen() {
     }, [])
   );
 
-  // ✅커플 연결 여부 판단 로직
-  // 기념일(anniversary)은 솔로도 입력하므로, 채팅방 ID(roomId)가 생성되었는지(0보다 큰지)로 판단
-  const isCoupled = !!(userData && userData.roomId && userData.roomId > 0);
+  // ✅ 커플 연결 여부 판단 (서버 데이터 + 로컬 ID 둘 다 있어야 함)
+  const isCoupled = !!(userData && cidStr);
   
   const userName = userData?.name || '사용자';
-  // 솔로여도 기념일은 보여줄 수 있음
   const startDate = userData?.anniversary || null;
   const dDay = userData?.date ?? 1; 
-  
-  // 미션 제목 추출
   const todayMissionTitle = userData?.coupleMission?.[0]?.mission?.title || null;
 
   const showModal = (msg: string) => {
@@ -221,7 +245,6 @@ export default function HomeScreen() {
           <View style={styles.nameDateContainer}>
             <AppText style={styles.userName}>{userName}</AppText>
             <AppText style={styles.dateText}>
-              {/* 솔로일 때도 기념일은 보여주려면 isCoupled 체크를 빼거나, 문구를 다르게 처리 */}
               {startDate
                 ? `📅 ${startDate.replace(/-/g, '. ')}.`
                 : '📅 시작일을 설정해주세요'}
@@ -314,8 +337,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFCF5',
   },
-
-  // ... (기존 배경 관련 스타일) ...
   backgroundLayer: {
     position: 'absolute',
     top: 0,
@@ -339,13 +360,11 @@ const styles = StyleSheet.create({
     bottom: 0,
     height: '30%',
   },
-
   contentContainer: {
     flex: 1,
     zIndex: 1,
     justifyContent: 'space-between',
   },
-
   headerContainer: {
     paddingTop: '7%',
     paddingHorizontal: 20,
@@ -385,7 +404,6 @@ const styles = StyleSheet.create({
   profileButton: {
     padding: 4,
   },
-
   infoSection: {
     paddingHorizontal: 24,
     marginTop: 14,
@@ -420,12 +438,10 @@ const styles = StyleSheet.create({
     color: '#EEE',
     fontSize: 13,
   },
-
   dashboard: {
     paddingHorizontal: 16,
     gap: 12,
   },
-
   pressedCard: {
     opacity: 0.9,
     transform: [{ scale: 0.98 }],
@@ -439,7 +455,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#EEE',
     color: '#353535ff',
   },
-
   missionCard: {
     backgroundColor: 'rgba(247,245,241,0.8)',
     borderRadius: 12,
@@ -466,7 +481,6 @@ const styles = StyleSheet.create({
     fontSize: 22,
     color: '#000',
   },
-
   bottomRow: {
     flexDirection: 'row',
     gap: 12,
@@ -477,7 +491,6 @@ const styles = StyleSheet.create({
     padding: 20,
     justifyContent: 'space-between',
   },
-
   calendarCard: {
     flex: 1.7,
     backgroundColor: '#3E3C3C',
@@ -486,7 +499,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#EAE8E3',
   },
-
   cardLabelWhite: {
     fontSize: 17,
     color: '#FFF',
@@ -500,7 +512,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.3)', // 배경 
+    backgroundColor: 'rgba(0,0,0,0.3)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -510,7 +522,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 24,
     alignItems: 'center',
-    // 그림자
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,

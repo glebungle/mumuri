@@ -76,6 +76,7 @@ export default function GalleryScreen() {
       // 1. AsyncStorage에서 직접 최신 값 조회 (로그 출력)
       const token = await AsyncStorage.getItem('token');
       const cidStr = await AsyncStorage.getItem('coupleId');
+      // const cidStr = 33;
       
       console.log('============== [Gallery Debug] ==============');
       console.log('🔑 현재 토큰:', token ? `${token.slice(0, 10)}...` : '없음');

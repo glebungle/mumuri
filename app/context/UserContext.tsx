@@ -100,7 +100,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const refreshUserData = async () => {
     try {
       const data = await fetchHomeMain();
-      // console.log('✅ Home Data Loaded:', data); // 데이터 확인용
+      console.log('✅ Home Data Loaded:', data); // 데이터 확인용
       setUserData(data);
     } catch (e) {
       console.warn('User data fetch failed', e);
