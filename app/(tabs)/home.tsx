@@ -1,5 +1,3 @@
-// app/(tabs)/home.tsx
-
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -20,10 +18,9 @@ import AppText from '../../components/AppText';
 import { useUser } from '../context/UserContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
 const heartImg = require('../../assets/images/Heart.png');
 
-// 모달 컴포넌트
+// --- 모달 컴포넌트 ---
 const AlertModal = ({
   visible,
   message,
@@ -41,7 +38,7 @@ const AlertModal = ({
             <Ionicons name="information-circle" size={32} color="#6198FF" />
           </View>
           <AppText style={styles.modalTitle}>알림</AppText>
-          <AppText type='medium' style={styles.modalMessage}>{message}</AppText>
+          <AppText type="medium" style={styles.modalMessage}>{message}</AppText>
           <Pressable style={styles.modalButton} onPress={onClose}>
             <AppText style={styles.modalButtonText}>확인</AppText>
           </Pressable>
@@ -53,29 +50,26 @@ const AlertModal = ({
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const { userData, refreshUserData } = useUser(); // 전역 상태 
+  
+  // ✅ Context에서 todayMissions 추가로 가져옴
+  const { userData, todayMissions, refreshUserData } = useUser();
   
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [modalMessage, setModalMessage] = useState('');
-  
-  // ✅ 커플 ID 상태 관리
   const [cidStr, setCidStr] = useState<string | null>(null);
 
-  // ✅ [중요] 좀비 데이터 청소기 (Stale Data Cleaner)
-  // 서버에서는 솔로(roomId 없음)라고 하는데, 로컬엔 커플ID가 남아있다면 삭제!
+  // ✅ [중요] 좀비 데이터 청소기
   useEffect(() => {
     const cleanUpStaleData = async () => {
       if (userData) {
-        // 백엔드: "너 커플 아니야" (roomId가 0이거나 없음)
         if (!userData.roomId || userData.roomId === 0) {
           const zombieId = await AsyncStorage.getItem('coupleId');
-          
           if (zombieId) {
-            console.log(`🧹 [Cleanup] 이전 계정의 커플ID(${zombieId}) 발견! 삭제합니다.`);
+            console.log(`🧹 [Cleanup] 이전 계정의 커플ID(${zombieId}) 삭제`);
             await AsyncStorage.removeItem('coupleId');
-            await AsyncStorage.removeItem('roomId'); 
-            setCidStr(null); // 화면 상태도 즉시 솔로로 갱신
+            await AsyncStorage.removeItem('roomId');
+            setCidStr(null);
           }
         }
       }
@@ -83,16 +77,7 @@ export default function HomeScreen() {
     cleanUpStaleData();
   }, [userData]);
 
-  // ✅ [디버깅] userData 확인용
-  useEffect(() => {
-    if (userData) {
-      console.log('📢 [HOME] 수신된 UserData:', JSON.stringify(userData, null, 2));
-    } else {
-      console.log('📢 [HOME] UserData가 아직 없습니다 (null/undefined)');
-    }
-  }, [userData]);
-
-  // 배경 이미지
+  // 배경 이미지 (필요시 설정)
   const bgImage = null;
 
   useFocusEffect(
@@ -102,13 +87,11 @@ export default function HomeScreen() {
       const load = async () => {
         try {
           console.log('🔄 [HOME] 데이터 새로고침 시작...');
-          await refreshUserData(); // API 호출
+          await refreshUserData(); // API 호출 (Home + Missions)
 
-          // 스토리지의 coupleId도 최신 상태로 읽어오기
           const id = await AsyncStorage.getItem('coupleId');
           if (isActive) setCidStr(id);
 
-          console.log('✅ [HOME] 데이터 새로고침 완료');
         } catch (error) {
           console.error('❌ [HOME] 데이터 로드 실패:', error);
         } finally {
@@ -117,28 +100,31 @@ export default function HomeScreen() {
       };
       
       load();
-
       return () => { isActive = false; };
     }, [])
   );
 
-  // ✅ 커플 연결 여부 판단 (서버 데이터 + 로컬 ID 둘 다 있어야 함)
+  // ✅ 커플 여부 판단
   const isCoupled = !!(userData && cidStr);
   
   const userName = userData?.name || '사용자';
   const startDate = userData?.anniversary || null;
-  const dDay = userData?.date ?? 1; 
-  const todayMissionTitle = userData?.coupleMission?.[0]?.mission?.title || null;
+  const dDay = userData?.date ?? 1;
+
+  // ✅ [수정됨] 오늘의 미션 제목 가져오기 (배열의 첫번째 요소)
+  const todayMissionTitle = todayMissions && todayMissions.length > 0 
+    ? todayMissions[0].title 
+    : null;
 
   const showModal = (msg: string) => {
     setModalMessage(msg);
     setModalVisible(true);
   };
 
-  // --- 네비게이션 핸들러 ---
+  // --- 네비게이션 ---
   const handlePressCamera = () => {
     if (!isCoupled) {
-      showModal('커플 연결 후 미션을 수행할 수 있어요!'); 
+      showModal('커플 연결 후 미션을 수행할 수 있어요!');
       return;
     }
     router.push('/camera');
@@ -154,7 +140,7 @@ export default function HomeScreen() {
 
   const handlePressChat = () => {
     if (!isCoupled) {
-      showModal('커플 연결 후 채팅을 할 수 있어요!'); 
+      showModal('커플 연결 후 채팅을 할 수 있어요!');
       return;
     }
     router.push('/chat');
@@ -195,7 +181,6 @@ export default function HomeScreen() {
           resizeMode="cover"
         >
           <View style={styles.dimOverlay} />
-
           <LinearGradient
             colors={['transparent', '#FFFCF5']}
             style={styles.gradientOverlay}
@@ -205,6 +190,7 @@ export default function HomeScreen() {
       </View>
 
       <View style={styles.contentContainer}>
+        {/* 상단 헤더 영역 */}
         <View style={styles.headerContainer}>
           <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
             <View style={styles.tabSwitch}>
@@ -237,10 +223,12 @@ export default function HomeScreen() {
           <View style={styles.dDayBadge}>
             <Image source={heartImg} style={[styles.heartImage]} />
             <AppText type="bold" style={styles.dDayText}>
-              {isCoupled ? `${dDay}일째` : '연결 대기중'}
+              {isCoupled ? `${dDay-1}일째` : '연결 대기중'}
             </AppText>
           </View>
         </View>
+
+        {/* 사용자 정보 영역 */}
         <View style={styles.infoSection}>
           <View style={styles.nameDateContainer}>
             <AppText style={styles.userName}>{userName}</AppText>
@@ -252,6 +240,7 @@ export default function HomeScreen() {
           </View>
         </View>
 
+        {/* 대시보드 카드 영역 */}
         <View style={[styles.dashboard, { paddingBottom: insets.bottom + 20 }]}>
           <Pressable
             style={({ pressed }) => [
@@ -275,7 +264,7 @@ export default function HomeScreen() {
               numberOfLines={2}
             >
               {isCoupled
-                ? todayMissionTitle || '오늘의 미션을 불러오는 중...'
+                ? todayMissionTitle || '미션 불러오는 중...'
                 : '커플을 연결해주세요.'}
             </AppText>
             <View style={styles.cameraLabelBox}>
@@ -518,7 +507,7 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     width: SCREEN_WIDTH * 0.8,
-    backgroundColor: '#FFFCF5', 
+    backgroundColor: '#FFFCF5',
     borderRadius: 20,
     padding: 24,
     alignItems: 'center',
@@ -544,7 +533,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   modalButton: {
-    backgroundColor: '#6198FF', 
+    backgroundColor: '#6198FF',
     paddingVertical: 12,
     paddingHorizontal: 40,
     borderRadius: 12,
@@ -557,6 +546,6 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     tintColor: '#ffffffff',
-    margin:5,
-  }
+    margin: 5,
+  },
 });

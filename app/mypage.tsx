@@ -171,7 +171,7 @@ export default function MyPage() {
                       {anniversaryDate || '---. --. --'}
                     </AppText>
                     <AppText type="pretendard-m" style={styles.bigNumberText}>
-                      {dDayCount > 0 ? `${dDayCount}일째` : 'D-Day'}
+                      {dDayCount > 0 ? `${dDayCount-1}일째` : 'D-Day'}
                     </AppText>
                     <AppText type="pretendard-m" style={styles.subLabelText}>
                       기념일
@@ -285,7 +285,7 @@ const styles = StyleSheet.create({
   },
   verticalDivider: {
     width: 2,
-    height: 50,
+    height: '100%',
     backgroundColor: '#E2E2E2',
     marginHorizontal: 10,
   },
@@ -331,7 +331,7 @@ const styles = StyleSheet.create({
   settingsImage: {
     width: 24,
     height: 24,
-    tintColor: '#444', // 아이콘 색상을 변경하고 싶다면 추가 (이미지가 흑백일 경우)
+    tintColor: '#444', 
   },
   heartImage: {
     width: 20,

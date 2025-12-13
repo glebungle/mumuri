@@ -21,6 +21,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppText from '../components/AppText';
 import { ChatIncoming, ChatReadUpdate, createChatClient } from './lib/chatSocket';
+// ✅ [수정] Hook은 컴포넌트 내부에서만 사용해야 하므로 여기서 호출하던 코드를 제거했습니다.
+import { useUser } from './context/UserContext';
 
 const ChatText = (props: React.ComponentProps<typeof AppText>) => {
   const { style, ...rest } = props;
@@ -49,10 +51,9 @@ const CACHE_VERSION = 'v1';
 // 채팅 캐시 저장
 async function saveChatCache(roomId: string, messages: ChatMessage[]) {
   try {
-    // 1. 상태가 failed인 것만 제외하고, sent나 sending은 모두 저장
     const toSave = messages
       .filter(m => m.status !== 'failed') 
-      .slice(-100); // 최근 100개
+      .slice(-100); 
 
     await AsyncStorage.setItem(
       CHAT_CACHE_KEY(roomId),
@@ -123,18 +124,6 @@ async function authedFetch(path: string, init: RequestInit = {}) {
   const text = await res.text();
   if (!res.ok) throw new Error(`${path} ${res.status}: ${text.slice(0, 200)}`);
   try { return JSON.parse(text); } catch { return text; }
-}
-
-function normalizeGetUser(raw: any) {
-  if (typeof raw === 'number') return { userId: raw };
-  if (typeof raw === 'string' && /^[0-9]+$/.test(raw)) return { userId: Number(raw) };
-  if (raw && typeof raw === 'object') {
-    const userId = raw.userId ?? raw.id ?? raw.memberId ?? null;
-    const coupleId = raw.coupleId ?? raw.couple_id ?? null;
-    const coupleCode = raw.coupleCode ?? raw.couple_code ?? null;
-    return { userId, coupleId, coupleCode };
-  }
-  return { userId: null, coupleId: null, coupleCode: null };
 }
 
 async function presignIfNeeded(rawUrl?: string | null) {
@@ -280,6 +269,14 @@ function isPerformed(status?: string) {
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const accessoryID = 'chat-input-accessory';
+  
+  // ✅ [수정] 컴포넌트 내부에서 Context 사용
+  const { userData } = useUser();
+
+  // ✅ [수정] Context 데이터에서 ID 추출 (타입 안전성 고려)
+  const userId = userData?.userId || null;
+  console.log(userId);
+  const ROOM_KEY = userData?.roomId ? String(userData.roomId) : null;
 
   const { justCompletedMissionId, justCompletedMissionText, justCompletedPhotoUrl, justCompletedAt } =
     useLocalSearchParams<{
@@ -290,10 +287,7 @@ export default function ChatScreen() {
     }>();
 
   const [token, setToken] = useState<string | undefined>(undefined);
-  const [coupleId, setCoupleId] = useState<number | null>(null);
-  const [coupleCode, setCoupleCode] = useState<string | null>(null);
-  const [userId, setUserId] = useState<number | null>(null);
-
+  
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
@@ -320,39 +314,13 @@ export default function ChatScreen() {
   const chatRef = useRef<ReturnType<typeof createChatClient> | null>(null);
   const latestVisibleMsgId = useRef<string | null>(null);
 
-  // 초기 사용자/커플 식별자 확보
+  // ✅ [수정] 토큰만 로드 (ID는 Context에서 이미 가져옴)
   useEffect(() => {
     (async () => {
-      const entries = await AsyncStorage.multiGet(['token', 'userId', 'coupleId', 'coupleCode']);
-      const map = Object.fromEntries(entries);
-      const tokenStr = map.token || undefined;
-      const userIdNum = map.userId ? Number(map.userId) : null;
-      const coupleIdNum = map.coupleId ? Number(map.coupleId) : null;
-      const codeStr = map.coupleCode || null;
-
-      setToken(tokenStr);
-      setUserId(userIdNum);
-      setCoupleId(coupleIdNum);
-      setCoupleCode(codeStr);
-
-      if (tokenStr && (!userIdNum || (!coupleIdNum && !codeStr))) {
-        try {
-          const raw = await authedFetch('/user/getuser', { method: 'GET' });
-          const { userId: uid, coupleId: cid, coupleCode: ccode } = normalizeGetUser(raw);
-          const kv: [string, string][] = [];
-          if (uid != null && uid !== userIdNum) { setUserId(uid); kv.push(['userId', String(uid)]); }
-          if (cid != null && cid !== coupleIdNum) { setCoupleId(cid); kv.push(['coupleId', String(cid)]); }
-          if (ccode && ccode !== codeStr) { setCoupleCode(ccode); kv.push(['coupleCode', ccode]); }
-          if (kv.length) await AsyncStorage.multiSet(kv);
-        } catch (e: any) {
-          console.warn('[getuser] failed:', e?.message);
-        }
-      }
+      const t = await AsyncStorage.getItem('token');
+      if (t) setToken(t);
     })();
   }, []);
-
-  const ROOM_KEY: string | null = (coupleId != null ? String(coupleId) : null);
-  // const ROOM_KEY = "902";
 
   // ✅ 화면이 종료(Unmount)될 때 최신 데이터 저장
   useEffect(() => {
@@ -444,7 +412,7 @@ export default function ChatScreen() {
     });
   }, [userId, ROOM_KEY]);
 
-  // ✅ [수정] onIncoming 핸들러의 최신 상태를 Ref로 관리
+  // ✅ onIncoming 핸들러의 최신 상태를 Ref로 관리
   const onIncomingRef = useRef(onIncoming);
   useEffect(() => {
     onIncomingRef.current = onIncoming;
@@ -453,20 +421,24 @@ export default function ChatScreen() {
   useFocusEffect(
     useCallback(() => {
       // 1. 포커스 얻었을 때 (Mount/Focus)
-      if (!USE_STOMP || !token || !ROOM_KEY || !userId) return;
+      // ✅ [중요] 모든 필수 데이터가 준비되어야 연결
+      if (!USE_STOMP || !token || !ROOM_KEY || !userId) {
+        // 데이터가 아직 없으면 대기 (Context 로드 시 재실행됨)
+        return;
+      }
 
-      console.log('[useFocusEffect] Mounted/Focused - Connecting STOMP');
+      console.log(`[useFocusEffect] Connecting Chat - Room: ${ROOM_KEY}, User: ${userId}`);
       
       const chat = createChatClient({
         wsUrl: WS_URL,
         token,
         roomId: ROOM_KEY,
         handlers: {
-          // ✅ [수정] Ref를 통해 최신 핸들러 호출 (의존성 제거 효과)
+          // ✅ Ref를 통해 최신 핸들러 호출
           onMessage: (p) => onIncomingRef.current(p),
           onReadUpdate: (_u: ChatReadUpdate) => { },
           onConnected: () => {
-            chatRef.current?.markAsRead(ROOM_KEY, userId, latestVisibleMsgId.current ?? undefined);
+            chatRef.current?.markAsRead(ROOM_KEY, Number(userId), latestVisibleMsgId.current ?? undefined);
           },
           onError: (e: unknown) => console.warn('[STOMP ERROR]', e),
         },
@@ -478,22 +450,21 @@ export default function ChatScreen() {
 
       // 2. 포커스 잃었을 때 (Unmount/Blur)
       return () => {
-        console.log('[useFocusEffect] Unmounted/Blurred - Disconnecting & Saving');
+        console.log('[useFocusEffect] Disconnecting');
         
         chat.deactivate();
         chatRef.current = null;
 
-        // 다른 탭 갈 때 반드시 저장!
         if (ROOM_KEY) {
             saveChatCache(ROOM_KEY, latestMessages.current);
             saveMissionCache(latestPerformedMissions.current);
         }
       };
-    }, [token, ROOM_KEY, userId]) // ✅ [수정] onIncoming 제거하여 불필요한 재연결 방지
+    }, [token, ROOM_KEY, userId]) 
   );
 
   useEffect(() => {
-    if (!ROOM_KEY || !token) return;
+    if (!ROOM_KEY || !token || !userId) return;
 
     const loadData = async () => {
       let cachedMsgs: ChatMessage[] = [];
@@ -718,7 +689,7 @@ export default function ChatScreen() {
 
   const sendMessage = useCallback(async () => {
     if (!ROOM_KEY || !userId) {
-      Alert.alert('안내', '커플 정보가 아직 준비되지 않았어요.');
+      Alert.alert('안내', '채팅 서버 연결을 기다리고 있어요.');
       return;
     }
     if (sending) return;
@@ -753,7 +724,7 @@ export default function ChatScreen() {
 
     try {
       if (USE_STOMP) {
-        chatRef.current?.sendMessage(ROOM_KEY, userId, {
+        chatRef.current?.sendMessage(ROOM_KEY, Number(userId), {
           message: trimmed,
           imageUrl: null,
           clientMsgId,
@@ -868,7 +839,7 @@ export default function ChatScreen() {
     const last = visibleMsg[visibleMsg.length - 1];
     if (last?.id && last.id !== latestVisibleMsgId.current) {
       latestVisibleMsgId.current = last.id;
-      if (ROOM_KEY && userId) chatRef.current?.markAsRead(ROOM_KEY, userId, last.id);
+      if (ROOM_KEY && userId) chatRef.current?.markAsRead(ROOM_KEY, Number(userId), last.id);
     }
   }).current;
 
