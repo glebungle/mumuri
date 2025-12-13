@@ -51,25 +51,27 @@ const AlertModal = ({
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   
-  // ✅ Context에서 todayMissions 추가로 가져옴
+  // ✅ Context에서 필요한 데이터 가져오기
   const { userData, todayMissions, refreshUserData } = useUser();
   
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [modalMessage, setModalMessage] = useState('');
-  const [cidStr, setCidStr] = useState<string | null>(null);
 
-  // ✅ [중요] 좀비 데이터 청소기
+  // ✅ [수정] 스토리지 대신 Context의 coupleId로 커플 여부 판단
+  // userData가 있고, coupleId가 0보다 크면 커플임
+  const isCoupled = !!(userData && userData.coupleId && userData.coupleId > 0);
+
+  // ✅ [중요] 좀비 데이터 청소기 (Context 기준 솔로면 로컬 스토리지도 정리)
   useEffect(() => {
     const cleanUpStaleData = async () => {
       if (userData) {
-        if (!userData.roomId || userData.roomId === 0) {
+        // 서버에서는 솔로라고 하는데(coupleId가 0), 로컬엔 값이 남아있다면 삭제
+        if (!userData.coupleId || userData.coupleId === 0) {
           const zombieId = await AsyncStorage.getItem('coupleId');
           if (zombieId) {
-            console.log(`🧹 [Cleanup] 이전 계정의 커플ID(${zombieId}) 삭제`);
-            await AsyncStorage.removeItem('coupleId');
-            await AsyncStorage.removeItem('roomId');
-            setCidStr(null);
+            console.log(`🧹 [Cleanup] 유효하지 않은 커플ID(${zombieId}) 정리`);
+            await AsyncStorage.multiRemove(['coupleId', 'roomId']);
           }
         }
       }
@@ -88,10 +90,6 @@ export default function HomeScreen() {
         try {
           console.log('🔄 [HOME] 데이터 새로고침 시작...');
           await refreshUserData(); // API 호출 (Home + Missions)
-
-          const id = await AsyncStorage.getItem('coupleId');
-          if (isActive) setCidStr(id);
-
         } catch (error) {
           console.error('❌ [HOME] 데이터 로드 실패:', error);
         } finally {
@@ -103,15 +101,12 @@ export default function HomeScreen() {
       return () => { isActive = false; };
     }, [])
   );
-
-  // ✅ 커플 여부 판단
-  const isCoupled = !!(userData && cidStr);
   
   const userName = userData?.name || '사용자';
   const startDate = userData?.anniversary || null;
   const dDay = userData?.date ?? 1;
 
-  // ✅ [수정됨] 오늘의 미션 제목 가져오기 (배열의 첫번째 요소)
+  // ✅ 오늘의 미션 제목 가져오기
   const todayMissionTitle = todayMissions && todayMissions.length > 0 
     ? todayMissions[0].title 
     : null;
@@ -264,7 +259,7 @@ export default function HomeScreen() {
               numberOfLines={2}
             >
               {isCoupled
-                ? todayMissionTitle || '미션 불러오는 중...'
+                ? todayMissionTitle || '새로운 미션 준비 중...'
                 : '커플을 연결해주세요.'}
             </AppText>
             <View style={styles.cameraLabelBox}>

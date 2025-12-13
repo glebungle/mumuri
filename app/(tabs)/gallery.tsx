@@ -5,7 +5,7 @@ import { format, parseISO } from 'date-fns';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
 import { router, useFocusEffect } from 'expo-router';
-import React, { useCallback, useState } from 'react'; // useRef 제거
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -20,6 +20,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppText from '../../components/AppText';
+// ✅ [수정] Context 사용
+import { useUser } from '../context/UserContext';
 
 const BASE_URL = 'https://mumuri.shop';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -60,9 +62,13 @@ function normalizePhoto(raw: any): Photo | null {
 export default function GalleryScreen() {
   const insets = useSafeAreaInsets();
   
+  // ✅ [수정] Context에서 coupleId 가져오기
+  const { userData } = useUser();
+  const coupleId = userData?.coupleId || null;
+
   const [loading, setLoading] = useState(true);
   const [photos, setPhotos] = useState<Photo[]>([]);
-  const [coupleId, setCoupleId] = useState<number | null>(null);
+  // const [coupleId, setCoupleId] = useState<number | null>(null); // 삭제됨
   const [refreshing, setRefreshing] = useState(false);
 
   // 뷰어 관련 상태
@@ -70,31 +76,26 @@ export default function GalleryScreen() {
   const [isMenuVisible, setIsMenuVisible] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // --- 데이터 로드 (Ref 제거하고 직접 조회) ---
+  // --- 데이터 로드 ---
   const loadPhotos = useCallback(async () => {
     try {
-      // 1. AsyncStorage에서 직접 최신 값 조회 (로그 출력)
+      // 1. 토큰 및 coupleId 확인 (Context 값 사용)
       const token = await AsyncStorage.getItem('token');
-      const cidStr = await AsyncStorage.getItem('coupleId');
-      // const cidStr = 33;
       
       console.log('============== [Gallery Debug] ==============');
       console.log('🔑 현재 토큰:', token ? `${token.slice(0, 10)}...` : '없음');
-      console.log('❤️ 현재 커플ID:', cidStr);
+      console.log('❤️ 현재 커플ID:', coupleId);
 
-      if (!token || !cidStr) {
+      // coupleId가 없으면 로드 중단
+      if (!token || !coupleId) {
         console.log('❌ 토큰이나 커플ID가 없어서 초기화합니다.');
         setPhotos([]);
-        setCoupleId(null);
         setLoading(false);
         return;
       }
 
-      const cid = Number(cidStr);
-      setCoupleId(cid);
-
       // 2. 서버 요청
-      const url = `${BASE_URL}/photo/${cid}/all`;
+      const url = `${BASE_URL}/photo/${coupleId}/all`;
       console.log('🚀 요청 URL:', url);
 
       const res = await fetch(url, {
@@ -113,8 +114,7 @@ export default function GalleryScreen() {
       }
 
       const data = await res.json();
-      // console.log('📦 응답 데이터(요약):', JSON.stringify(data).slice(0, 100));
-
+      
       const rawList = Array.isArray(data) ? data : (data.items || []);
       const parsed = rawList.map(normalizePhoto).filter(Boolean) as Photo[];
       
@@ -131,13 +131,11 @@ export default function GalleryScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [coupleId]); // ✅ coupleId 변경 시 함수 재생성
 
-  // 화면 포커스 될 때마다 무조건 실행
+  // 화면 포커스 될 때마다 실행
   useFocusEffect(
     useCallback(() => {
-      // 화면 진입 시 로딩 표시를 잠깐 보여주거나, 기존 데이터를 일단 비워주는 게 확실함
-      // setPhotos([]); // (원하면 주석 해제: 깜빡임이 생기지만 확실히 비워짐)
       loadPhotos();
     }, [loadPhotos])
   );
