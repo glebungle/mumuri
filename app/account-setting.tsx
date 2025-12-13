@@ -30,7 +30,7 @@ export default function AccountSettingScreen() {
           onPress={() => router.push('/logout')}
         >
           <AppText type="medium" style={styles.menuText}>로그아웃</AppText>
-          <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
+          <Ionicons name="chevron-forward" size={20} color="#505050" />
         </Pressable>
 
         {/* 회원 탈퇴 메뉴 */}
@@ -39,7 +39,7 @@ export default function AccountSettingScreen() {
           onPress={() => router.push('/withdraw')}
         >
           <AppText type="medium" style={styles.menuText}>회원 탈퇴</AppText>
-          <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
+          <Ionicons name="chevron-forward" size={20} color="#505050" />
         </Pressable>
 
       </View>
@@ -77,11 +77,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 18,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F2F2F2',
   },
   menuText: {
-    fontSize: 16,
-    color: '#444444',
+    fontSize: 14,
+    color: '#747474',
   },
 });

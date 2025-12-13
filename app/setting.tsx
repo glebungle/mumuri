@@ -1,6 +1,5 @@
 // app/setting.tsx
 import { Ionicons } from '@expo/vector-icons';
-// import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
@@ -19,15 +18,7 @@ export default function SettingScreen() {
   // 뒤로가기
   const handleBack = () => router.back();
 
-  // // 커플코드 복사 핸들러
-  // const handleCopyCode = async () => {
-  //   // 실제로는 AsyncStorage나 API에서 내 코드를 가져와야 함
-  //   const code = await AsyncStorage.getItem('coupleCode') || 'CODE-NOT-FOUND';
-  //   await Clipboard.setStringAsync(code);
-  //   Alert.alert('복사 완료', '커플 코드가 클립보드에 복사되었어요.');
-  // };
-
-  // 로그아웃 핸들러
+  // // 로그아웃 핸들러
   // const handleLogout = () => {
   //   Alert.alert('로그아웃', '정말 로그아웃 하시겠습니까?', [
   //     { text: '취소', style: 'cancel' },
@@ -43,7 +34,7 @@ export default function SettingScreen() {
   //   ]);
   // };
 
-  // // 회원탈퇴 핸들러
+  // // // 회원탈퇴 핸들러
   // const handleWithdraw = () => {
   //   Alert.alert('회원 탈퇴', '정말 탈퇴하시겠습니까? 모든 데이터가 삭제됩니다.', [
   //     { text: '취소', style: 'cancel' },
@@ -60,7 +51,7 @@ export default function SettingScreen() {
           <Ionicons name="chevron-back" size={24} color="#1E1E1E" />
         </Pressable>
         <AppText style={styles.headerTitle}>설정</AppText>
-        <View style={{ width: 24 }} /> {/* 레이아웃 균형용 공백 */}
+        <View style={{ width: 24 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -69,7 +60,7 @@ export default function SettingScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <AppText type='semibold' style={styles.sectionTitle}>프로필 관리</AppText>
-            <Ionicons name="chevron-forward" size={18} color="#000" />
+            <Ionicons name="chevron-forward" size={20} color="#000" />
           </View>
           <View style={styles.itemGroup}>
             {/* <Pressable onPress={() => router.push('/mypage/edit')}> */}
@@ -82,7 +73,9 @@ export default function SettingScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <AppText type='semibold' style={styles.sectionTitle}>커플 연결</AppText>
-            <Ionicons name="chevron-forward" size={18} color="#000" />
+            <Pressable onPress={()=> router.push('./couple-connect')}>
+              <Ionicons name="chevron-forward" size={20} color="#000" />
+            </Pressable>
           </View>
           <View>
             <View style={styles.itemGroup}>
@@ -97,15 +90,13 @@ export default function SettingScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <AppText type='semibold' style={styles.sectionTitle}>계정 관리</AppText>
-            <Ionicons name="chevron-forward" size={18} color="#000" />
+            <Pressable onPress={()=> router.push('./account-setting')}>
+              <Ionicons name="chevron-forward" size={20} color="#000" />
+            </Pressable>
           </View>
           <View style={styles.itemGroup}>
-            {/* <Pressable onPress={handleLogout} style={styles.itemRow}> */}
-              <AppText type='medium' style={styles.itemText}>로그아웃</AppText>
-            {/* </Pressable> */}
-            {/* <Pressable onPress={handleWithdraw} style={styles.itemRow}> */}
-              <AppText type='medium' style={styles.itemText}>회원 탈퇴</AppText>
-            {/* </Pressable> */}
+            <AppText type='medium' style={styles.itemText}>로그아웃</AppText>
+            <AppText type='medium' style={styles.itemText}>회원 탈퇴</AppText>
           </View>
         </View>
 
@@ -113,7 +104,7 @@ export default function SettingScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <AppText type='semibold' style={styles.sectionTitle}>정보</AppText>
-            <Ionicons name="chevron-forward" size={18} color="#000" />
+            <Ionicons name="chevron-forward" size={20} color="#000" />
           </View>
           <View style={styles.itemGroup}>
             <View style={styles.itemRow}>

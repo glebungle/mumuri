@@ -370,7 +370,7 @@ export default function Signup() {
               {/* 건너뛰기 텍스트 링크 */}
               <TouchableOpacity onPress={onSkip} activeOpacity={0.7} style={{ marginTop: 16, alignItems:'center' }}>
                 <AppText style={{ color: '#9CA3AF', fontSize: 12 }}>
-                  아직 커플코드가 없으신가요? <AppText style={{ textDecorationLine: 'underline', color: '#6B7280' }}>건너뛰기</AppText>
+                  아직 커플코드가 없으신가요? <AppText style={{ textDecorationLine: 'underline', color: '#6B7280', fontSize: 12  }}>건너뛰기</AppText>
                 </AppText>
               </TouchableOpacity>
 
@@ -456,13 +456,12 @@ const styles = StyleSheet.create({
 
   // 과거 카드
   pastCardBase: {
-    borderWidth: 2, borderColor: '#D1D5DB', borderRadius: 16,
+    borderWidth: 2, borderColor: '#75787B', borderRadius: 16,
     paddingHorizontal: 20, paddingVertical: 14,
     marginTop: 10, justifyContent: 'center', overflow: 'hidden',
-    backgroundColor: '#FAFAFA'
   },
   pastCardLabel: { fontSize: 11, color: '#75787B', marginBottom: 4 },
-  pastCardValue: { fontSize: 13, color: '#CECECE' },
+  pastCardValue: { fontSize: 13, color: '#75787B' },
 
   inputLabel: { fontSize: 11, marginBottom: 8 },
   textInputBase: { color:'#CECECE', padding: 0, fontSize: 15 },
