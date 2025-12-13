@@ -325,7 +325,7 @@ const styles = StyleSheet.create({
   codeContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F7F7F7', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14 },
   codeText: { fontSize: 12, color: '#4D5053'},
   copyButton: { flexDirection: 'row', alignItems: 'center', gap: 4, padding: 4 },
-  copyText: { color: '#6198FF', fontSize: 14, fontWeight: '600' },
+  copyText: { color: '#6198FF', fontSize: 14, },
   input: { backgroundColor: '#F7F7F7', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, fontSize: 16, color: '#333', marginBottom: 20, fontFamily: 'Pretendard-Medium' },
   connectButton: { backgroundColor: '#6198FF', borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
   connectButtonText: { color: '#FFF', fontSize: 16 },
