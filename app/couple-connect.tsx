@@ -31,7 +31,6 @@ export default function CoupleConnectScreen() {
   // 성공 모달 상태
   const [modalVisible, setModalVisible] = useState(false);
 
-  // ✅ [추가] 테스트 상대 생성 모달 상태
   const [testModalVisible, setTestModalVisible] = useState(false);
   const [testCode, setTestCode] = useState('');
 
@@ -219,12 +218,12 @@ export default function CoupleConnectScreen() {
           </AppText>
 
           <TextInput
-            style={[styles.input,{ fontFamily: 'Pretendard-Medium', fontSize: 12, color: '#4D5053' }]}
             placeholder="코드를 입력하세요"
             placeholderTextColor="#AAA"
             value={partnerCode}
             onChangeText={setPartnerCode}
             autoCapitalize="characters"
+            style={[styles.input,{ fontFamily: 'Pretendard-Medium', fontSize: 12, color: '#4D5053' }]}
           />
 
           <Pressable 
@@ -264,7 +263,7 @@ export default function CoupleConnectScreen() {
               <Ionicons name="heart" size={32} color="#FF6B6B" />
             </View>
             <AppText type="bold" style={styles.modalTitle}>연결 성공!</AppText>
-            <AppText style={styles.modalMessage}>
+            <AppText type="medium" style={styles.modalMessage}>
               이제 두 분만의 소중한 기록을{'\n'}시작해보세요.
             </AppText>
             <Pressable style={styles.modalButton} onPress={handleSuccessConfirm}>
@@ -287,7 +286,7 @@ export default function CoupleConnectScreen() {
               <Ionicons name="people" size={32} color="#6198FF" />
             </View>
             <AppText type="bold" style={styles.modalTitle}>테스트 상대 생성 완료</AppText>
-            <AppText style={styles.modalMessage}>
+            <AppText type="medium" style={styles.modalMessage}>
               코드: {testCode}{'\n'}입력창에 넣을까요?
             </AppText>
             

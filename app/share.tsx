@@ -3,11 +3,13 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as MediaLibrary from 'expo-media-library';
-import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, Image, Pressable, StyleSheet, View } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import React, { useState } from 'react';
+import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, View } from 'react-native'; // ActivityIndicator 추가
 import AppText from '../components/AppText';
 import { ChatIncoming, ChatReadUpdate, createChatClient } from './lib/chatSocket';
+// ✅ [수정] Context 사용
+import { useUser } from './context/UserContext';
 
 const BASE_URL = 'https://mumuri.shop';
 const WS_URL   = `${BASE_URL}/ws-chat`;
@@ -31,21 +33,18 @@ function toRawUrl(url?: string | null) {
   try { return url.split('?')[0] || url; } catch { return url; }
 }
 
-// presigned/full URL에서 "S3 object key"만 추출 (예: couples/15/-1/xxx.jpg)
+// presigned/full URL에서 "S3 object key"만 추출
 function extractS3KeyFromUrl(url?: string | null) {
   if (!url) return null;
   try {
     const u = new URL(url);
-    // "/couples/15/..." → "couples/15/..."
     return u.pathname.replace(/^\/+/, '');
   } catch {
-    // new URL 실패 시 문자열로 fallback
     const marker = '.amazonaws.com/';
     const idx = url.indexOf(marker);
     if (idx >= 0) {
       return url.substring(idx + marker.length);
     }
-    // 그래도 못 뽑으면 원본 반환(최악의 경우)
     return url;
   }
 }
@@ -98,86 +97,13 @@ export default function ShareScreen() {
   const photoUri = uri || '';
   const missionLabel = missionDescription || missionTitle || '미션을 연결해주세요!';
 
-  const [token, setToken] = useState<string | null>(null);
-  const [coupleId, setCoupleId] = useState<number | null>(null);
-  const [userId, setUserId] = useState<number | null>(null);
+  // ✅ [수정] 전역 Context에서 사용자 정보 가져오기
+  const { userData } = useUser();
+  const userId = userData?.userId || null;
+  const coupleId = userData?.coupleId || null;
+
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
-
-  // /user/getuser 로 보강
-  const fetchMeAndStore = useCallback(async () => {
-    const t = await AsyncStorage.getItem('token');
-    if (!t) return;
-    try {
-      const res = await fetch(`${BASE_URL}/user/getuser`, {
-        method: 'GET',
-        headers: {
-          Accept: 'application/json',
-          Authorization: `Bearer ${t}`,
-          'ngrok-skip-browser-warning': 'true',
-        },
-      });
-      const text = await res.text();
-      if (!res.ok) return;
-
-      let data: any = {};
-      try { data = JSON.parse(text); } catch {}
-
-      const foundCoupleId = data?.coupleId ?? data?.couple_id ?? null;
-      const foundUserId   = data?.userId   ?? data?.id       ?? data?.memberId ?? null;
-
-      if (foundCoupleId != null && Number.isFinite(Number(foundCoupleId))) {
-        const cid = Number(foundCoupleId);
-        await AsyncStorage.setItem('coupleId', String(cid));
-        setCoupleId(cid);
-      }
-      if (foundUserId != null && Number.isFinite(Number(foundUserId))) {
-        const uid = Number(foundUserId);
-        await AsyncStorage.setItem('userId', String(uid));
-        setUserId(uid);
-      }
-      console.log('[share] /user/getuser →', { coupleId: foundCoupleId, userId: foundUserId });
-    } catch (e) {
-      console.warn('[share] /user/getuser failed', (e as any)?.message);
-    }
-  }, []);
-
-  const hydrate = useCallback(async () => {
-    const t = await AsyncStorage.getItem('token');
-    const cidStr = await AsyncStorage.getItem('coupleId');
-    const uidStr = await AsyncStorage.getItem('userId');
-    setToken(t);
-    setCoupleId(cidStr != null && Number.isFinite(Number(cidStr)) ? Number(cidStr) : null);
-    setUserId(uidStr != null && Number.isFinite(Number(uidStr)) ? Number(uidStr) : null);
-    if (t && (!cidStr || !uidStr)) await fetchMeAndStore();
-  }, [fetchMeAndStore]);
-
-  useEffect(() => { hydrate(); }, [hydrate]);
-
-  useFocusEffect(
-    useCallback(() => {
-      let active = true;
-      (async () => { if (active) await hydrate(); })();
-      return () => { active = false; };
-    }, [hydrate])
-  );
-
-  // userId/coupleId 확보
-  const ensureIdsReady = useCallback(async () => {
-    if (!token) throw new Error('토큰 없음');
-    let uid = userId, cid = coupleId;
-    if (!uid || !cid) {
-      await fetchMeAndStore();
-      const [uidStr, cidStr] = await Promise.all([
-        AsyncStorage.getItem('userId'),
-        AsyncStorage.getItem('coupleId'),
-      ]);
-      uid = uid ?? (uidStr ? Number(uidStr) : null);
-      cid = cid ?? (cidStr ? Number(cidStr) : null);
-    }
-    if (!uid || !cid) throw new Error('유저/커플 식별자 준비 실패');
-    return { uid, cid };
-  }, [token, userId, coupleId, fetchMeAndStore]);
 
   // ===== 앨범 저장 =====
   const saveToAlbum = async () => {
@@ -214,11 +140,22 @@ export default function ShareScreen() {
   // ===== 전송 =====
   const sendToPartner = async () => {
     if (!photoUri || sending) return;
+    
+    // ✅ 토큰은 스토리지에서 직접 가져오고, ID는 Context값 사용
+    const token = await AsyncStorage.getItem('token');
     if (!token) { Alert.alert('오류','로그인 정보가 없습니다. 다시 로그인해 주세요.'); return; }
+    
+    // ✅ Context 정보 확인
+    if (!userId || !coupleId) {
+      Alert.alert('정보 부족', '사용자 또는 커플 정보를 불러오지 못했습니다. 앱을 다시 실행해주세요.');
+      console.log('[Share Error] Missing Info:', { userId, coupleId });
+      return;
+    }
 
     setSending(true);
     try {
-      const { uid, cid } = await ensureIdsReady();
+      const uid = userId;
+      const cid = coupleId;
 
       // 1) 리사이즈 (업로드/저장 공통 소스)
       let uploadUri = photoUri;
@@ -272,7 +209,7 @@ export default function ShareScreen() {
         },
       });
       const listRaw = await listRes.text();
-      console.log('[PHOTO LIST] status =', listRes.status, 'raw =', listRaw.slice(0, 200));
+      // console.log('[PHOTO LIST] status =', listRes.status, 'raw =', listRaw.slice(0, 200));
       if (!listRes.ok) throw new Error(`photo list HTTP ${listRes.status}`);
 
       let listJson: any[] = [];
@@ -296,9 +233,10 @@ export default function ShareScreen() {
 
       // 필터 결과가 없거나 미션이 없는 경우 → id 가장 큰 항목
       if (!photoUrlPresigned) {
-        if (listJson.length > 0) {
-          let latest = listJson[0];
-          for (const it of listJson) { if (it?.id > latest?.id) latest = it; }
+        const rawList = Array.isArray(listJson) ? listJson : (listJson as any).items || [];
+        if (rawList.length > 0) {
+          let latest = rawList[0];
+          for (const it of rawList) { if (it?.id > latest?.id) latest = it; }
           photoUrlPresigned =
             typeof latest?.presignedUrl === 'string' ? latest.presignedUrl : null;
         }
@@ -310,7 +248,7 @@ export default function ShareScreen() {
 
       // ---- 여기서부터 미션 여부에 따라 분기 ----
       if (missionId) {
-        // 🔸 미션 완료 API는 application/json {"file":"string"} 형식
+        // 🔸 미션 완료 API
         const mid = Number(missionId);
         const completeUrl = `${BASE_URL}/api/couples/missions/${mid}/complete-v2`;
 
@@ -335,34 +273,18 @@ export default function ShareScreen() {
         if (!compRes.ok) throw new Error(`mission complete ${compRes.status}: ${compText}`);
 
         // (옵션) STOMP로 채팅 전송
-        console.log('[STOMP GUARD(mission)]', {
-          SEND_CHAT_IMAGE_AFTER_COMPLETE,
-          hasPresigned: !!photoUrlPresigned,
-          userId: uid,
-          coupleId: cid,
-          token: !!token,
-        });
-
         if (SEND_CHAT_IMAGE_AFTER_COMPLETE && photoUrlPresigned && uid) {
           const imageUrlForStomp = USE_PRESIGNED_FOR_STOMP
             ? photoUrlPresigned
             : (toRawUrl(photoUrlPresigned) || photoUrlPresigned);
 
-          console.log('[STOMP SEND PREPARED(mission)]', {
-            roomId: String(cid),
-            senderId: uid,
-            usingPresigned: USE_PRESIGNED_FOR_STOMP,
-            imageUrlLen: imageUrlForStomp?.length,
-          });
-
           try {
-            const ok = await sendChatImageViaStomp({
+            await sendChatImageViaStomp({
               token,
               roomId: String(cid),
               senderId: uid,
               imageUrl: imageUrlForStomp!,
             });
-            console.log('[CHAT IMAGE SEND] (mission) via STOMP =', ok);
           } catch (e) {
             console.warn('[CHAT IMAGE SEND] (mission) STOMP error', (e as any)?.message);
           }
@@ -381,34 +303,18 @@ export default function ShareScreen() {
         });
       } else {
         // 🔹 일반 사진 전송: presigned를 STOMP로만 보내고 채팅으로 이동
-        console.log('[STOMP GUARD(no mission)]', {
-          SEND_CHAT_IMAGE_AFTER_COMPLETE,
-          hasPresigned: !!photoUrlPresigned,
-          userId: uid,
-          coupleId: cid,
-          token: !!token,
-        });
-
         if (SEND_CHAT_IMAGE_AFTER_COMPLETE && photoUrlPresigned && uid) {
           const imageUrlForStomp = USE_PRESIGNED_FOR_STOMP
             ? photoUrlPresigned
             : (toRawUrl(photoUrlPresigned) || photoUrlPresigned);
 
-          console.log('[STOMP SEND PREPARED(no mission)]', {
-            roomId: String(cid),
-            senderId: uid,
-            usingPresigned: USE_PRESIGNED_FOR_STOMP,
-            imageUrlLen: imageUrlForStomp?.length,
-          });
-
           try {
-            const ok = await sendChatImageViaStomp({
+            await sendChatImageViaStomp({
               token,
               roomId: String(cid),
               senderId: uid,
               imageUrl: imageUrlForStomp!,
             });
-            console.log('[CHAT IMAGE SEND] (no mission) via STOMP =', ok);
           } catch (e) {
             console.warn('[CHAT IMAGE SEND] (no mission) STOMP error', (e as any)?.message);
           }
@@ -440,15 +346,19 @@ export default function ShareScreen() {
     <View style={styles.wrap}>
       <AppText style={styles.title}>{missionLabel}</AppText>
 
-      <Image source={{ uri: photoUri }} style={styles.image} resizeMode="cover" />
+      <Image source={{ uri: photoUri }} style={styles.image} resizeMode="contain" />
 
       <View style={styles.bottomActions}>
         <Pressable
           style={styles.sendBtn}
           onPress={sendToPartner}
-          disabled={sending || !token || !coupleId || !userId}
+          disabled={sending || !coupleId || !userId} // ID 없으면 비활성화
         >
-          <Ionicons name="paper-plane" size={32} color={sending ? '#FF9191' : '#FF9191'} />
+          {sending ? (
+             <ActivityIndicator color="#FF9191" />
+          ) : (
+             <Ionicons name="paper-plane" size={32} color={sending ? '#FF9191' : '#FF9191'} />
+          )}
         </Pressable>
         <Pressable style={styles.saveBtn} onPress={saveToAlbum} disabled={saving || sending}>
           <Ionicons name="download-outline" size={24} color="#FF9191" />
@@ -461,12 +371,12 @@ export default function ShareScreen() {
 const styles = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: '#FFFCF5', paddingHorizontal: 16, paddingTop: 24 },
   title: { color: '#3279FF', fontSize: 12, marginTop: 10, marginBottom: 12, textAlign: 'center' },
-  image: { width: '100%', aspectRatio: 3 / 4, borderRadius: 16, backgroundColor: '#e5e7eb' },
+  image: { width: '100%', flex: 1, borderRadius: 16, backgroundColor: '#000', marginBottom: 100 },
   bottomActions: {
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 28,
+    bottom: 40,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
@@ -489,7 +399,6 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    // backgroundColor: '#fdeaea',
     alignItems: 'center',
     justifyContent: 'center',
   },

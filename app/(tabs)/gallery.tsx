@@ -1,7 +1,7 @@
-// app/(tabs)/gallery.tsx
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { format, parseISO } from 'date-fns';
+// ✅ [수정] addHours 추가 (시간 보정용)
+import { addHours, format, parseISO } from 'date-fns';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
 import { router, useFocusEffect } from 'expo-router';
@@ -20,7 +20,6 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppText from '../../components/AppText';
-// ✅ [수정] Context 사용
 import { useUser } from '../context/UserContext';
 
 const BASE_URL = 'https://mumuri.shop';
@@ -62,13 +61,11 @@ function normalizePhoto(raw: any): Photo | null {
 export default function GalleryScreen() {
   const insets = useSafeAreaInsets();
   
-  // ✅ [수정] Context에서 coupleId 가져오기
   const { userData } = useUser();
   const coupleId = userData?.coupleId || null;
 
   const [loading, setLoading] = useState(true);
   const [photos, setPhotos] = useState<Photo[]>([]);
-  // const [coupleId, setCoupleId] = useState<number | null>(null); // 삭제됨
   const [refreshing, setRefreshing] = useState(false);
 
   // 뷰어 관련 상태
@@ -79,14 +76,12 @@ export default function GalleryScreen() {
   // --- 데이터 로드 ---
   const loadPhotos = useCallback(async () => {
     try {
-      // 1. 토큰 및 coupleId 확인 (Context 값 사용)
       const token = await AsyncStorage.getItem('token');
       
       console.log('============== [Gallery Debug] ==============');
       console.log('🔑 현재 토큰:', token ? `${token.slice(0, 10)}...` : '없음');
       console.log('❤️ 현재 커플ID:', coupleId);
 
-      // coupleId가 없으면 로드 중단
       if (!token || !coupleId) {
         console.log('❌ 토큰이나 커플ID가 없어서 초기화합니다.');
         setPhotos([]);
@@ -94,7 +89,6 @@ export default function GalleryScreen() {
         return;
       }
 
-      // 2. 서버 요청
       const url = `${BASE_URL}/photo/${coupleId}/all`;
       console.log('🚀 요청 URL:', url);
 
@@ -131,9 +125,8 @@ export default function GalleryScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [coupleId]); // ✅ coupleId 변경 시 함수 재생성
+  }, [coupleId]); 
 
-  // 화면 포커스 될 때마다 실행
   useFocusEffect(
     useCallback(() => {
       loadPhotos();
@@ -249,9 +242,13 @@ export default function GalleryScreen() {
               <Ionicons name="close" size={28} color="#FFF" />
             </Pressable>
             
+            {/* ✅ [수정] 한국 시간(UTC+9) 보정하여 날짜 표시 */}
             {selectedPhotoIndex !== null && (
               <AppText style={styles.viewerDate}>
-                {format(parseISO(photos[selectedPhotoIndex].createdAt), 'yyyy. MM. dd')}
+                {format(
+                  addHours(parseISO(photos[selectedPhotoIndex].createdAt), 9), 
+                  'yyyy. MM. dd'
+                )}
               </AppText>
             )}
 

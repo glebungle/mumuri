@@ -131,7 +131,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
           myDone: false,
           myCompletedAt: null
         }));
-        
+        console.log('[미션 확인용]', JSON.stringify(mappedMissions, null, 2));
         console.log(`🔄 [UserContext] 미션 ${mappedMissions.length}개 로드됨`);
         setTodayMissions(mappedMissions);
       } else {
