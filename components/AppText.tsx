@@ -3,7 +3,7 @@ import { StyleSheet, Text, TextProps } from 'react-native';
 
 interface AppTextProps extends TextProps {
     // 💡 기본값을 'bold'로 지정
-    type?: 'bold' | 'medium' | 'regular'|'semibold'|'extrabold'|'light'|'extralight'|'thin'|'pretendard-r'|'pretendard-m'|'pretendard-b'; 
+    type?: 'bold' | 'medium' | 'regular'|'semibold'|'extrabold'|'light'|'extralight'|'thin'|'pretendard-r'|'pretendard-m'|'pretendard-s'|'pretendard-b'; 
 }
 
 // 🚨 type의 기본값을 'bold'로 설정합니다.
@@ -40,6 +40,9 @@ const AppText: React.FC<AppTextProps> = ({ type = 'bold', style, children, ...re
             break;
         case 'pretendard-m':
             fontFamilyName = 'Pretendard-Medium';
+            break;
+        case 'pretendard-s':
+            fontFamilyName = 'Pretendard-SemiBold';
             break;
         case 'pretendard-b':
             fontFamilyName = 'Pretendard-Bold';
