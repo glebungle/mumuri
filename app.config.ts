@@ -32,7 +32,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: 'mumuri.test',
-    googleServicesFile: './google-services.json', // ✅ [필수] Firebase 설정 파일 경로
+    // googleServicesFile: './google-services.json', // ✅ [필수] Firebase 설정 파일 경로
     adaptiveIcon: {
       foregroundImage: './assets/images/logo.png',
       backgroundColor: '#FFFCF5',
@@ -69,15 +69,15 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         },
       },
     ],
-    // ✅ [추가] 푸시 알림 플러그인 설정
-    [
-      'expo-notifications',
-      {
-        icon: './assets/images/logo.png', // 알림바 아이콘 (투명 배경의 단색 아이콘 권장)
-        color: '#FFFCF5', // 알림 아이콘 색상
-        sounds: [], // 커스텀 사운드 필요 시 경로 추가
-      },
-    ],
+    // // ✅ [추가] 푸시 알림 플러그인 설정
+    // [
+    //   'expo-notifications',
+    //   {
+    //     icon: './assets/images/logo.png', // 알림바 아이콘 (투명 배경의 단색 아이콘 권장)
+    //     color: '#FFFCF5', // 알림 아이콘 색상
+    //     sounds: [], // 커스텀 사운드 필요 시 경로 추가
+    //   },
+    // ],
     [
       '@react-native-kakao/core',
       {
