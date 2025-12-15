@@ -277,13 +277,13 @@ export default function HomeScreen() {
               ]}
               onPress={handlePressCalendar}
             >
-              <AppText style={styles.cardLabelWhite}>캘린더</AppText>
               <Ionicons
                 name="calendar"
                 size={32}
                 color="rgba(255,255,255,0.8)"
                 style={styles.cardIcon}
               />
+              <AppText style={styles.cardLabelWhite}>캘린더</AppText>
             </Pressable>
 
             <Pressable
@@ -295,13 +295,13 @@ export default function HomeScreen() {
               ]}
               onPress={handlePressChat}
             >
-              <AppText style={styles.cardLabelBlack}>채팅</AppText>
               <Ionicons
                 name="chatbubble-ellipses"
                 size={32}
                 color="#4A4A4A"
                 style={styles.cardIcon}
               />
+              <AppText style={styles.cardLabelBlack}>채팅</AppText>
             </Pressable>
           </View>
         </View>

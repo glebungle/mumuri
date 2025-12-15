@@ -1,11 +1,10 @@
 // app/share.tsx
-import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as MediaLibrary from 'expo-media-library';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, View } from 'react-native'; // ActivityIndicator 추가
+import { Alert, Image, Pressable, StyleSheet, View } from 'react-native'; // ActivityIndicator 추가
 import AppText from '../components/AppText';
 import { ChatIncoming, ChatReadUpdate, createChatClient } from './lib/chatSocket';
 // ✅ [수정] Context 사용
@@ -13,6 +12,8 @@ import { useUser } from './context/UserContext';
 
 const BASE_URL = 'https://mumuri.shop';
 const WS_URL   = `${BASE_URL}/ws-chat`;
+const sendImg = require('../assets/images/Send.png');
+const downloadImg = require('../assets/images/Download.png');
 
 // 미션 완료 후 채팅에도 실제 "이미지 메시지"를 남길지
 const SEND_CHAT_IMAGE_AFTER_COMPLETE = true;
@@ -345,8 +346,9 @@ export default function ShareScreen() {
   return (
     <View style={styles.wrap}>
       <AppText style={styles.title}>{missionLabel}</AppText>
-
-      <Image source={{ uri: photoUri }} style={styles.image} resizeMode="contain" />
+      <View style={styles.imageContainer}>
+        <Image source={{ uri: photoUri }} style={styles.image} resizeMode="contain" />
+      </View>
 
       <View style={styles.bottomActions}>
         <Pressable
@@ -354,14 +356,19 @@ export default function ShareScreen() {
           onPress={sendToPartner}
           disabled={sending || !coupleId || !userId} // ID 없으면 비활성화
         >
-          {sending ? (
-             <ActivityIndicator color="#FF9191" />
-          ) : (
-             <Ionicons name="paper-plane" size={32} color={sending ? '#FF9191' : '#FF9191'} />
-          )}
+            <Image 
+            source={sendImg} 
+            style={styles.sendImage} 
+            resizeMode="cover"
+          />
         </Pressable>
         <Pressable style={styles.saveBtn} onPress={saveToAlbum} disabled={saving || sending}>
-          <Ionicons name="download-outline" size={24} color="#FF9191" />
+          {/* <Ionicons name="download-outline" size={24} color="#FF9191" /> */}
+          <Image 
+            source={downloadImg} 
+            style={styles.downloadImage} 
+            resizeMode="cover"
+          />
         </Pressable>
       </View>
     </View>
@@ -370,8 +377,18 @@ export default function ShareScreen() {
 
 const styles = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: '#FFFCF5', paddingHorizontal: 16, paddingTop: 24 },
-  title: { color: '#3279FF', fontSize: 12, marginTop: 10, marginBottom: 12, textAlign: 'center' },
-  image: { width: '100%', flex: 1, borderRadius: 16, backgroundColor: '#000', marginBottom: 100 },
+  title: { color: '#3279FF', fontSize: 12, marginTop: '5%', marginBottom: 12, textAlign: 'center' },
+  imageContainer: {
+    width: '100%',
+    height: '75.8%',
+    borderRadius: 16,  
+    overflow: 'hidden',   
+    backgroundColor: '#000',
+  },
+  image: { 
+    width: '100%', 
+    height: '100%', 
+  },
   bottomActions: {
     position: 'absolute',
     left: 0,
@@ -388,10 +405,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#1A1A1A',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
+    marginBottom:'5%'
   },
   saveBtn: {
     position: 'absolute',
@@ -401,6 +415,7 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom:'5%'
   },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   backBtn: {
@@ -409,5 +424,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 8,
+  },
+  sendImage: {
+    width: 40,
+    height: 40,
+  },
+  downloadImage: {
+    width: 32,
+    height: 32,
   },
 });

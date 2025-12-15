@@ -20,9 +20,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppText from '../components/AppText';
-import { ChatIncoming, ChatReadUpdate, createChatClient } from './lib/chatSocket';
-// ✅ [수정] Hook은 컴포넌트 내부에서만 사용해야 하므로 여기서 호출하던 코드를 제거했습니다.
 import { useUser } from './context/UserContext';
+import { ChatIncoming, ChatReadUpdate, createChatClient } from './lib/chatSocket';
 
 const ChatText = (props: React.ComponentProps<typeof AppText>) => {
   const { style, ...rest } = props;
@@ -42,6 +41,7 @@ const MAX_TEXT_LEN = 500;
 const HEADER_HEIGHT = 56;
 
 const USE_STOMP = true;
+const cameraImg = require('../assets/images/Camera.png');
 
 // ================== 내부 유틸(API) ==================
 const CHAT_CACHE_KEY = (roomId: string) => `chat_cache_${roomId}`;
@@ -270,10 +270,8 @@ export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const accessoryID = 'chat-input-accessory';
   
-  // ✅ [수정] 컴포넌트 내부에서 Context 사용
   const { userData } = useUser();
 
-  // ✅ [수정] Context 데이터에서 ID 추출 (타입 안전성 고려)
   const userId = userData?.userId || null;
   const ROOM_KEY = userData?.roomId ? String(userData.roomId) : null;
 
@@ -410,8 +408,6 @@ export default function ChatScreen() {
       return newMessages;
     });
   }, [userId, ROOM_KEY]);
-
-  // ✅ onIncoming 핸들러의 최신 상태를 Ref로 관리
   const onIncomingRef = useRef(onIncoming);
   useEffect(() => {
     onIncomingRef.current = onIncoming;
@@ -420,7 +416,6 @@ export default function ChatScreen() {
   useFocusEffect(
     useCallback(() => {
       // 1. 포커스 얻었을 때 (Mount/Focus)
-      // ✅ [중요] 모든 필수 데이터가 준비되어야 연결
       if (!USE_STOMP || !token || !ROOM_KEY || !userId) {
         // 데이터가 아직 없으면 대기 (Context 로드 시 재실행됨)
         return;
@@ -433,7 +428,6 @@ export default function ChatScreen() {
         token,
         roomId: ROOM_KEY,
         handlers: {
-          // ✅ Ref를 통해 최신 핸들러 호출
           onMessage: (p) => onIncomingRef.current(p),
           onReadUpdate: (_u: ChatReadUpdate) => { },
           onConnected: () => {
@@ -940,9 +934,13 @@ export default function ChatScreen() {
           <Ionicons name="chevron-back" size={24} color="#111" />
         </Pressable>
         <AppText style={styles.headerTitle}>애인</AppText>
-        <Pressable onPress={() => router.push('/camera')} style={{ paddingHorizontal: 8 }}>
-          <Ionicons name="camera-outline" size={24} color="#111" />
-        </Pressable>
+        {/* <Pressable onPress={() => router.push('/camera')} style={{ paddingHorizontal: 8 }}>
+          <Image 
+                source={cameraImg} 
+                style={styles.cameraImage} 
+                resizeMode="contain"
+              />
+        </Pressable> */}
       </View>
 
       <FlatList<ChatMessage | DateMarker>
@@ -963,6 +961,13 @@ export default function ChatScreen() {
             style={[styles.inputBar, { paddingBottom: 8 + insets.bottom }]}
             onLayout={(e) => setInputBarHeight(e.nativeEvent.layout.height)}
           >
+          <Pressable onPress={() => router.push('/camera')} style={{ paddingHorizontal: 8 }}>
+            <Image 
+                source={cameraImg} 
+                style={styles.cameraImage} 
+                resizeMode="contain"
+              />
+          </Pressable>
             <TextInput
               style={[styles.input, { fontFamily: 'Pretendard-Bold' }]}
               placeholder="대화를 입력하세요"
@@ -984,6 +989,13 @@ export default function ChatScreen() {
           ]}
           onLayout={(e) => setInputBarHeight(e.nativeEvent.layout.height)}
         >
+        <Pressable onPress={() => router.push('/camera')} style={{ paddingHorizontal: 8 }}>
+          <Image 
+                source={cameraImg} 
+                style={styles.cameraImage} 
+                resizeMode="contain"
+              />
+        </Pressable>
           <TextInput
             style={[styles.input, { fontFamily: 'Pretendard-Medium' }]}
             placeholder="대화를 입력하세요"
@@ -1009,9 +1021,10 @@ const styles = StyleSheet.create({
     height: HEADER_HEIGHT,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 6,
-    justifyContent: 'space-between', 
+    paddingHorizontal: 10,
+    justifyContent: 'flex-start', 
     marginVertical: 25,
+    gap:'37%'
   },
   headerTitle: { fontSize: 16, color: '#111' },
 
@@ -1112,5 +1125,11 @@ const styles = StyleSheet.create({
     width: 40, height: 40, borderRadius: 20,
     alignItems: 'center', justifyContent: 'center',
     backgroundColor: '#EEEFEF',
+  },
+  cameraImage: {
+    width: 24,
+    height: 24,
+    tintColor: '#757575', 
+    marginBottom:10
   },
 });
