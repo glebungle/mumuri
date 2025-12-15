@@ -10,7 +10,6 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppText from '../../components/AppText';
 
-// AppText를 애니메이션 가능하게
 const AnimatedAppText = Animated.createAnimatedComponent(AppText);
 
 export default function OnboardingDetail2() {
@@ -88,14 +87,14 @@ export default function OnboardingDetail2() {
       }).start();
     }, 1000);
 
-    // 그로부터 2초 뒤(총 3초 경과) bubble2 등장
+    // bubble2 등장
     const t2 = setTimeout(() => {
       Animated.timing(bubble2Opacity, {
         toValue: 1,
         duration: 600,
         useNativeDriver: true,
       }).start();
-    }, 3000);
+    }, 1500);
 
     return () => {
       clearTimeout(t1);
@@ -203,13 +202,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   bubble1: {
-    width: 200,
-    height: 200,
+    left: '13%',
+    width: 173,
+    height: 168,
   },
   bubble2: {
-    width: 230,
-    height: 230,
-    marginTop: 50,
+    right: '5%',
+    width: 243,
+    height: 157,
+    marginTop: 0,
   },
 
   textBox: {

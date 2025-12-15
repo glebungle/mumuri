@@ -1,11 +1,10 @@
+// app/onboarding/detail.tsx
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
+import { Animated, Image, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppText from '../../components/AppText';
-// 'Image'를 중괄호 안에 추가해주세요
-import { Animated, Image, Pressable, StyleSheet, View } from 'react-native';
 
-// 이미지 경로를 실제 프로젝트에 맞게 수정해주세요.
 const onboardingImg = require('../../assets/images/onboarding.png');
 const onboardingWinkImg = require('../../assets/images/onboarding_wink.png');
 const onboardingBgImg = require('../../assets/images/onboardingbg.png');

@@ -26,6 +26,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppText from '../components/AppText';
 import { useUser } from './context/UserContext';
 
+const clockImg = require('../assets/images/Clock.png');
+const heartImg = require('../assets/images/Heart.png');
+
 // Android 애니메이션 설정
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental && !(global as any)?.nativeFabricUIManager) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -281,7 +284,7 @@ const AddScheduleModal = ({ visible, onClose, onSave, selectedDate }: any) => {
 
           <View style={styles.timeSection}>
              <View style={styles.timeRow}>
-                <Ionicons name="time-outline" size={20} color="#CCC" style={{marginRight: 8}} />
+              <Image source={clockImg} style={[styles.clockImage]} />
                 <View style={styles.timeInputContainer}>
                     <AppText type='semibold' style={styles.timeDateText}>{formattedDate}</AppText>
                     {!isAllDay && (
@@ -297,7 +300,7 @@ const AddScheduleModal = ({ visible, onClose, onSave, selectedDate }: any) => {
              <View style={styles.timeConnector} />
 
              <View style={styles.timeRow}>
-                <View style={{width: 28}} /> 
+                <Image source={clockImg} style={[styles.clockImage]} /> 
                 <View style={styles.timeInputContainer}>
                     <AppText type='semibold' style={styles.timeDateText}>{formattedDate}</AppText>
                     {!isAllDay && (
@@ -324,7 +327,8 @@ const AddScheduleModal = ({ visible, onClose, onSave, selectedDate }: any) => {
 
           <View style={styles.toggleRow}>
             <View style={{flexDirection:'row', alignItems:'center', gap: 6}}>
-                <Ionicons name="heart-outline" size={18} color="#CCC" />
+                {/* <Ionicons name="heart-outline" size={18} color="#CCC" /> */}
+                <Image source={heartImg} style={[styles.heartImage]} />
                 <AppText type='semibold' style={styles.modalLabel}>커플 일정으로 등록</AppText>
             </View>
             <Pressable onPress={() => setIsCouple(!isCouple)} style={styles.checkboxArea}>
@@ -463,6 +467,11 @@ export default function CalendarScreen() {
   const changeMonth = (direction: 'prev' | 'next') => {
     const newDate = direction === 'prev' ? subMonths(parseISO(currentMonth), 1) : addMonths(parseISO(currentMonth), 1);
     setCurrentMonth(format(newDate, 'yyyy-MM-01'));
+    
+    // 월 변경 시 선택 상태 초기화
+    setSelectedDate('');
+    setSelectedPhotos([]);
+    setSelectedSchedules([]);
   };
 
   const handleAddSchedule = async (input: any) => {
@@ -649,7 +658,10 @@ export default function CalendarScreen() {
         {calendarMode === 'SCHEDULE' && (
             <>
                 <View style={styles.scheduleHeader}>
-                    <AppText style={{color:'#FFF', fontSize:14}}>{selectedDate}</AppText>
+                    {/* [수정됨] selectedDate가 비어있으면 format 실행 안함 */}
+                    <AppText style={{color:'#FFF', fontSize:14}}>
+                        {selectedDate ? format(parseISO(selectedDate), 'yyyy. MM. dd.') : ''}
+                    </AppText>
                 </View>
                 <FlatList 
                     data={selectedSchedules}
@@ -663,7 +675,6 @@ export default function CalendarScreen() {
                         const timeStr = item.allDay ? '하루 종일' : format(parseISO(item.startAt), 'HH:mm');
 
                         return (
-                            // 🟢 [수정 2] 삭제 버튼(X)으로 변경
                             <View style={[styles.scheduleItem, { backgroundColor: barColor }]}>
                                 <View style={styles.scheduleTimeBox}>
                                     <AppText type="bold" style={styles.scheduleTimeText}>{timeStr}</AppText>
@@ -685,7 +696,6 @@ export default function CalendarScreen() {
                     }
                 />
                 
-                {/* 🟢 [수정 3] FAB 버튼 위치 조정 */}
                 <Pressable style={[styles.fabBtn, { bottom: insets.bottom + 30 }]} onPress={() => setAddModalVisible(true)}>
                     <Ionicons name="add" size={32} color="#1C1C1E" />
                 </Pressable>
@@ -770,9 +780,9 @@ const styles = StyleSheet.create({
   timeInputContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flex: 1 },
   timeDateText: { color: '#FFF', fontSize: 14 },
   timeInputBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#3A3A3C', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
-  timeInput: { color: '#FFF', fontSize: 18, width: 28, textAlign: 'center' },
+  timeInput: { color: '#FFF', fontSize: 18, width: 35, textAlign: 'center' },
   timeColon: { color: '#FFF', fontSize: 18, marginHorizontal: 2 },
-  timeConnector: { width: 1, height: 12, backgroundColor: '#555', marginLeft: 9, marginVertical: 2 },
+  timeConnector: { width: 2, height: 20, backgroundColor: '#fff', marginLeft: 9, marginVertical: 2 },
   toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 12 },
   modalLabel: { color: '#FFF', fontSize: 13 },
   checkboxArea: { padding: 4 },
@@ -780,4 +790,15 @@ const styles = StyleSheet.create({
   checkboxChecked: { backgroundColor: '#FFF' },
   saveButton: { backgroundColor: '#FFF', borderRadius: 30, paddingVertical: 16, alignItems: 'center' },
   saveButtonText: { color: '#000', fontSize: 16 },
+  heartImage: {
+    width: 20,
+    height: 20,
+    tintColor: '#fff',
+  },
+  clockImage: {
+    width: 20,
+    height: 20,
+    tintColor: '#fff',
+    marginRight:4
+  }
 });

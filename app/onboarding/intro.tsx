@@ -25,7 +25,7 @@ const LINES = [
 export default function OnboardingIntro() {
   const router = useRouter();
   const { width } = useWindowDimensions();
-  const contentWidth = Math.min(width - 56, 420); // 가운데 들어갈 실제 폭
+  const contentWidth = Math.min(width - 10, 420); // 가운데 들어갈 실제 폭
   const [activeIdx, setActiveIdx] = useState(0);
 
   const lineScales = useRef(
@@ -92,7 +92,7 @@ export default function OnboardingIntro() {
     const isPast = idx < activeIdx;
     const isCurrent = idx === activeIdx;
     const isLast = idx === LINES.length - 1;
-    const baseFontSize = isPast ? 15 : isLast ? 20 : 16;
+    const baseFontSize = isPast ? 12 : isLast ? 18 : 13;
 
     if (isPast) {
       const plain = parts
