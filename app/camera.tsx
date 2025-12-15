@@ -163,13 +163,32 @@ export default function CameraHome() {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
-        aspect: [3, 4],
+        aspect: [screenWidth, screenHeight * 0.8],
         quality: 1,
       });
+
       if (!result.canceled && result.assets[0]) {
-        setIsLayoutMode(false); setLayoutPhotos([]); setPreviewUri(result.assets[0].uri);
+        const selectedUri = result.assets[0].uri;
+
+        // [수정 2] 레이아웃 모드일 경우 갤러리 사진을 슬롯에 추가
+        if (isLayoutMode) {
+          const newLayout = [...layoutPhotos, selectedUri];
+          setLayoutPhotos(newLayout);
+          
+          // 4장이 꽉 차면 미리보기(병합 대기) 상태로 전환
+          if (newLayout.length === 4) {
+            setPreviewUri('PENDING_MERGE');
+          }
+        } else {
+          // 일반 모드일 경우 기존 로직 유지 (한 장만 선택 및 즉시 미리보기)
+          setIsLayoutMode(false);
+          setLayoutPhotos([]);
+          setPreviewUri(selectedUri);
+        }
       }
-    } catch { Alert.alert('오류', '갤러리 접근 실패'); }
+    } catch {
+      Alert.alert('오류', '갤러리 접근 실패');
+    }
   };
 
   const toggleCameraFacing = () => setFacing((prev) => (prev === 'back' ? 'front' : 'back'));

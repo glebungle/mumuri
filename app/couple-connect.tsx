@@ -223,7 +223,7 @@ export default function CoupleConnectScreen() {
             value={partnerCode}
             onChangeText={setPartnerCode}
             autoCapitalize="characters"
-            style={[styles.input,{ fontFamily: 'Pretendard-Medium', fontSize: 12, color: '#4D5053' }]}
+            style={[styles.input,{ fontFamily: 'Paperlogy-7Bold', fontSize: 12, color: '#4D5053' }]}
           />
 
           <Pressable 

@@ -117,6 +117,17 @@ const InputField = React.memo(({
 
 const HOBBIES = ['운동/스포츠', '예술/창작', '문화생활', '게임/오락', '여행/탐험', '맛집/카페', '집콕/힐링', '학습/자기계발'];
 const DATE_STYLES = ['활동적인', '문화/감성', '미식/카페', '휴식/힐링', '체험/창작', '홈데이트', '여행/탐험'];
+// ✅ [추가] 사랑의 언어 데이터
+const LOVE_LANGUAGES = [
+  '"사랑해", "보고싶어" 등 말로 표현해줄 때',
+  '안아주고 스킨십 해줄 때',
+  '깜짝 선물이나 이벤트 해줄 때',
+  '함께 시간 내서 데이트 할 때',
+  '집안일, 심부름 등 도움을 줄 때',
+  '관심 갖고 내 이야기 들어줄 때',
+  '응원하고 칭찬해줄 때',
+  '작은 것도 기억하고 챙겨줄 때'
+];
 
 // ===================== Signup =====================
 export default function Signup() {
@@ -132,6 +143,8 @@ export default function Signup() {
 
   const [selectedHobbies, setSelectedHobbies] = useState<string[]>([]);
   const [selectedDateStyles, setSelectedDateStyles] = useState<string[]>([]);
+  // ✅ [추가] 사랑의 언어 선택 상태
+  const [selectedLoveLanguages, setSelectedLoveLanguages] = useState<string[]>([]);
 
   const myCode = useMemo(() => Math.random().toString(36).slice(2, 10), []);
 
@@ -150,11 +163,11 @@ export default function Signup() {
       case 'name':        return values.name.trim().length >= 1;
       case 'birthday':    return isDate(values.birthday);
       case 'anniversary': return isDate(values.anniversary);
-      case 'preferences': return selectedHobbies.length > 0 && selectedDateStyles.length > 0;
-      // [수정] 다시 입력값이 있어야만 버튼이 활성화되도록 변경
+      // ✅ [수정] 3가지 설문 모두 최소 1개 이상 선택해야 함
+      case 'preferences': return selectedHobbies.length > 0 && selectedDateStyles.length > 0 && selectedLoveLanguages.length > 0;
       case 'partnerCode': return values.partnerCode.trim().length > 0;
     }
-  }, [current.key, values, selectedHobbies, selectedDateStyles]);
+  }, [current.key, values, selectedHobbies, selectedDateStyles, selectedLoveLanguages]);
 
   const progressPercent = ((step + 1) / steps.length) * 100;
   const progressAnim = useRef(new Animated.Value(progressPercent)).current;
@@ -175,11 +188,9 @@ export default function Signup() {
     }
   };
 
-  // ✅ [추가] 건너뛰기 전용 핸들러
   const onSkip = useCallback(async () => {
     try {
       console.log('⏭ [onSkip] 커플 연결 건너뜀');
-      // 백엔드에서 자동 매칭되었을 수도 있으니 확인 차원에서만 호출 (실패해도 무관)
       try {
         const me: any = await authedFetch('/user/getuser', { method: 'GET' });
         const fallbackCid = me?.coupleId ?? me?.couple_id ?? null;
@@ -234,12 +245,12 @@ export default function Signup() {
 
       } else if (current.key === 'preferences') {
         console.log('👉 [onNext] Preferences Saved');
+        // 추후 API 연동 시 selectedLoveLanguages 도 함께 전송
 
       } else if (current.key === 'partnerCode') {
         const code = values.partnerCode.trim();
         console.log('👉 [onNext] PartnerCode:', code); 
 
-        // 여기서는 코드가 있을 때만 실행됨 (canNext 덕분)
         const resp: any = await postCouple(code);
         console.log('✅ [postCouple] Response:', resp); 
 
@@ -270,7 +281,7 @@ export default function Signup() {
     } finally {
       setIsPosting(false);
     }
-  }, [canNext, isPosting, current.key, values, step, steps.length, selectedHobbies, selectedDateStyles]);
+  }, [canNext, isPosting, current.key, values, step, steps.length, selectedHobbies, selectedDateStyles, selectedLoveLanguages]);
 
   const onBack = useCallback(() => {
     if (step === 0) return router.back();
@@ -339,6 +350,24 @@ export default function Signup() {
                     >
                       <AppText type='regular'style={[styles.chipText, isSelected && styles.chipTextSelected]}>
                         {style}
+                      </AppText>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <AppText type="bold" style={[styles.questionTitle, { marginTop: 40 }]}>가장 사랑받는다고 느껴지는 순간은?</AppText>
+              <View style={styles.chipContainer}>
+                {LOVE_LANGUAGES.map((item) => {
+                  const isSelected = selectedLoveLanguages.includes(item);
+                  return (
+                    <TouchableOpacity
+                      key={item}
+                      style={[styles.chip, isSelected && styles.chipSelected, { width: '100%' }]}
+                      onPress={() => toggleSelection(selectedLoveLanguages, setSelectedLoveLanguages, item)}
+                    >
+                      <AppText type='regular' style={[styles.chipText, isSelected && styles.chipTextSelected]}>
+                        {item}
                       </AppText>
                     </TouchableOpacity>
                   );
