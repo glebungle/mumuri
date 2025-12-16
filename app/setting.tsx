@@ -18,30 +18,6 @@ export default function SettingScreen() {
   // 뒤로가기
   const handleBack = () => router.back();
 
-  // // 로그아웃 핸들러
-  // const handleLogout = () => {
-  //   Alert.alert('로그아웃', '정말 로그아웃 하시겠습니까?', [
-  //     { text: '취소', style: 'cancel' },
-  //     { 
-  //       text: '로그아웃', 
-  //       style: 'destructive',
-  //       onPress: async () => {
-  //         // 토큰 삭제 및 로그인 화면 이동 로직
-  //         await AsyncStorage.clear();
-  //         router.replace('/'); 
-  //       }
-  //     }
-  //   ]);
-  // };
-
-  // // // 회원탈퇴 핸들러
-  // const handleWithdraw = () => {
-  //   Alert.alert('회원 탈퇴', '정말 탈퇴하시겠습니까? 모든 데이터가 삭제됩니다.', [
-  //     { text: '취소', style: 'cancel' },
-  //     { text: '탈퇴하기', style: 'destructive', onPress: () => console.log('탈퇴 API 호출') }
-  //   ]);
-  // };
-
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       
@@ -60,12 +36,14 @@ export default function SettingScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <AppText type='semibold' style={styles.sectionTitle}>프로필 관리</AppText>
-            <Ionicons name="chevron-forward" size={20} color="#000" />
+            <Pressable onPress={() => router.push('/profile')}>
+              <Ionicons name="chevron-forward" size={20} color="#000" />
+            </Pressable>
           </View>
           <View style={styles.itemGroup}>
-            {/* <Pressable onPress={() => router.push('/mypage/edit')}> */}
+            <Pressable onPress={() => router.push('/profile')}>
               <AppText type='medium' style={styles.itemText}>마이 프로필</AppText>
-            {/* </Pressable> */}
+            </Pressable>
           </View>
         </View>
 

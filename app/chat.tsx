@@ -432,7 +432,7 @@ export default function ChatScreen() {
     try {
       if (USE_STOMP) chatRef.current?.sendMessage(ROOM_KEY, Number(userId), { message: trimmed, imageUrl: null, clientMsgId, createdAt });
     } catch {
-       setMessages(prev => prev.map(m => m.id === tempId ? ({ ...m, status: 'failed' } as ChatMessage) : m));
+      setMessages(prev => prev.map(m => m.id === tempId ? ({ ...m, status: 'failed' } as ChatMessage) : m));
     } finally { setSending(false); }
   }, [ROOM_KEY, userId, sending, text, scrollToBottom]);
 
@@ -441,42 +441,86 @@ export default function ChatScreen() {
     const missionMsgs: ChatMessage[] = [];
     
     performedMissions.forEach(m => {
+        // 🚨 [핵심 수정] 방금 완료한 미션 ID(로컬 파라미터)와 서버 데이터 ID가 같으면
+        // 서버 데이터는 렌더링하지 않고 건너뜁니다. (로컬 임시 메시지만 보여줌)
+        if (justCompletedMissionId && String(m.missionId) === String(justCompletedMissionId)) {
+            return;
+        }
+
         const baseTs = m.doneAtTs ?? m.missionDateTs;
         const mtId = `mission_text_${m.missionId}`;
-        if (!baseMsgs.some(msg => msg.id === mtId || msg.text === m.title)) {
-            missionMsgs.push({ id: mtId, type: 'mission_text', text: m.title, mine: true, createdAt: baseTs, status: 'sent' });
+        
+        // 1. 미션 텍스트 추가 (이미 로컬에 같은 내용이 있으면 스킵)
+        const hasSameText = baseMsgs.some(msg => 
+            msg.id === mtId || 
+            (msg.type === 'mission_text' && msg.text === m.title)
+        );
+
+        if (!hasSameText) {
+            missionMsgs.push({ 
+                id: mtId, 
+                type: 'mission_text', 
+                text: m.title, 
+                mine: true, 
+                createdAt: baseTs, 
+                status: 'sent' 
+            });
         }
         
+        // 2. 상대방 사진 추가
         if (m.partner && m.partner.url) {
             const pUrl = m.partner.url;
             const pWhen = m.partner.when;
             const mpId = `mission_img_partner_${m.missionId}`;
             if (!baseMsgs.some(msg => msg.id === mpId || msg.imageUrl === pUrl)) {
-                missionMsgs.push({ id: mpId, type: 'image', imageUrl: pUrl, mine: false, createdAt: pWhen??baseTs, status: 'sent' });
+                missionMsgs.push({ 
+                    id: mpId, 
+                    type: 'image', 
+                    imageUrl: pUrl, 
+                    mine: false, 
+                    createdAt: pWhen ?? baseTs, 
+                    status: 'sent' 
+                });
             }
         }
         
+        // 3. 내 사진 추가
         if (m.me && m.me.url) {
             const mUrl = m.me.url;
             const mWhen = m.me.when;
             const mmId = `mission_img_me_${m.missionId}`;
+            // URL이 같거나 ID가 같은 이미지가 이미 리스트에 있다면 추가하지 않음
             if (!baseMsgs.some(msg => msg.id === mmId || msg.imageUrl === mUrl)) {
-                missionMsgs.push({ id: mmId, type: 'image', imageUrl: mUrl, mine: true, createdAt: mWhen??baseTs, status: 'sent' });
+                missionMsgs.push({ 
+                    id: mmId, 
+                    type: 'image', 
+                    imageUrl: mUrl, 
+                    mine: true, 
+                    createdAt: mWhen ?? baseTs, 
+                    status: 'sent' 
+                });
             }
         }
     });
 
+    // 메시지 병합 및 시간순 정렬
     const merged = [...baseMsgs, ...missionMsgs].sort((a, b) => a.createdAt - b.createdAt);
+    
+    // 날짜 마커(--- 2025년 10월... ---) 추가 로직
     const withDate: (ChatMessage | DateMarker)[] = [];
     let lastTs: number | null = null;
+    
     for (const m of merged) {
-        if (lastTs == null || !sameYMD(lastTs, m.createdAt)) withDate.push({ __type: 'date', key: `date_${m.createdAt}`, ts: m.createdAt });
+        if (lastTs == null || !sameYMD(lastTs, m.createdAt)) {
+            withDate.push({ __type: 'date', key: `date_${m.createdAt}`, ts: m.createdAt });
+        }
         withDate.push(m);
         lastTs = m.createdAt;
     }
     
+    // FlatList inverted={true} 이므로 역순 반환
     return withDate.reverse();
-  }, [messages, performedMissions]);
+  }, [messages, performedMissions, justCompletedMissionId]);
 
   const shouldShowTime = useCallback((idx: number) => {
     const cur = listData[idx] as ChatMessage;
@@ -614,5 +658,5 @@ const styles = StyleSheet.create({
   inputBar: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 10, gap: 8, backgroundColor: '#FFFCF5' },
   input: { flex: 1, minHeight: 40, maxHeight: 120, backgroundColor: '#fff', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, borderColor: '#e5e7eb', color: '#111' },
   sendBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: '#EEEFEF' },
-  cameraImage: { width: 24, height: 24, tintColor: '#757575', marginBottom:10 },
+  cameraImage: { width: 24, height: 24, tintColor: '#6198FF', marginBottom:10 },
 });

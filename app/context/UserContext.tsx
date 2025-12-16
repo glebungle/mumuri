@@ -3,24 +3,36 @@ import React, { createContext, useContext, useState } from 'react';
 
 const BASE_URL = 'https://mumuri.shop';
 
-// [1] 홈 메인 데이터 + 유저 ID
+// [1] MainPhoto 타입 정의
+export interface MainPhoto {
+  photoId: number;
+  imageUrl: string;
+  uploaderType: string; // 'ME' | 'PARTNER'
+  uploaderNickname: string;
+  createdAt: string;
+}
+
+// [2] 홈 메인 데이터 타입 수정 (mainPhoto 추가)
 export interface HomeData {
   anniversary: string;
   name: string | null;
-  date: number;
+  date: number; // dDay
   roomId: number;
   userId: number; 
   coupleId: number;
+  missionCompletedCount: number;
+  mainPhoto: MainPhoto | null; 
+  myProfileImageUrl: string | null;
+  partnerProfileImageUrl: string | null;
 }
 
-// [2] 오늘의 미션 데이터
 export interface TodayMission {
   missionId: number;
   title: string;
   description: string | null;
   difficulty: string; 
   reward: number;
-  status: string;    
+  status: string;     
   missionDate: string;
   progresses: any[];
   myDone: boolean;
@@ -31,16 +43,15 @@ interface UserContextType {
   userData: HomeData | null;
   todayMissions: TodayMission[];
   setUserData: (data: HomeData | null) => void;
-  setTodayMissions: (missions: TodayMission[]) => void; // ✅ [수정] 이 줄이 추가되어야 합니다!
+  setTodayMissions: (missions: TodayMission[]) => void;
   refreshUserData: () => Promise<void>;
 }
 
-// 초기값 설정
 const UserContext = createContext<UserContextType>({
   userData: null,
   todayMissions: [],
   setUserData: () => {},
-  setTodayMissions: () => {}, // ✅ [수정] 초기값 추가
+  setTodayMissions: () => {},
   refreshUserData: async () => {},
 });
 
@@ -74,6 +85,20 @@ async function fetchUserInfo(token: string) {
   }
 }
 
+async function fetchTodayMissions(token: string) {
+  try {
+    const res = await fetch(`${BASE_URL}/api/couples/missions/today`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.status === 404) return []; 
+    if (!res.ok) throw new Error(`Today Mission Fetch Error: ${res.status}`);
+    return res.json();
+  } catch (error) {
+    console.error('❌ fetchTodayMissions 실패:', error);
+    return [];
+  }
+}
+
 export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const [userData, setUserData] = useState<HomeData | null>(null);
   const [todayMissions, setTodayMissions] = useState<TodayMission[]>([]);
@@ -86,13 +111,12 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
 
-      // 1️⃣ [STEP 1] 홈 데이터(미션포함)와 유저 ID 정보 병렬 호출
-      const [homeResponse, userInfo] = await Promise.all([
+      const [homeResponse, userInfo, missionResponse] = await Promise.all([
         fetchHomeMain(token),
         fetchUserInfo(token),
+        fetchTodayMissions(token),
       ]);
 
-      // 2️⃣ [STEP 2] UserData (내 정보 + 커플 정보) 조립
       let mergedData: HomeData | null = null;
       let extractedUserId = null;
 
@@ -106,34 +130,22 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
         mergedData = {
           anniversary: homeResponse.anniversary,
           name: homeResponse.name,
-          date: homeResponse.date,
+          date: homeResponse.dDay || 0,
           roomId: homeResponse.roomId,
           coupleId: homeResponse.coupleId, 
           userId: Number(extractedUserId),
+          missionCompletedCount: homeResponse.missionCompletedCount || 0,
+          mainPhoto: homeResponse.mainPhoto || null,
+          myProfileImageUrl: homeResponse.myProfileImageUrl || null,
+          partnerProfileImageUrl: homeResponse.partnerProfileImageUrl || null,
         };
         setUserData(mergedData);
-        console.log(`✅ [UserContext] 데이터 로드 완료 (RoomID: ${mergedData.roomId}, CoupleID: ${mergedData.coupleId})`);
       } else {
         console.warn('⚠️ [UserContext] 데이터 로드 실패 (필수 정보 누락)');
       }
 
-      // 3️⃣ [STEP 3] 홈 데이터에 포함된 미션 정보를 상태로 변환
-      if (homeResponse && Array.isArray(homeResponse.coupleMission)) {
-        const mappedMissions: TodayMission[] = homeResponse.coupleMission.map((m: any) => ({
-          missionId: m.id,
-          title: m.title || '오늘의 미션',
-          status: m.status || 'NOT_STARTED',
-          description: m.description || null,
-          difficulty: m.difficulty || 'NORMAL',
-          reward: m.reward || 0,
-          missionDate: new Date().toISOString().split('T')[0],
-          progresses: [], 
-          myDone: false,
-          myCompletedAt: null
-        }));
-        console.log('[미션 확인용]', JSON.stringify(mappedMissions, null, 2));
-        console.log(`🔄 [UserContext] 미션 ${mappedMissions.length}개 로드됨`);
-        setTodayMissions(mappedMissions);
+      if (Array.isArray(missionResponse)) {
+        setTodayMissions(missionResponse);
       } else {
         setTodayMissions([]);
       }
@@ -144,7 +156,6 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    // ✅ [수정] setTodayMissions를 Provider 값에 포함
     <UserContext.Provider value={{ userData, todayMissions, setUserData, setTodayMissions, refreshUserData }}>
       {children}
     </UserContext.Provider>

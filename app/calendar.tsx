@@ -28,8 +28,8 @@ import { useUser } from './context/UserContext';
 
 const clockImg = require('../assets/images/Clock.png');
 const heartImg = require('../assets/images/Heart.png');
+const defaultProfileImg = require('../assets/images/userprofile.png');
 
-// Android 애니메이션 설정
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental && !(global as any)?.nativeFabricUIManager) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
@@ -46,6 +46,8 @@ type Photo = {
   createdAt: string;
   missionId?: number | null;
   missionTitle?: string | null;
+  ownerType?: 'ME' | 'PARTNER'; 
+  ownerNickname?: string;
 };
 
 type Schedule = {
@@ -61,17 +63,19 @@ type Schedule = {
 type PhotosByDate = Record<string, Photo[]>;
 type SchedulesByDate = Record<string, Schedule[]>;
 
-// --- 데이터 정규화 ---
+// 데이터 정규화
 function normalizeMission(raw: any): Photo | null {
   if (!raw || typeof raw !== 'object') return null;
-  if (!raw.photoUrl || !raw.completedAt) return null;
+  if (!raw.imageUrl || !raw.createdAt) return null;
 
   return {
-    id: String(raw.missionId),
-    url: raw.photoUrl,
-    createdAt: raw.completedAt,
-    missionId: raw.missionId,
-    missionTitle: raw.title || null,
+    id: String(raw.photoId),
+    url: raw.imageUrl,
+    createdAt: raw.createdAt,
+    missionId: null,
+    missionTitle: raw.missionText || null,
+    ownerType: raw.ownerType,
+    ownerNickname: raw.ownerNickname,
   };
 }
 
@@ -90,15 +94,12 @@ const groupPhotosByDate = (photos: Photo[]): PhotosByDate => {
 };
 
 const groupSchedulesByDate = (schedules: Schedule[]): SchedulesByDate => {
-  // 1. ID 기준으로 중복 제거 (Map 사용)
   const uniqueSchedules = new Map<number, Schedule>();
   schedules.forEach(sch => {
       uniqueSchedules.set(sch.id, sch);
   });
 
   const grouped: SchedulesByDate = {};
-  
-  // 2. 날짜별 그룹핑
   uniqueSchedules.forEach((sch) => {
     try {
       const date = format(parseISO(sch.startAt), 'yyyy-MM-dd');
@@ -106,7 +107,6 @@ const groupSchedulesByDate = (schedules: Schedule[]): SchedulesByDate => {
       grouped[date].push(sch);
     } catch (e) { console.warn(e); }
   });
-  
   return grouped;
 };
 
@@ -179,7 +179,6 @@ const AddScheduleModal = ({ visible, onClose, onSave, selectedDate }: any) => {
   const [title, setTitle] = useState('');
   const [isCouple, setIsCouple] = useState(false);
   const [isAllDay, setIsAllDay] = useState(false);
-  
   const [startHour, setStartHour] = useState('13');
   const [startMin, setStartMin] = useState('00');
   const [endHour, setEndHour] = useState('15');
@@ -234,19 +233,12 @@ const AddScheduleModal = ({ visible, onClose, onSave, selectedDate }: any) => {
       Alert.alert('알림', '일정 제목을 입력해주세요.');
       return;
     }
-    
     onSave({
       title,
       isCouple,
       isAllDay,
-      start: { 
-        hour: parseInt(startHour, 10) || 0, 
-        minute: parseInt(startMin, 10) || 0 
-      },
-      end: { 
-        hour: parseInt(endHour, 10) || 0, 
-        minute: parseInt(endMin, 10) || 0 
-      }
+      start: { hour: parseInt(startHour, 10) || 0, minute: parseInt(startMin, 10) || 0 },
+      end: { hour: parseInt(endHour, 10) || 0, minute: parseInt(endMin, 10) || 0 }
     });
   };
 
@@ -264,24 +256,12 @@ const AddScheduleModal = ({ visible, onClose, onSave, selectedDate }: any) => {
           style={[styles.modalContent, { transform: [{ translateY: panY }] }]} 
           {...panResponder.panHandlers}
         >
-          <View style={styles.dragHandleContainer}>
-            <View style={styles.dragHandle} />
-          </View>
-
+          <View style={styles.dragHandleContainer}><View style={styles.dragHandle} /></View>
           <View style={styles.titleInputRow}>
              <View style={styles.blueDot} />
-             <TextInput 
-                style={[styles.modalTitleInput,{fontFamily:'Pretendard-Bold'}]} 
-                placeholder="제목" 
-                placeholderTextColor="#999"
-                value={title}
-                onChangeText={setTitle}
-                autoFocus={false} 
-             />
+             <TextInput style={[styles.modalTitleInput,{fontFamily:'Pretendard-Bold'}]} placeholder="제목" placeholderTextColor="#999" value={title} onChangeText={setTitle} autoFocus={false} />
           </View>
-
           <View style={{height: 20}} />
-
           <View style={styles.timeSection}>
              <View style={styles.timeRow}>
               <Image source={clockImg} style={[styles.clockImage]} />
@@ -296,9 +276,7 @@ const AddScheduleModal = ({ visible, onClose, onSave, selectedDate }: any) => {
                     )}
                 </View>
              </View>
-
              <View style={styles.timeConnector} />
-
              <View style={styles.timeRow}>
                 <Image source={clockImg} style={[styles.clockImage]} /> 
                 <View style={styles.timeInputContainer}>
@@ -313,9 +291,7 @@ const AddScheduleModal = ({ visible, onClose, onSave, selectedDate }: any) => {
                 </View>
              </View>
           </View>
-
           <View style={{height: 20}} />
-
           <View style={styles.toggleRow}>
             <AppText type='semibold' style={styles.modalLabel}>하루종일</AppText>
             <Pressable onPress={() => setIsAllDay(!isAllDay)} style={styles.checkboxArea}>
@@ -324,10 +300,8 @@ const AddScheduleModal = ({ visible, onClose, onSave, selectedDate }: any) => {
                 </View>
             </Pressable>
           </View>
-
           <View style={styles.toggleRow}>
             <View style={{flexDirection:'row', alignItems:'center', gap: 6}}>
-                {/* <Ionicons name="heart-outline" size={18} color="#CCC" /> */}
                 <Image source={heartImg} style={[styles.heartImage]} />
                 <AppText type='semibold' style={styles.modalLabel}>커플 일정으로 등록</AppText>
             </View>
@@ -337,13 +311,10 @@ const AddScheduleModal = ({ visible, onClose, onSave, selectedDate }: any) => {
                 </View>
             </Pressable>
           </View>
-
           <View style={{flex: 1}} />
-
           <Pressable style={[styles.saveButton, {marginBottom: insets.bottom + 20}]} onPress={handleSave}>
             <AppText type="bold" style={styles.saveButtonText}>저장</AppText>
           </Pressable>
-
         </Animated.View>
       </View>
     </Modal>
@@ -354,7 +325,6 @@ export default function CalendarScreen() {
   const insets = useSafeAreaInsets();
   const { userData } = useUser();
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   
   const [calendarMode, setCalendarMode] = useState<CalendarMode>('MISSION');
 
@@ -391,20 +361,48 @@ export default function CalendarScreen() {
     outputRange: ['#EEEEEE', '#111111'], 
   });
 
-  const fetchMissions = useCallback(async () => {
-    try {
-      const token = await AsyncStorage.getItem('token');
-      if (!token) return;
-      const res = await fetch(`${BASE_URL}/api/couples/missions/history`, {
-        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-      });
-      if (!res.ok) throw new Error('Failed to fetch missions');
-      const data = await res.json();
-      const list = Array.isArray(data) ? data : data.content || [];
-      const parsed = list.map(normalizeMission).filter(Boolean) as Photo[];
-      setPhotosByDate(groupPhotosByDate(parsed));
-    } catch (e) { console.warn(e); }
-  }, []);
+  const fetchMissions = useCallback(async (targetMonth: string) => {
+  try {
+    const token = await AsyncStorage.getItem('token');
+    if (!token) return;
+
+    const dateObj = parseISO(targetMonth);
+    const year = dateObj.getFullYear();
+    const month = dateObj.getMonth() + 1;
+
+    const res = await fetch(
+      `${BASE_URL}/calendar/missions?year=${year}&month=${month}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
+      }
+    );
+
+    // 404면 데이터 없는 달 → 빈 데이터로 초기화
+    if (res.status === 404) {
+      setPhotosByDate({});
+      return;
+    }
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.warn(`🚨 월별 미션 조회 실패 (${res.status}):`, errText);
+      setPhotosByDate({});
+      return;
+    }
+
+    const data = await res.json();
+    const list = Array.isArray(data) ? data : [];
+    const parsed = list.map(normalizeMission).filter(Boolean) as Photo[];
+    setPhotosByDate(groupPhotosByDate(parsed));
+  } catch (e) {
+    console.warn('fetchMissions Logic Error:', e);
+    setPhotosByDate({});
+  }
+}, []);
+
 
   const fetchSchedules = useCallback(async (targetMonth: string) => {
     try {
@@ -423,23 +421,34 @@ export default function CalendarScreen() {
     } catch (e) { console.warn(e); }
   }, []);
 
+  // 초기 진입 시 로딩
   useFocusEffect(
     useCallback(() => {
         const initLoad = async () => {
             setLoading(true);
-            await fetchMissions();
+            await fetchMissions(currentMonth);
             await fetchSchedules(currentMonth);
             setLoading(false);
         };
         initLoad();
-    }, [])
+    }, []) 
   );
 
+  // 월 변경 시 데이터 갱신
   useEffect(() => {
-      if (!loading && calendarMode === 'SCHEDULE') {
-          fetchSchedules(currentMonth);
-      }
+      fetchMissions(currentMonth);
+      fetchSchedules(currentMonth);
   }, [currentMonth]);
+
+  // 🟢 [핵심] 날짜 변경 시 API 호출 X -> 로컬 데이터 필터링
+  useEffect(() => {
+    if (calendarMode === 'MISSION') {
+        const missionsOfDay = photosByDate[selectedDate] || [];
+        setSelectedPhotos(missionsOfDay);
+    } else {
+        setSelectedSchedules(schedulesByDate[selectedDate] || []);
+    }
+  }, [selectedDate, calendarMode, photosByDate, schedulesByDate]);
 
   const toggleMode = () => {
     const nextMode = calendarMode === 'MISSION' ? 'SCHEDULE' : 'MISSION';
@@ -452,23 +461,15 @@ export default function CalendarScreen() {
     }).start();
   };
 
-  useEffect(() => {
-    if (calendarMode === 'MISSION') {
-        setSelectedPhotos(photosByDate[selectedDate] || []);
-    } else {
-        setSelectedSchedules(schedulesByDate[selectedDate] || []);
-    }
-  }, [photosByDate, schedulesByDate, selectedDate, calendarMode]);
-
   const onDayPress = useCallback((day: DateData) => {
     setSelectedDate(day.dateString);
   }, []);
 
   const changeMonth = (direction: 'prev' | 'next') => {
     const newDate = direction === 'prev' ? subMonths(parseISO(currentMonth), 1) : addMonths(parseISO(currentMonth), 1);
-    setCurrentMonth(format(newDate, 'yyyy-MM-01'));
+    const newMonthStr = format(newDate, 'yyyy-MM-01');
+    setCurrentMonth(newMonthStr);
     
-    // 월 변경 시 선택 상태 초기화
     setSelectedDate('');
     setSelectedPhotos([]);
     setSelectedSchedules([]);
@@ -506,8 +507,6 @@ export default function CalendarScreen() {
             setAddModalVisible(false);
             fetchSchedules(currentMonth); 
         } else {
-            const errText = await res.text();
-            console.error('[Schedule Add] Failed:', res.status, errText);
             Alert.alert('실패', `등록 실패 (${res.status})`);
         }
     } catch(e) { console.error('[Schedule Add] Error:', e); }
@@ -533,17 +532,12 @@ export default function CalendarScreen() {
     ]);
   };
 
-  const isScheduleMode = calendarMode === 'SCHEDULE';
-  const bgColorStyle = isScheduleMode ? '#1C1C1E' : '#FFFCF5'; 
-  const textColorStyle = isScheduleMode ? '#FFF' : '#111';
-
-  if (loading && !refreshing) {
-    return <View style={[styles.center, { backgroundColor: bgColorStyle }]}><ActivityIndicator size="large" color={textColorStyle} /></View>;
+  if (loading) {
+    return <View style={[styles.center, { backgroundColor: calendarMode === 'SCHEDULE' ? '#1C1C1E' : '#FFFCF5' }]}><ActivityIndicator size="large" color="#999" /></View>;
   }
 
   return (
     <Animated.View style={[styles.container, { backgroundColor: bgColor }]}>
-      {/* 1. 헤더 */}
       <Animated.View style={[styles.header, { backgroundColor: bgColor }]}>
         <View style={styles.headerLeft}>
           <Pressable onPress={() => router.back()} style={styles.backBtn}>
@@ -564,7 +558,6 @@ export default function CalendarScreen() {
         </Pressable>
       </Animated.View>
 
-      {/* 2. 월 이동 */}
       <View style={styles.monthNav}>
         <Pressable onPress={() => changeMonth('prev')} style={styles.monthNavBtn}>
             <Animated.Text style={{ color: headerTextColor }}>
@@ -581,7 +574,6 @@ export default function CalendarScreen() {
         </Pressable>
       </View>
 
-      {/* 3. 캘린더 */}
       <View style={styles.CalenderContainer}>
         <Calendar
           key={`${currentMonth}`} 
@@ -614,7 +606,6 @@ export default function CalendarScreen() {
         />
       </View>
 
-      {/* 4. 하단 영역 */}
       <View style={styles.bottomContainer}>
         {calendarMode === 'MISSION' && (
             selectedPhotos.length === 0 ? (
@@ -628,29 +619,38 @@ export default function CalendarScreen() {
                     horizontal
                     pagingEnabled
                     showsHorizontalScrollIndicator={false}
-                    renderItem={({ item }) => (
-                        <View style={styles.previewCard}>
-                            <ImageBackground source={{ uri: item.url }} style={styles.previewImage} resizeMode="cover">
-                                <View style={styles.previewHeaderOverlay}>
-                                    <View style={styles.previewAvatar}>
-                                        <Image source={{ uri: item.url }} style={{ width: '100%', height: '100%' }} />
-                                    </View>
-                                    <View>
-                                        <AppText style={styles.previewNameText}>애인</AppText>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                            <Ionicons name="calendar-outline" size={12} color="#EEE" />
-                                            <AppText style={styles.previewDateText}>{format(parseISO(item.createdAt), 'yyyy. MM. dd.')}</AppText>
+                    renderItem={({ item }) => {
+                        let avatarSource = defaultProfileImg;
+                        if (item.ownerType === 'ME' && userData?.myProfileImageUrl) {
+                            avatarSource = { uri: userData.myProfileImageUrl };
+                        } else if (item.ownerType === 'PARTNER' && userData?.partnerProfileImageUrl) {
+                            avatarSource = { uri: userData.partnerProfileImageUrl };
+                        }
+
+                        return (
+                            <View style={styles.previewCard}>
+                                <ImageBackground source={{ uri: item.url }} style={styles.previewImage} resizeMode="cover">
+                                    <View style={styles.previewHeaderOverlay}>
+                                        <View style={styles.previewAvatar}>
+                                            <Image source={avatarSource} style={{ width: '100%', height: '100%' }} />
+                                        </View>
+                                        <View>
+                                            <AppText style={styles.previewNameText}>{item.ownerNickname || '알 수 없음'}</AppText>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                                <Ionicons name="calendar-outline" size={12} color="#EEE" />
+                                                <AppText style={styles.previewDateText}>{format(parseISO(item.createdAt), 'yyyy. MM. dd.')}</AppText>
+                                            </View>
                                         </View>
                                     </View>
-                                </View>
-                                {item.missionTitle && (
-                                    <View style={styles.previewMissionBadge}>
-                                        <AppText style={styles.previewMissionText}>{item.missionTitle}</AppText>
-                                    </View>
-                                )}
-                            </ImageBackground>
-                        </View>
-                    )}
+                                    {item.missionTitle && (
+                                        <View style={styles.previewMissionBadge}>
+                                            <AppText style={styles.previewMissionText}>{item.missionTitle}</AppText>
+                                        </View>
+                                    )}
+                                </ImageBackground>
+                            </View>
+                        );
+                    }}
                 />
             )
         )}
@@ -658,7 +658,6 @@ export default function CalendarScreen() {
         {calendarMode === 'SCHEDULE' && (
             <>
                 <View style={styles.scheduleHeader}>
-                    {/* [수정됨] selectedDate가 비어있으면 format 실행 안함 */}
                     <AppText style={{color:'#FFF', fontSize:14}}>
                         {selectedDate ? format(parseISO(selectedDate), 'yyyy. MM. dd.') : ''}
                     </AppText>
@@ -728,19 +727,12 @@ const styles = StyleSheet.create({
   CalenderContainer: {},
   dayCellEmpty: { flex: 1 },
   dayCellContainer: { width: 44, height: 56, alignItems: 'center', justifyContent: 'flex-start' },
-  
   dayCellSelectedBorder: { borderWidth: 2, borderColor: '#6198FF', borderRadius: 10 },
-  
-  dayCellSelectedSchedule: { 
-      backgroundColor: '#FFF', 
-      borderRadius: 10,
-  },
-
+  dayCellSelectedSchedule: { backgroundColor: '#FFF', borderRadius: 10 },
   dayText: { fontSize: 12 },
   dayTextDisabled: { color: '#555' },
   dayTextSunday: { color: '#FF3B30' },
   dayTextSelected: { color: '#6198FF'},
-  
   photoCell: { width: '100%', height: '100%', borderRadius: 8, overflow: 'hidden', backgroundColor: '#E5E5EA' },
   photoCellImage: { width: '100%', height: '100%', opacity: 0.8 },
   photoSelectedOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(97, 152, 255, 0.3)' },
@@ -764,10 +756,7 @@ const styles = StyleSheet.create({
   scheduleTimeText: { color: '#FFF', fontSize: 14 },
   verticalBar: { width: 2, height: '100%', backgroundColor: '#fff', marginHorizontal: 12 },
   scheduleTitleText: { color: '#FFF', fontSize: 15 },
-  
   fabBtn: { position: 'absolute', right: 16, width: 56, height: 56, borderRadius: 28, backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 6 },
-  
-  // 모달 스타일
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
   modalContent: { width: '100%', height: '92%', backgroundColor: '#2C2C2E', borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingHorizontal: 20, paddingTop: 10 },
   dragHandleContainer: { alignItems: 'center', paddingVertical: 10, marginBottom: 10 },

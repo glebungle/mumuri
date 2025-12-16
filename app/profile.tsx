@@ -17,32 +17,33 @@ export default function AccountSettingScreen() {
         <Pressable onPress={handleBack} style={styles.backButton}>
           <Ionicons name="chevron-back" size={24} color="#1E1E1E" />
         </Pressable>
-        <AppText style={styles.headerTitle}>정보</AppText>
+        <AppText style={styles.headerTitle}>프로필 관리</AppText>
         <View style={{ width: 24 }} />
       </View>
 
       {/* 메뉴 리스트 */}
       <View style={styles.content}>
+      <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <AppText type='medium' style={styles.sectionTitle}>마이 프로필</AppText>
+            <Ionicons name="pencil" size={20} color="#505050" />
+          </View>
+        </View>
+        
         <View style={styles.menuItem}>
-          <AppText type="medium" style={styles.menuText}>나의 앱 버전</AppText>
-          <AppText type="medium" style={styles.subText}>25.12.1</AppText>
+          <AppText type="semibold" style={styles.menuText}>이름</AppText>
+          <AppText type="regular" style={styles.subText}>25.12.1</AppText>
         </View>
 
-        <Pressable 
-          style={styles.menuItem} 
-          onPress={() => router.push('/termofuse')}
-        >
-          <AppText type="medium" style={styles.menuText}>이용 약관</AppText>
-          <Ionicons name="chevron-forward" size={20} color="#505050" />
-        </Pressable>
+        <View style={styles.menuItem}>
+          <AppText type="semibold" style={styles.menuText}>생년월일</AppText>
+          <AppText type="regular" style={styles.subText}>25.12.1</AppText>
+        </View>
 
-        <Pressable 
-          style={styles.menuItem} 
-          onPress={() => router.push('/personal-info')}
-        >
-          <AppText type="medium" style={styles.menuText}>개인정보 처리방침</AppText>
-          <Ionicons name="chevron-forward" size={20} color="#505050" />
-        </Pressable>
+        <View style={styles.menuItem}>
+          <AppText type="semibold" style={styles.menuText}>기념일</AppText>
+          <AppText type="regular" style={styles.subText}>25.12.1</AppText>
+        </View>
 
       </View>
     </View>
@@ -71,8 +72,25 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   content: {
-    marginTop: 20,
+    marginTop: 10,
     paddingHorizontal: 24,
+  },
+    // 공통 섹션 스타일
+  section: {
+    marginTop: 32,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#000000',
+    paddingBottom: 8,
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    color: '#444444',
   },
   menuItem: {
     flexDirection: 'row',
@@ -88,5 +106,4 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#747474',
   },
-  
 });

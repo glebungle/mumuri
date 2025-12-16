@@ -5,6 +5,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppText from '../components/AppText';
+import { useUser } from './context/UserContext';
 
 // 백엔드 API 명세에 맞춘 타입 정의
 interface MyPageResponse {
@@ -37,8 +38,16 @@ const formatBirthString = (raw?: string | null): string => {
 };
 
 export default function MyPage() {
+  // 🟢 [수정 1] 훅은 반드시 컴포넌트 안에서 호출해야 합니다.
+  const { userData, refreshUserData } = useUser(); 
+  
   const [myPageData, setMyPageData] = useState<MyPageResponse | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // 🟢 [수정 2] 컴포넌트 안에서 상태(userData)에 따라 이미지를 결정해야 실시간 반영됩니다.
+  const displayProfileImage = userData?.myProfileImageUrl 
+    ? { uri: userData.myProfileImageUrl } 
+    : profileImg;
 
   const fetchMyPageData = async () => {
     try {
@@ -70,11 +79,18 @@ export default function MyPage() {
   useFocusEffect(
     useCallback(() => {
       fetchMyPageData();
+      // 🟢 [수정 3] 화면에 들어올 때마다 최신 유저 정보(사진 포함)를 다시 불러옵니다.
+      refreshUserData(); 
     }, [])
   );
 
   const handlePressSetting = () => {
     router.push('/setting');
+  };
+
+  // 🟢 [수정 4] 버튼 핸들러도 컴포넌트 안으로 이동
+  const handlePressEditProfile = () => {
+    router.push('/edit'); 
   };
 
   const myName = myPageData?.name || '사용자';
@@ -133,7 +149,7 @@ export default function MyPage() {
                 <View style={styles.avatarContainer}>
                   <View style={styles.avatarPlaceholder}>
                     <Image 
-                        source={profileImg} 
+                        source={displayProfileImage} // 여기서 위에서 계산한 이미지를 사용
                         style={styles.profileImage} 
                         resizeMode="cover"
                     />
@@ -143,9 +159,9 @@ export default function MyPage() {
                 <AppText type="pretendard-b" style={styles.nameText}>
                   {myName}
                 </AppText>
-                <AppText style={styles.birthText}>{myBirth}</AppText>
+                <AppText type="pretendard-m" style={styles.birthText}>{myBirth}</AppText>
 
-                <Pressable style={styles.editButton}>
+                <Pressable style={styles.editButton} onPress={handlePressEditProfile}>
                   <AppText type="pretendard-m" style={styles.editButtonText}>
                     프로필 편집
                   </AppText>
@@ -231,10 +247,10 @@ const styles = StyleSheet.create({
   avatarPlaceholder: {
     width: 110,
     height: 110,
-    borderRadius: 45,
+    borderRadius: 99,
     justifyContent: 'center',
     alignItems: 'center',
-    overflow: 'hidden', // 이미지가 둥근 테두리를 벗어나지 않도록 설정
+    overflow: 'hidden', 
   },
   profileImage: {
     width: '100%',
@@ -252,7 +268,6 @@ const styles = StyleSheet.create({
   },
   editButton: {
     backgroundColor: '#FFF',
-    marginTop: 10,
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 8,
