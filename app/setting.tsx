@@ -108,12 +108,13 @@ export default function SettingScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <AppText type='semibold' style={styles.sectionTitle}>정보</AppText>
-            <Ionicons name="chevron-forward" size={20} color="#000" />
+            <Pressable onPress={()=> router.push('./info')}>
+              <Ionicons name="chevron-forward" size={20} color="#000" />
+            </Pressable>
           </View>
           <View style={styles.itemGroup}>
             <View style={styles.itemRow}>
               <AppText type='medium' style={styles.itemText}>나의 앱 버전</AppText>
-              {/* 버전 정보 등 추가 가능 */}
             </View>
             <Pressable style={styles.itemRow}>
               <AppText type='medium' style={styles.itemText}>이용약관</AppText>
