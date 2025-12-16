@@ -12,7 +12,7 @@ export interface MainPhoto {
   createdAt: string;
 }
 
-// [2] 홈 메인 데이터 타입 수정 (mainPhoto 추가)
+// [2] 홈 메인 데이터 타입 수정
 export interface HomeData {
   anniversary: string;
   name: string | null;
@@ -111,12 +111,24 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
 
-      const [homeResponse, userInfo, missionResponse] = await Promise.all([
+      // 🟢 [STEP 1] 기본 정보(홈, 유저)만 먼저 호출하여 커플 여부를 확인합니다.
+      const [homeResponse, userInfo] = await Promise.all([
         fetchHomeMain(token),
         fetchUserInfo(token),
-        fetchTodayMissions(token),
       ]);
 
+      // [STEP 2] 커플 연결 여부에 따라 미션 API 호출 분기
+      let missionResponse: TodayMission[] = [];
+      
+      // homeResponse가 정상이고, coupleId가 0보다 커야(커플임) 미션 API를 호출
+      if (homeResponse && homeResponse.coupleId && homeResponse.coupleId > 0) {
+          const missions = await fetchTodayMissions(token);
+          if (Array.isArray(missions)) {
+              missionResponse = missions;
+          }
+      }
+
+      // [STEP 3] 데이터 조립 및 상태 업데이트
       let mergedData: HomeData | null = null;
       let extractedUserId = null;
 
@@ -144,11 +156,8 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
         console.warn('⚠️ [UserContext] 데이터 로드 실패 (필수 정보 누락)');
       }
 
-      if (Array.isArray(missionResponse)) {
-        setTodayMissions(missionResponse);
-      } else {
-        setTodayMissions([]);
-      }
+      // 미션 상태 업데이트 (커플이 아니면 위에서 빈 배열로 설정됨)
+      setTodayMissions(missionResponse);
 
     } catch (e) {
       console.warn('User data fetch failed', e);

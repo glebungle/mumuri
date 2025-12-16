@@ -52,7 +52,9 @@ const CACHE_VERSION = 'v1';
 
 async function saveChatCache(roomId: string, messages: ChatMessage[]) {
   try {
-    const toSave = messages.filter(m => m.status !== 'failed').slice(-100); 
+    const toSave = messages
+      .filter(m => m.status !== 'failed' && !String(m.id).startsWith('mission_')) 
+      .slice(-100); 
     await AsyncStorage.setItem(CHAT_CACHE_KEY(roomId), JSON.stringify({ version: CACHE_VERSION, data: toSave }));
   } catch (e) { console.warn('[cache save]', e); }
 }
@@ -441,21 +443,28 @@ export default function ChatScreen() {
     const missionMsgs: ChatMessage[] = [];
     
     performedMissions.forEach(m => {
-        // 🚨 [핵심 수정] 방금 완료한 미션 ID(로컬 파라미터)와 서버 데이터 ID가 같으면
-        // 서버 데이터는 렌더링하지 않고 건너뜁니다. (로컬 임시 메시지만 보여줌)
+        // 🟢 [1차 방어] 파라미터로 받은 ID와 같다면 스킵
         if (justCompletedMissionId && String(m.missionId) === String(justCompletedMissionId)) {
+            return;
+        }
+
+        // 🟢 [2차 방어 - 핵심] 이미 baseMsgs(화면에 떠있는 메시지들) 안에 
+        // 이 미션 ID를 가진 임시 메시지(mission_text_opt_... 등)가 존재한다면 서버 데이터 무시
+        // 임시 메시지 ID 포맷: `mission_text_opt_${id}_...`
+        const alreadyHasLocal = baseMsgs.some(msg => 
+            String(msg.id).includes(`mission_text_opt_${m.missionId}`) || 
+            String(msg.id).includes(`mission_img_opt_${m.missionId}`)
+        );
+
+        if (alreadyHasLocal) {
             return;
         }
 
         const baseTs = m.doneAtTs ?? m.missionDateTs;
         const mtId = `mission_text_${m.missionId}`;
         
-        // 1. 미션 텍스트 추가 (이미 로컬에 같은 내용이 있으면 스킵)
-        const hasSameText = baseMsgs.some(msg => 
-            msg.id === mtId || 
-            (msg.type === 'mission_text' && msg.text === m.title)
-        );
-
+        // 1. 미션 텍스트 추가
+        const hasSameText = baseMsgs.some(msg => msg.id === mtId); // ID로만 체크해도 충분
         if (!hasSameText) {
             missionMsgs.push({ 
                 id: mtId, 
@@ -472,7 +481,7 @@ export default function ChatScreen() {
             const pUrl = m.partner.url;
             const pWhen = m.partner.when;
             const mpId = `mission_img_partner_${m.missionId}`;
-            if (!baseMsgs.some(msg => msg.id === mpId || msg.imageUrl === pUrl)) {
+            if (!baseMsgs.some(msg => msg.id === mpId)) {
                 missionMsgs.push({ 
                     id: mpId, 
                     type: 'image', 
@@ -489,8 +498,7 @@ export default function ChatScreen() {
             const mUrl = m.me.url;
             const mWhen = m.me.when;
             const mmId = `mission_img_me_${m.missionId}`;
-            // URL이 같거나 ID가 같은 이미지가 이미 리스트에 있다면 추가하지 않음
-            if (!baseMsgs.some(msg => msg.id === mmId || msg.imageUrl === mUrl)) {
+            if (!baseMsgs.some(msg => msg.id === mmId)) {
                 missionMsgs.push({ 
                     id: mmId, 
                     type: 'image', 
@@ -503,10 +511,9 @@ export default function ChatScreen() {
         }
     });
 
-    // 메시지 병합 및 시간순 정렬
+    // ... (이하 동일) ...
     const merged = [...baseMsgs, ...missionMsgs].sort((a, b) => a.createdAt - b.createdAt);
     
-    // 날짜 마커(--- 2025년 10월... ---) 추가 로직
     const withDate: (ChatMessage | DateMarker)[] = [];
     let lastTs: number | null = null;
     
@@ -518,7 +525,6 @@ export default function ChatScreen() {
         lastTs = m.createdAt;
     }
     
-    // FlatList inverted={true} 이므로 역순 반환
     return withDate.reverse();
   }, [messages, performedMissions, justCompletedMissionId]);
 
@@ -655,7 +661,7 @@ const styles = StyleSheet.create({
   metaWrapRight: { marginLeft: 6, alignItems: 'center', justifyContent: 'flex-end' },
   dateWrap: { alignItems: 'center', marginVertical: 26 },
   dateText: { fontSize: 12, color: '#4D5053', backgroundColor: '#F8F4EA', paddingHorizontal: 18, paddingVertical: 8, borderRadius: 100 },
-  inputBar: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 10, gap: 8, backgroundColor: '#FFFCF5' },
+  inputBar: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 10, gap: 8, backgroundColor: '#FFFCF5',paddingTop:8},
   input: { flex: 1, minHeight: 40, maxHeight: 120, backgroundColor: '#fff', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, borderColor: '#e5e7eb', color: '#111' },
   sendBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: '#EEEFEF' },
   cameraImage: { width: 24, height: 24, tintColor: '#6198FF', marginBottom:10 },

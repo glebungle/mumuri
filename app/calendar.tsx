@@ -29,6 +29,7 @@ import { useUser } from './context/UserContext';
 const clockImg = require('../assets/images/Clock.png');
 const heartImg = require('../assets/images/Heart.png');
 const defaultProfileImg = require('../assets/images/userprofile.png');
+const calendarImg = require('../assets/images/calendar.png');
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental && !(global as any)?.nativeFabricUIManager) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -248,6 +249,7 @@ const AddScheduleModal = ({ visible, onClose, onSave, selectedDate }: any) => {
       const days = ['일', '월', '화', '수', '목', '금', '토'];
       return `${format(date, 'MM월 dd일')} (${days[date.getDay()]})`;
   }, [selectedDate]);
+  
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -358,7 +360,7 @@ export default function CalendarScreen() {
 
   const switchTextColor = modeAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: ['#EEEEEE', '#111111'], 
+    outputRange: ['#999999', '#999999'], 
   });
 
   const fetchMissions = useCallback(async (targetMonth: string) => {
@@ -394,6 +396,12 @@ export default function CalendarScreen() {
     }
 
     const data = await res.json();
+    // 🕵️‍♂️ [디버깅용 로그 추가] 데이터가 배열이라면 첫 번째 요소만 찍어봅니다.
+      if (Array.isArray(data) && data.length > 0) {
+          console.log('🔥 [캘린더 미션 원본 데이터]:', JSON.stringify(data[0], null, 2));
+      } else {
+          console.log('🔥 [캘린더 미션 원본 데이터]:', data);
+      }
     const list = Array.isArray(data) ? data : [];
     const parsed = list.map(normalizeMission).filter(Boolean) as Photo[];
     setPhotosByDate(groupPhotosByDate(parsed));
@@ -402,6 +410,10 @@ export default function CalendarScreen() {
     setPhotosByDate({});
   }
 }, []);
+
+  // 닉네임 가져오기 
+    const myName = userData?.name || '나';
+    const partnerName = (userData as any)?.partnerName || '애인'; //추후 수정필요!
 
 
   const fetchSchedules = useCallback(async (targetMonth: string) => {
@@ -440,7 +452,7 @@ export default function CalendarScreen() {
       fetchSchedules(currentMonth);
   }, [currentMonth]);
 
-  // 🟢 [핵심] 날짜 변경 시 API 호출 X -> 로컬 데이터 필터링
+  // [핵심] 날짜 변경 시 API 호출 X -> 로컬 데이터 필터링
   useEffect(() => {
     if (calendarMode === 'MISSION') {
         const missionsOfDay = photosByDate[selectedDate] || [];
@@ -536,6 +548,8 @@ export default function CalendarScreen() {
     return <View style={[styles.center, { backgroundColor: calendarMode === 'SCHEDULE' ? '#1C1C1E' : '#FFFCF5' }]}><ActivityIndicator size="large" color="#999" /></View>;
   }
 
+  
+
   return (
     <Animated.View style={[styles.container, { backgroundColor: bgColor }]}>
       <Animated.View style={[styles.header, { backgroundColor: bgColor }]}>
@@ -558,20 +572,39 @@ export default function CalendarScreen() {
         </Pressable>
       </Animated.View>
 
-      <View style={styles.monthNav}>
-        <Pressable onPress={() => changeMonth('prev')} style={styles.monthNavBtn}>
+      <View style={styles.monthNavRow}>
+        <View style={styles.monthNavControls}>
+          <Pressable onPress={() => changeMonth('prev')} style={styles.monthNavBtn}>
             <Animated.Text style={{ color: headerTextColor }}>
-                <Ionicons name="chevron-back" size={20} />
+              <Ionicons name="chevron-back" size={20} />
             </Animated.Text>
-        </Pressable>
-        <Animated.Text style={[styles.monthTitle, { color: headerTextColor, fontFamily: 'Pretendard-SemiBold' }]}>
-          {format(parseISO(currentMonth), 'yyyy년 M월')}
-        </Animated.Text>
-        <Pressable onPress={() => changeMonth('next')} style={styles.monthNavBtn}>
+          </Pressable>
+          <Animated.Text style={[styles.monthTitle, { color: headerTextColor, fontFamily: 'Paperlogy-6SemiBold' }]}>
+            {format(parseISO(currentMonth), 'yyyy년 M월')}
+          </Animated.Text>
+          <Pressable onPress={() => changeMonth('next')} style={styles.monthNavBtn}>
             <Animated.Text style={{ color: headerTextColor }}>
-                <Ionicons name="chevron-forward" size={20} />
+              <Ionicons name="chevron-forward" size={20} />
             </Animated.Text>
-        </Pressable>
+          </Pressable>
+        </View>
+
+        {calendarMode === 'SCHEDULE' && (
+          <View style={styles.legendContainer}>
+            <View style={styles.legendItem}>
+              <AppText type='semibold' style={[styles.legendText, { color: '#FFF' }]}>{myName}</AppText>
+              <View style={[styles.legendDot, { backgroundColor: '#6198FF' }]} />
+            </View>
+            <View style={styles.legendItem}>
+              <AppText  type='semibold' style={[styles.legendText, { color: '#FFF' }]}>{partnerName}</AppText>
+              <View style={[styles.legendDot, { backgroundColor: '#49DC95' }]} />
+            </View>
+            <View style={styles.legendItem}>
+              <AppText type='semibold' style={[styles.legendText, { color: '#FFF' }]}>함께</AppText>
+              <View style={[styles.legendDot, { backgroundColor: '#FF9191' }]} />
+            </View>
+          </View>
+        )}
       </View>
 
       <View style={styles.CalenderContainer}>
@@ -637,8 +670,8 @@ export default function CalendarScreen() {
                                         <View>
                                             <AppText style={styles.previewNameText}>{item.ownerNickname || '알 수 없음'}</AppText>
                                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                                <Ionicons name="calendar-outline" size={12} color="#EEE" />
-                                                <AppText style={styles.previewDateText}>{format(parseISO(item.createdAt), 'yyyy. MM. dd.')}</AppText>
+                                                <Image source={calendarImg} style={[styles.calendarImage]} />
+                                                <AppText type='semibold' style={styles.previewDateText}>{format(parseISO(item.createdAt), 'yyyy. MM. dd.')}</AppText>
                                             </View>
                                         </View>
                                     </View>
@@ -658,7 +691,7 @@ export default function CalendarScreen() {
         {calendarMode === 'SCHEDULE' && (
             <>
                 <View style={styles.scheduleHeader}>
-                    <AppText style={{color:'#FFF', fontSize:14}}>
+                    <AppText type='semibold' style={{color:'#FFF', fontSize:13}}>
                         {selectedDate ? format(parseISO(selectedDate), 'yyyy. MM. dd.') : ''}
                     </AppText>
                 </View>
@@ -696,7 +729,7 @@ export default function CalendarScreen() {
                 />
                 
                 <Pressable style={[styles.fabBtn, { bottom: insets.bottom + 30 }]} onPress={() => setAddModalVisible(true)}>
-                    <Ionicons name="add" size={32} color="#1C1C1E" />
+                    <Ionicons name="add" size={40} color="#1E1E1E" />
                 </Pressable>
             </>
         )}
@@ -721,9 +754,39 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 22 },
   switchBtn: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 24 },
   switchBtnText: { fontSize: 13, color:'#999999' },
-  monthNav: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, marginTop: 8 },
+  monthNavRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between', 
+    paddingHorizontal: 20, 
+    marginTop: 8,
+    height: 40, 
+  },
+  monthNavControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   monthNavBtn: { padding: 4 },
-  monthTitle: { fontSize: 14, marginHorizontal: 4 },
+  monthTitle: { fontSize: 14, marginHorizontal: 0, }, 
+
+  legendContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12, 
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4, 
+  },
+  legendText: {
+    fontSize: 12,
+  },
+  legendDot: {
+    width: 12,
+    height: 16,
+    borderRadius: 5,
+  },
   CalenderContainer: {},
   dayCellEmpty: { flex: 1 },
   dayCellContainer: { width: 44, height: 56, alignItems: 'center', justifyContent: 'flex-start' },
@@ -747,7 +810,7 @@ const styles = StyleSheet.create({
   previewHeaderOverlay: { flexDirection: 'row', alignItems: 'center', padding: 20, paddingTop: 24, gap: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.3, shadowRadius: 3 },
   previewAvatar: { width: 40, height: 40, borderRadius: 22, overflow: 'hidden', backgroundColor: '#DDD' },
   previewNameText: { color: '#FFF', fontSize: 11, marginBottom: 2 },
-  previewDateText: { color: '#EEE', fontSize: 11 },
+  previewDateText: { color: '#fff', fontSize: 11 },
   previewMissionBadge: { position: 'absolute', bottom: 20, left: 20, backgroundColor: 'rgba(0,0,0,0.4)', paddingVertical: 10, paddingHorizontal: 16, borderRadius: 16, alignItems: 'center' },
   previewMissionText: { color: '#FFF', fontSize: 10, textAlign: 'center' },
   scheduleHeader: { marginBottom: 10 },
@@ -756,7 +819,7 @@ const styles = StyleSheet.create({
   scheduleTimeText: { color: '#FFF', fontSize: 14 },
   verticalBar: { width: 2, height: '100%', backgroundColor: '#fff', marginHorizontal: 12 },
   scheduleTitleText: { color: '#FFF', fontSize: 15 },
-  fabBtn: { position: 'absolute', right: 16, width: 56, height: 56, borderRadius: 28, backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 6 },
+  fabBtn: { position: 'absolute', right: 16, width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(255,255,255,0.9)', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 6 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
   modalContent: { width: '100%', height: '92%', backgroundColor: '#2C2C2E', borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingHorizontal: 20, paddingTop: 10 },
   dragHandleContainer: { alignItems: 'center', paddingVertical: 10, marginBottom: 10 },
@@ -789,5 +852,6 @@ const styles = StyleSheet.create({
     height: 20,
     tintColor: '#fff',
     marginRight:4
-  }
+  },
+  calendarImage: { width: 16, height: 16, tintColor: '#fff', marginRight: 0,},
 });

@@ -38,13 +38,11 @@ const formatBirthString = (raw?: string | null): string => {
 };
 
 export default function MyPage() {
-  // 🟢 [수정 1] 훅은 반드시 컴포넌트 안에서 호출해야 합니다.
   const { userData, refreshUserData } = useUser(); 
   
   const [myPageData, setMyPageData] = useState<MyPageResponse | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // 🟢 [수정 2] 컴포넌트 안에서 상태(userData)에 따라 이미지를 결정해야 실시간 반영됩니다.
   const displayProfileImage = userData?.myProfileImageUrl 
     ? { uri: userData.myProfileImageUrl } 
     : profileImg;
@@ -79,7 +77,6 @@ export default function MyPage() {
   useFocusEffect(
     useCallback(() => {
       fetchMyPageData();
-      // 🟢 [수정 3] 화면에 들어올 때마다 최신 유저 정보(사진 포함)를 다시 불러옵니다.
       refreshUserData(); 
     }, [])
   );
@@ -88,7 +85,6 @@ export default function MyPage() {
     router.push('/setting');
   };
 
-  // 🟢 [수정 4] 버튼 핸들러도 컴포넌트 안으로 이동
   const handlePressEditProfile = () => {
     router.push('/edit'); 
   };
@@ -149,7 +145,7 @@ export default function MyPage() {
                 <View style={styles.avatarContainer}>
                   <View style={styles.avatarPlaceholder}>
                     <Image 
-                        source={displayProfileImage} // 여기서 위에서 계산한 이미지를 사용
+                        source={displayProfileImage} 
                         style={styles.profileImage} 
                         resizeMode="cover"
                     />
@@ -263,7 +259,7 @@ const styles = StyleSheet.create({
   },
   birthText: {
     fontSize: 14,
-    color: '#888',
+    color: '#A8A8A8',
     marginBottom: 16,
   },
   editButton: {
@@ -326,8 +322,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: '#FFF1F1',
-    borderRadius: 12,
-    paddingVertical: 15,
+    borderRadius: 8,
+    paddingVertical: 12,
     paddingHorizontal: 20,
   },
   listItemLeft: {

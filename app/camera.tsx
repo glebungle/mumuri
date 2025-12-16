@@ -1,4 +1,3 @@
-// app/camera.tsx
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -43,7 +42,6 @@ async function authedFetch(path: string, init: RequestInit = {}) {
 }
 
 type CropRect = { originX: number; originY: number; width: number; height: number };
-
 type MissionProgress = { userId: number; status: string; photoUrl: string | null; completedAt?: string | null; };
 type TodayMission = { missionId: number; title: string; description: string; difficulty: string; reward: number; status: string; missionDate: string; progresses: MissionProgress[]; myDone?: boolean; myCompletedAt?: string; };
 
@@ -63,7 +61,7 @@ export default function CameraHome() {
 
   const [isLayoutMode, setIsLayoutMode] = useState(false);
   const [layoutPhotos, setLayoutPhotos] = useState<string[]>([]);
-  
+
   const [dday, setDday] = useState<number>(100);
   const [missions, setMissions] = useState<TodayMission[]>([]);
   const [sel, setSel] = useState(0);
@@ -73,7 +71,7 @@ export default function CameraHome() {
   const onCameraWrapLayout = (e: LayoutChangeEvent) => { const { width, height } = e.nativeEvent.layout; setViewW(width); setViewH(height); };
 
   useEffect(() => { (async () => { if (!camPerm?.granted) await requestCamPerm(); })(); }, []);
-  useEffect(() => { const fetchDday = async () => { try { const token = await AsyncStorage.getItem('token'); if (!token) return; const res = await fetch(`${BASE_URL}/user/main`, { method: 'GET', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } }); if (!res.ok) return; const json = await res.json(); if (typeof json.dday === 'number') setDday(json.dday); } catch {} }; fetchDday(); }, []);
+  useEffect(() => { const fetchDday = async () => { try { const token = await AsyncStorage.getItem('token'); if (!token) return; const res = await fetch(`${BASE_URL}/user/main`, { method: 'GET', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } }); if (!res.ok) return; const json = await res.json(); if (typeof json.dday === 'number') setDday(json.dday); } catch { } }; fetchDday(); }, []);
   useEffect(() => { const fetchTodayMission = async () => { try { const json = await authedFetch('/api/couples/missions/today', { method: 'GET' }); let missionsData: TodayMission[] = []; if (Array.isArray(json)) missionsData = json as TodayMission[]; else if (json && Array.isArray((json as any).missions)) missionsData = (json as any).missions; if (missionsData.length > 0) { setMissions(missionsData); setSel(0); } else { setMissions([]); } } catch (e) { setMissions([]); } }; fetchTodayMission(); }, []);
 
   if (!camPerm) return <View style={styles.loadingScreen} />;
@@ -82,22 +80,13 @@ export default function CameraHome() {
   const toggleLayoutMode = () => { setIsLayoutMode(!isLayoutMode); setLayoutPhotos([]); setPreviewUri(null); };
 
   const getActiveGridStyle = () => {
-    if (!viewW || !viewH) return {}; 
-
+    if (!viewW || !viewH) return {};
     const idx = layoutPhotos.length;
     const halfW = viewW / 2;
     const halfH = viewH / 2;
-
     const top = idx >= 2 ? halfH : 0;
     const left = idx % 2 === 1 ? halfW : 0;
-
-    return {
-      position: 'absolute' as const,
-      top,
-      left,
-      width: halfW,
-      height: halfH,
-    };
+    return { position: 'absolute' as const, top, left, width: halfW, height: halfH };
   };
 
   const takePhoto = async () => {
@@ -158,36 +147,31 @@ export default function CameraHome() {
     }
   };
 
+  // 🟢 [갤러리 선택 - 시스템 피커 사용]
   const pickFromGallery = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [screenWidth, screenHeight * 0.8],
+        allowsEditing: true, // 크롭(편집) 허용
+        aspect: [screenWidth, Math.round(screenHeight * 0.8)], // 화면 비율대로 자르기
         quality: 1,
       });
 
-      if (!result.canceled && result.assets[0]) {
+      if (!result.canceled && result.assets && result.assets.length > 0) {
         const selectedUri = result.assets[0].uri;
-
-        // [수정 2] 레이아웃 모드일 경우 갤러리 사진을 슬롯에 추가
+        
         if (isLayoutMode) {
           const newLayout = [...layoutPhotos, selectedUri];
           setLayoutPhotos(newLayout);
-          
-          // 4장이 꽉 차면 미리보기(병합 대기) 상태로 전환
           if (newLayout.length === 4) {
             setPreviewUri('PENDING_MERGE');
           }
         } else {
-          // 일반 모드일 경우 기존 로직 유지 (한 장만 선택 및 즉시 미리보기)
-          setIsLayoutMode(false);
-          setLayoutPhotos([]);
           setPreviewUri(selectedUri);
         }
       }
-    } catch {
-      Alert.alert('오류', '갤러리 접근 실패');
+    } catch (e) {
+      Alert.alert("알림", "갤러리를 불러오지 못했습니다.");
     }
   };
 
@@ -196,11 +180,17 @@ export default function CameraHome() {
 
   const confirm = async () => {
     let uriToSend = previewUri;
-    if (isLayoutMode) {
-      if (viewShotRef.current?.capture) {
-        try { uriToSend = await viewShotRef.current.capture(); } catch { Alert.alert('오류', '이미지 병합 실패'); return; }
+    
+    // ViewShot으로 현재 보이는 화면(크롭/배치된 상태)을 최종 저장
+    if (viewShotRef.current?.capture) {
+      try { 
+        uriToSend = await viewShotRef.current.capture(); 
+      } catch { 
+        Alert.alert('오류', '이미지 저장 실패'); 
+        return; 
       }
     }
+
     if (!uriToSend || uriToSend === 'PENDING_MERGE') return;
     const picked = missions[sel];
     try { router.push({ pathname: '/share', params: { uri: uriToSend, missionId: picked ? String(picked.missionId) : '', missionTitle: picked?.title ?? '', missionDescription: picked?.description ?? '' } }); } catch { Alert.alert('오류', '이동 실패'); }
@@ -209,28 +199,29 @@ export default function CameraHome() {
   const cameraPreviewComponent = (
     <View style={styles.cameraFrame} onLayout={onCameraWrapLayout}>
       {previewUri ? (
-        isLayoutMode ? (
-          <ViewShot ref={viewShotRef} options={{ format: 'jpg', quality: 0.9 }} style={styles.previewFrameImage}>
-            <View style={styles.gridContainer}>
+        <ViewShot ref={viewShotRef} options={{ format: 'jpg', quality: 0.9 }} style={styles.previewFrameImage}>
+          {isLayoutMode ? (
+            <>
+              <View style={styles.gridContainer}>
                 {layoutPhotos.map((uri, idx) => (
                   <Image key={idx} source={{ uri }} style={styles.gridImage} resizeMode="cover" />
                 ))}
-            </View>
-            <View style={styles.gridLineVertical} />
-            <View style={styles.gridLineHorizontal} />
-          </ViewShot>
-        ) : (
-          <Image source={{ uri: previewUri }} style={styles.previewFrameImage} resizeMode="cover" />
-        )
+              </View>
+              <View style={styles.gridLineVertical} />
+              <View style={styles.gridLineHorizontal} />
+            </>
+          ) : (
+            <Image source={{ uri: previewUri }} style={styles.previewFrameImage} resizeMode="cover" />
+          )}
+        </ViewShot>
       ) : (
-        <View style={{ flex: 1, backgroundColor: 'black' }}> 
-          
+        <View style={{ flex: 1, backgroundColor: 'black' }}>
           {isLayoutMode && (
             <View style={styles.layoutUnderlay}>
               <View style={styles.gridContainer}>
-                  {layoutPhotos.map((uri, idx) => (
-                    <Image key={idx} source={{ uri }} style={styles.gridImage} />
-                  ))}
+                {layoutPhotos.map((uri, idx) => (
+                  <Image key={idx} source={{ uri }} style={styles.gridImage} />
+                ))}
               </View>
             </View>
           )}
@@ -239,7 +230,7 @@ export default function CameraHome() {
             <View style={getActiveGridStyle()}>
               <CameraView
                 ref={cameraRef}
-                style={{ flex: 1 }} 
+                style={{ flex: 1 }}
                 facing={facing}
                 onCameraReady={() => setIsReady(true)}
               />
@@ -297,7 +288,7 @@ export default function CameraHome() {
           <View style={styles.bottomButtonsRow}>
             <Pressable style={styles.galleryBtn} onPress={pickFromGallery}><Image source={galleryImg} style={[styles.galleryImage]} /></Pressable>
             <Pressable onPress={takePhoto} disabled={!isReady || capturing} style={[styles.shutterOuter, (!isReady || capturing) && { opacity: 0.5 }]}>
-              {isLayoutMode ? (<View style={[styles.shutterInner, { backgroundColor: '#6198FF', alignItems:'center', justifyContent:'center' }]}><AppText style={{color:'#fff', fontSize:12}}>{layoutPhotos.length}/4</AppText></View>) : (<View style={styles.shutterInner} />)}
+              {isLayoutMode ? (<View style={[styles.shutterInner, { backgroundColor: '#6198FF', alignItems: 'center', justifyContent: 'center' }]}><AppText style={{ color: '#fff', fontSize: 12 }}>{layoutPhotos.length}/4</AppText></View>) : (<View style={styles.shutterInner} />)}
             </Pressable>
             <Pressable style={styles.flipBtn} onPress={toggleCameraFacing}><Image source={rotateImg} style={[styles.rotateImage]} /></Pressable>
           </View>
@@ -331,10 +322,10 @@ const styles = StyleSheet.create({
   headerBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#D9D9D9', alignItems: 'center', justifyContent: 'center' },
   hintBubbleWrap: { position: 'absolute', top: screenHeight * 0.1, width: '100%', alignItems: 'center', paddingHorizontal: 24 },
   missionDotsRow: { flexDirection: 'row', marginBottom: 8 },
-  missionDot: { width: 6, height: 6, borderRadius: 3, marginHorizontal: 3, backgroundColor: 'rgba(255,255,255,0.5)' },
+  missionDot: { width: 6, height: 6, borderRadius: 3, marginHorizontal: 3, backgroundColor: 'rgba(255, 255, 255, 0.5)' },
   missionDotActive: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#3279FF' },
   hintRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
-  hintBubble: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 11, paddingVertical: 12, zIndex: 15 , backgroundColor: 'rgba(255,255,255,0.7)', borderRadius: 12, maxWidth: '85%' },
+  hintBubble: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 11, paddingVertical: 12, zIndex: 15, backgroundColor: 'rgba(255,255,255,0.7)', borderRadius: 12, maxWidth: '85%' },
   innerArrowArea: { width: 32, alignItems: 'center', justifyContent: 'center' },
   hintTextWrap: { flex: 1, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center' },
   hintText: { color: '#444444', fontSize: 12, textAlign: 'center', fontWeight: '600' },

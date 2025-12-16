@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  BackHandler,
   Dimensions,
   FlatList,
   Image,
@@ -78,7 +79,12 @@ const ToastMessage = ({ message, visible, onHide }: { message: string, visible: 
   );
 };
 
-export default function GalleryView() {
+
+interface GalleryViewProps {
+  onBackToHome?: () => void; 
+}
+
+export default function GalleryView({ onBackToHome }: GalleryViewProps) {
   const insets = useSafeAreaInsets();
   const { userData, refreshUserData } = useUser();
   const coupleId = userData?.coupleId || null;
@@ -100,6 +106,30 @@ export default function GalleryView() {
   const viewerListRef = useRef<FlatList<Photo> | null>(null);
 
   const showToast = (msg: string) => { setToastMsg(msg); setToastVisible(true); };
+
+  // 뒤로가기 버튼 핸들링
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        // 1. 뷰어가 열려있으면 뷰어를 닫음
+        if (selectedPhotoIndex !== null) {
+          handleCloseViewer();
+          return true; // 이벤트 소비
+        }
+        
+        // 2. 뷰어가 닫혀있고 홈으로 갈 함수가 있다면 -> 홈으로 이동
+        if (onBackToHome) {
+          onBackToHome();
+          return true; // 이벤트 소비
+        }
+
+        return false; // 기본 동작 수행
+      };
+
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => subscription.remove();
+    }, [selectedPhotoIndex, onBackToHome])
+  );
 
   const loadPhotos = useCallback(async (pageNum: number, shouldRefresh: boolean = false) => {
     try {
@@ -343,11 +373,10 @@ export default function GalleryView() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  emptyText: { color: '#808080', fontSize: 16, marginBottom:'50%' },
+  emptyText: { color: '#D9D9D9', fontSize: 16, marginBottom:'50%' },
   gridItem: { width: SCREEN_WIDTH / 3, height: SCREEN_WIDTH/1.5, borderWidth: 0.5, borderColor: '#FFF' },
   gridImage: { width: '100%', height: '100%' },
   
-  // 🟢 뷰어 스타일
   modalBackground: { flex: 1, backgroundColor: '#000' },
   modalContentContainer: { flex: 1, backgroundColor: '#000' },
   imageWrapper: { flex: 1, position: 'relative' },

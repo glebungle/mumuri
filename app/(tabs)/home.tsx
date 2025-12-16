@@ -23,7 +23,7 @@ import { useUser } from '../context/UserContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const heartImg = require('../../assets/images/Heart.png');
-const defaultBgImg = require('../../assets/images/default_bg.jpeg'); // 변수로 분리
+const defaultBgImg = require('../../assets/images/default_bg.png'); 
 const calendarImg = require('../../assets/images/calendar.png');
 
 const AlertModal = ({ visible, message, onClose }: { visible: boolean; message: string; onClose: () => void; }) => {
@@ -61,32 +61,23 @@ export default function HomeScreen() {
   const todayMissionTitle = todayMissions && todayMissions.length > 0 ? todayMissions[0].title : null;
 
   // 배경 이미지
-  // 1. 메인 사진 정보가 있는지 확인
   const mainPhoto = userData?.mainPhoto;
 
-  // 2. 배경 이미지 소스 결정 (메인 사진 URL vs 기본 이미지)
   const backgroundSource = mainPhoto?.imageUrl 
     ? { uri: mainPhoto.imageUrl } 
     : defaultBgImg;
 
-  // 3. 표시할 이름 결정 (업로더 닉네임 vs 내 이름 fallback)
   const displayTitle = mainPhoto?.uploaderNickname 
     ? mainPhoto.uploaderNickname 
-    : (userData?.name || '사용자');
+    : (userData?.name||'사용자');
 
-  // 4. 표시할 날짜 결정 (사진 생성일 vs 기념일 fallback)
   let displayDateText = '';
   if (mainPhoto?.createdAt) {
-    // 사진 생성일 포맷 (예: 2025. 12. 16.)
     displayDateText = `${format(parseISO(mainPhoto.createdAt), 'yyyy. MM. dd.')}`;
-  } else if (userData?.anniversary) {
-    // 기념일 fallback
-    displayDateText = `${userData.anniversary.replace(/-/g, '. ')}.`;
   } else {
-    displayDateText = '시작일을 설정해주세요';
+    displayDateText = '';
   }
 
-  // 좀비 데이터 정리
   useEffect(() => {
     const cleanUpStaleData = async () => {
       if (userData && (!userData.coupleId || userData.coupleId === 0)) {
@@ -97,7 +88,6 @@ export default function HomeScreen() {
     cleanUpStaleData();
   }, [userData]);
 
-  // 포커스 시 데이터 리로드
   useFocusEffect(
     useCallback(() => {
       let isActive = true;
@@ -182,7 +172,7 @@ export default function HomeScreen() {
 
         {/* D-Day & 미션 카운트 */}
         <Animated.View style={[styles.dDayContainer, { opacity: dDayOpacity }]}>
-           <View style={[styles.divider, { backgroundColor: activeTab === 0 ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.1)' }]} />
+           <View style={[styles.divider, { backgroundColor: activeTab === 0 ? '#EAEAEA' : 'rgba(0,0,0,0.1)' }]} />
            <View style={styles.dDayBadgeRow}>
              <View style={styles.dDayBadge}>
                 <Image source={heartImg} style={[styles.heartImage]} />
@@ -215,15 +205,19 @@ export default function HomeScreen() {
             <View style={styles.homeContentContainer}>
               <View style={{ height: HEADER_HEIGHT }} /> 
 
-              <View style={styles.infoSection}>
-                <View style={styles.nameDateContainer}>
-                  <AppText style={styles.userName}>{displayTitle}</AppText>
-                  <View style={styles.datewrap}>
-                    <Image source={calendarImg} style={[styles.calendarImage]} />
-                    <AppText type='semibold' style={styles.dateText}>{displayDateText}</AppText>
+              {mainPhoto!=defaultBgImg ? (
+                <View style={styles.infoSection}>
+                  <View style={styles.nameDateContainer}>
+                    <AppText style={styles.userName}>{displayTitle}</AppText>
+                    <View style={styles.datewrap}>
+                      <Image source={calendarImg} style={[styles.calendarImage]} />
+                      <AppText type='semibold' style={styles.dateText}>{displayDateText}</AppText>
+                    </View>
                   </View>
                 </View>
-              </View>
+              ) : (
+                <View style={{ marginBottom: 20 }} /> 
+              )}
 
               <View style={[styles.dashboard, { paddingBottom: insets.bottom + 10 }]}>
                 <Pressable
@@ -251,9 +245,9 @@ export default function HomeScreen() {
             </View>
           </View>
         ) : (
-          <View style={{ flex: 1, backgroundColor: '#FFF' }}>
+          <View style={{ flex: 1, backgroundColor: '#FFFCF5' }}>
             <View style={{ flex: 1, paddingTop: HEADER_HEIGHT - 30 }}> 
-               <GalleryView />
+               <GalleryView onBackToHome={() => switchTab(0)} />
             </View>
           </View>
         )}
@@ -263,7 +257,7 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  loadingContainer: { flex: 1, backgroundColor: '#FFF', justifyContent: 'center', alignItems: 'center' },
+  loadingContainer: { flex: 1, backgroundColor: '#FFFCF5', justifyContent: 'center', alignItems: 'center' },
   container: { flex: 1, backgroundColor: '#FFFCF5' },
   headerContainer: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 100, paddingHorizontal: 20 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', height: 40 },
@@ -274,12 +268,12 @@ const styles = StyleSheet.create({
   activeIndicator: { position: 'absolute', bottom: 0, left: 0, height: 2 },
   profileButton: { padding: 4 },
   dDayContainer: { marginTop: 10 }, 
-  divider: { width: '100%', height: 0.5, marginBottom: 8 },
+  divider: { width: '100%', height: 0.7, marginBottom: 8 },
   dDayBadgeRow: { flexDirection: 'column', alignItems: 'flex-start', gap: 4 }, 
   dDayBadge: { flexDirection: 'row', alignItems: 'center' },
   heartImage: { width: 20, height: 20, tintColor: '#fff', marginRight: 5 },
   calendarImage: { width: 16, height: 16, tintColor: '#fff', marginRight: 4,},
-  dDayText: { fontSize: 15 },
+  dDayText: { fontSize: 14 },
   missionCountBadge: { marginLeft: 2 },
   missionCountText: { fontSize: 12, color: 'rgba(255,255,255,0.8)' },
   backgroundLayer: { position: 'absolute', top: 0, left: 0, right: 0, height: '60%', zIndex: 0 },

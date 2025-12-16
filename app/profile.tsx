@@ -9,6 +9,7 @@ export default function AccountSettingScreen() {
   const insets = useSafeAreaInsets();
 
   const handleBack = () => router.back();
+  const handleEdit = () => router.push('/edit');
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -23,10 +24,9 @@ export default function AccountSettingScreen() {
 
       {/* 메뉴 리스트 */}
       <View style={styles.content}>
-      <View style={styles.section}>
+        <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <AppText type='medium' style={styles.sectionTitle}>마이 프로필</AppText>
-            <Ionicons name="pencil" size={20} color="#505050" />
           </View>
         </View>
         
@@ -44,8 +44,14 @@ export default function AccountSettingScreen() {
           <AppText type="semibold" style={styles.menuText}>기념일</AppText>
           <AppText type="regular" style={styles.subText}>25.12.1</AppText>
         </View>
-
       </View>
+
+      <View style={[styles.footer, { paddingBottom: 20 + insets.bottom }]}>
+        <Pressable style={styles.Button} onPress={handleEdit}>
+          <AppText type="semibold" style={styles.ButtonText}>프로필 변경</AppText>
+        </Pressable>
+      </View>
+
     </View>
   );
 }
@@ -75,7 +81,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     paddingHorizontal: 24,
   },
-    // 공통 섹션 스타일
+  // 공통 섹션 스타일
   section: {
     marginTop: 32,
   },
@@ -105,5 +111,20 @@ const styles = StyleSheet.create({
   subText: {
     fontSize: 14,
     color: '#747474',
+  },
+  footer: {
+    marginTop: 'auto', 
+    paddingHorizontal: 24,
+  },
+  Button: {
+    backgroundColor: '#6198FF', 
+    borderRadius: 12, 
+    height: 56,
+    alignItems: 'center', 
+    justifyContent: 'center',
+  },
+  ButtonText: { 
+    color: '#FFF', 
+    fontSize: 16, 
   },
 });
