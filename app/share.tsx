@@ -142,11 +142,9 @@ export default function ShareScreen() {
   const sendToPartner = async () => {
     if (!photoUri || sending) return;
     
-    // ✅ 토큰은 스토리지에서 직접 가져오고, ID는 Context값 사용
     const token = await AsyncStorage.getItem('token');
     if (!token) { Alert.alert('오류','로그인 정보가 없습니다. 다시 로그인해 주세요.'); return; }
     
-    // ✅ Context 정보 확인
     if (!userId || !coupleId) {
       Alert.alert('정보 부족', '사용자 또는 커플 정보를 불러오지 못했습니다. 앱을 다시 실행해주세요.');
       console.log('[Share Error] Missing Info:', { userId, coupleId });
@@ -210,7 +208,6 @@ export default function ShareScreen() {
         },
       });
       const listRaw = await listRes.text();
-      // console.log('[PHOTO LIST] status =', listRes.status, 'raw =', listRaw.slice(0, 200));
       if (!listRes.ok) throw new Error(`photo list HTTP ${listRes.status}`);
 
       let listJson: any[] = [];
@@ -249,7 +246,7 @@ export default function ShareScreen() {
 
       // ---- 여기서부터 미션 여부에 따라 분기 ----
       if (missionId) {
-        // 🔸 미션 완료 API
+        // 미션 완료 API
         const mid = Number(missionId);
         const completeUrl = `${BASE_URL}/api/couples/missions/${mid}/complete-v2`;
 
@@ -273,34 +270,9 @@ export default function ShareScreen() {
         console.log('[MISSION COMPLETE] response ←', compRes.status, compText);
         if (!compRes.ok) throw new Error(`mission complete ${compRes.status}: ${compText}`);
 
-        // (옵션) STOMP로 채팅 전송
-        if (SEND_CHAT_IMAGE_AFTER_COMPLETE && photoUrlPresigned && uid) {
-          const imageUrlForStomp = USE_PRESIGNED_FOR_STOMP
-            ? photoUrlPresigned
-            : (toRawUrl(photoUrlPresigned) || photoUrlPresigned);
-
-          try {
-            await sendChatImageViaStomp({
-              token,
-              roomId: String(cid),
-              senderId: uid,
-              imageUrl: imageUrlForStomp!,
-            });
-          } catch (e) {
-            console.warn('[CHAT IMAGE SEND] (mission) STOMP error', (e as any)?.message);
-          }
-        }
-
-        // 채팅으로 이동 (미션 텍스트/사진 URL 같이 넘기기)
+        // 채팅으로 이동 
         router.replace({
           pathname: '/chat',
-          params: {
-            justCompletedMissionId: String(mid),
-            justCompletedMissionText: missionDescription || missionTitle || '',
-            justCompletedPhotoUrl: USE_PRESIGNED_FOR_STOMP
-              ? (photoUrlPresigned || '')
-              : (toRawUrl(photoUrlPresigned || '') || ''),
-          },
         });
       } else {
         // 🔹 일반 사진 전송: presigned를 STOMP로만 보내고 채팅으로 이동

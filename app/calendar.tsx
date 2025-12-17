@@ -396,11 +396,10 @@ export default function CalendarScreen() {
     }
 
     const data = await res.json();
-    // 🕵️‍♂️ [디버깅용 로그 추가] 데이터가 배열이라면 첫 번째 요소만 찍어봅니다.
       if (Array.isArray(data) && data.length > 0) {
-          console.log('🔥 [캘린더 미션 원본 데이터]:', JSON.stringify(data[0], null, 2));
+          console.log('[캘린더 미션 원본 데이터]:', JSON.stringify(data[0], null, 2));
       } else {
-          console.log('🔥 [캘린더 미션 원본 데이터]:', data);
+          console.log('[캘린더 미션 원본 데이터]:', data);
       }
     const list = Array.isArray(data) ? data : [];
     const parsed = list.map(normalizeMission).filter(Boolean) as Photo[];
@@ -412,8 +411,8 @@ export default function CalendarScreen() {
 }, []);
 
   // 닉네임 가져오기 
-    const myName = userData?.myName || '나';
-    const partnerName = userData?.partnerName || '애인'; 
+  const myName = userData?.myName || '나';
+  const partnerName = userData?.partnerName || '애인'; 
 
 
   const fetchSchedules = useCallback(async (targetMonth: string) => {
@@ -487,6 +486,32 @@ export default function CalendarScreen() {
     setSelectedSchedules([]);
   };
 
+  // 일정 삭제
+  const handleDeleteSchedule = (schedule: Schedule) => {
+    if (schedule.ownerType === 'PARTNER' && !schedule.couple) {
+      Alert.alert('알림', '상대방 단독 일정은 삭제할 수 없어요.');
+      return;
+    }
+
+    Alert.alert('삭제', '이 일정을 삭제하시겠습니까?', [
+      { text: '취소', style: 'cancel' },
+      {
+        text: '삭제',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            const token = await AsyncStorage.getItem('token');
+            await fetch(`${BASE_URL}/calendar/schedules/${schedule.id}`, {
+              method: 'DELETE',
+              headers: { Authorization: `Bearer ${token}` }
+            });
+            fetchSchedules(currentMonth);
+          } catch(e) { console.error(e); }
+        }
+      }
+    ]);
+  };
+
   const handleAddSchedule = async (input: any) => {
     try {
         const token = await AsyncStorage.getItem('token');
@@ -524,31 +549,9 @@ export default function CalendarScreen() {
     } catch(e) { console.error('[Schedule Add] Error:', e); }
   };
 
-  const handleDeleteSchedule = (id: number) => {
-    Alert.alert('삭제', '이 일정을 삭제하시겠습니까?', [
-        { text: '취소', style: 'cancel' },
-        {
-            text: '삭제',
-            style: 'destructive',
-            onPress: async () => {
-                try {
-                    const token = await AsyncStorage.getItem('token');
-                    await fetch(`${BASE_URL}/calendar/schedules/${id}`, {
-                        method: 'DELETE',
-                        headers: { Authorization: `Bearer ${token}` }
-                    });
-                    fetchSchedules(currentMonth);
-                } catch(e) { console.error(e); }
-            }
-        }
-    ]);
-  };
-
   if (loading) {
     return <View style={[styles.center, { backgroundColor: calendarMode === 'SCHEDULE' ? '#1C1C1E' : '#FFFCF5' }]}><ActivityIndicator size="large" color="#999" /></View>;
   }
-
-  
 
   return (
     <Animated.View style={[styles.container, { backgroundColor: bgColor }]}>
@@ -592,11 +595,11 @@ export default function CalendarScreen() {
         {calendarMode === 'SCHEDULE' && (
           <View style={styles.legendContainer}>
             <View style={styles.legendItem}>
-              <AppText type='semibold' style={[styles.legendText, { color: '#FFF' }]}>{myName}</AppText>
+              <AppText type='semibold' style={[styles.legendText, { color: '#FFF' }]}>{myName}{Platform.OS === 'android' ? '\u200A' : ''}</AppText>
               <View style={[styles.legendDot, { backgroundColor: '#6198FF' }]} />
             </View>
             <View style={styles.legendItem}>
-              <AppText  type='semibold' style={[styles.legendText, { color: '#FFF' }]}>{partnerName}</AppText>
+              <AppText  type='semibold' style={[styles.legendText, { color: '#FFF' }]}>{partnerName}{Platform.OS === 'android' ? '\u200A' : ''}</AppText>
               <View style={[styles.legendDot, { backgroundColor: '#49DC95' }]} />
             </View>
             <View style={styles.legendItem}>
@@ -700,26 +703,36 @@ export default function CalendarScreen() {
                     keyExtractor={item => String(item.id)}
                     contentContainerStyle={{ gap: 10, paddingBottom: 100 }}
                     renderItem={({item}) => {
-                        let barColor = '#4CD964'; 
-                        if (item.couple) barColor = '#FF8080';
-                        else if (item.ownerType === 'ME') barColor = '#6198FF';
+                      let barColor = '#4CD964'; 
+                      if (item.couple) barColor = '#FF8080';
+                      else if (item.ownerType === 'ME') barColor = '#6198FF';
 
-                        const timeStr = item.allDay ? '하루 종일' : format(parseISO(item.startAt), 'HH:mm');
+                      const timeStr = item.allDay ? '하루 종일' : format(parseISO(item.startAt), 'HH:mm');
 
-                        return (
-                            <View style={[styles.scheduleItem, { backgroundColor: barColor }]}>
-                                <View style={styles.scheduleTimeBox}>
-                                    <AppText type="bold" style={styles.scheduleTimeText}>{timeStr}</AppText>
-                                </View>
-                                <View style={styles.verticalBar} />
-                                <View style={{flex:1}}>
-                                    <AppText type="medium" style={styles.scheduleTitleText}>{item.title}</AppText>
-                                </View>
-                                <TouchableOpacity onPress={() => handleDeleteSchedule(item.id)} style={{padding:8}} hitSlop={{top:10, bottom:10, left:10, right:10}}>
-                                    <Ionicons name="close" size={20} color="#FFF" />
-                                </TouchableOpacity>
-                            </View>
-                        );
+                      const isPartnerOnly = item.ownerType === 'PARTNER' && !item.couple;
+
+                      return (
+                        <View style={[styles.scheduleItem, { backgroundColor: barColor }]}>
+                          <View style={styles.scheduleTimeBox}>
+                            <AppText type="bold" style={styles.scheduleTimeText}>{timeStr}</AppText>
+                          </View>
+                          <View style={styles.verticalBar} />
+                          <View style={{flex:1}}>
+                            <AppText type="medium" style={styles.scheduleTitleText}>{item.title}</AppText>
+                          </View>
+
+                          {/* ✅ 상대방 단독 일정이면 X 버튼 숨김 */}
+                          {!isPartnerOnly && (
+                            <TouchableOpacity
+                              onPress={() => handleDeleteSchedule(item)}
+                              style={{ padding: 8 }}
+                              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                            >
+                              <Ionicons name="close" size={20} color="#FFF" />
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      );
                     }}
                     ListEmptyComponent={
                         <View style={{marginTop: 20, alignItems:'center'}}>
@@ -778,7 +791,7 @@ const styles = StyleSheet.create({
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4, 
+    gap: 0, 
   },
   legendText: {
     fontSize: 12,

@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Image, Platform, Pressable, ScrollView, StyleSheet, View, } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppText from '../components/AppText';
 import { useUser } from './context/UserContext';
@@ -153,7 +153,7 @@ export default function MyPage() {
                 </View>
 
                 <AppText type="pretendard-b" style={styles.nameText}>
-                  {myName}
+                  {myName}{Platform.OS === 'android' ? '\u200A' : ''}
                 </AppText>
                 <AppText type="pretendard-m" style={styles.birthText}>{myBirth}</AppText>
 
@@ -271,7 +271,6 @@ const styles = StyleSheet.create({
   editButtonText: {
     fontSize: 13,
     color: '#555',
-    fontWeight: '600',
   },
   whiteCard: {
     flex: 1,

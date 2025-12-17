@@ -53,18 +53,6 @@ const MISSION_CACHE_KEY = 'performed_missions_cache';
 const CACHE_VERSION = 'v1'; 
 
 
-// async function saveChatCache(roomId: string, messages: ChatMessage[]) {
-//   try {
-//     const toSave = messages
-//       .filter(m => 
-//         m.status !== 'failed' && 
-//         !String(m.id).startsWith('mission_') && 
-//         !String(m.id).includes('_opt_') 
-//       )
-//       .slice(-100); 
-//     await AsyncStorage.setItem(CHAT_CACHE_KEY(roomId), JSON.stringify({ version: CACHE_VERSION, data: toSave }));
-//   } catch (e) { console.warn('[cache save]', e); }
-// }
 async function loadChatCache(roomId: string): Promise<ChatMessage[]> {
   try {
     const cached = await AsyncStorage.getItem(CHAT_CACHE_KEY(roomId));
@@ -213,7 +201,6 @@ export default function ChatScreen() {
   useEffect(() => {
     return () => {
       if (ROOM_KEY) {
-        // saveChatCache(ROOM_KEY, latestMessages.current);
         saveMissionCache(latestPerformedMissions.current);
       }
     };
@@ -251,18 +238,18 @@ export default function ChatScreen() {
       if (p.clientMsgId) {
         const ix = prev.findIndex(x => x.clientMsgId === p.clientMsgId);
         if (ix >= 0) {
-           updated[ix] = { ...(updated[ix] as ChatMessage), id: String(p.id ?? updated[ix].id), status: 'sent', createdAt: p.createdAt ?? updated[ix].createdAt, imageUrl: p.imageUrl ?? updated[ix].imageUrl } as ChatMessage;
-           found = true;
+          updated[ix] = { ...(updated[ix] as ChatMessage), id: String(p.id ?? updated[ix].id), status: 'sent', createdAt: p.createdAt ?? updated[ix].createdAt, imageUrl: p.imageUrl ?? updated[ix].imageUrl } as ChatMessage;
+          found = true;
         }
       }
       if (!found) {
         const isMine = String(p.senderId) === String(userId ?? '');
         if (isMine && p.message) {
-           const matchIndex = prev.findIndex(m => m.id.startsWith('local_') && m.text === p.message && m.mine === true);
-           if (matchIndex >= 0) {
+          const matchIndex = prev.findIndex(m => m.id.startsWith('local_') && m.text === p.message && m.mine === true);
+          if (matchIndex >= 0) {
               updated[matchIndex] = { ...updated[matchIndex], id: String(p.id ?? updated[matchIndex].id), status: 'sent', createdAt: p.createdAt ?? updated[matchIndex].createdAt } as ChatMessage;
               found = true;
-           }
+          }
         }
       }
       if (!found) {
@@ -272,7 +259,6 @@ export default function ChatScreen() {
           type: p.imageUrl ? 'image' : 'text', status: 'sent',
         });
       }
-      // if (ROOM_KEY) saveChatCache(ROOM_KEY, updated);
       return updated;
     });
     setTimeout(scrollToBottom, 100); 
@@ -597,7 +583,7 @@ export default function ChatScreen() {
                 <View style={containerStyle}>
                     {m.type === 'mission_text' ? <AppText type='pretendard-b' style={styles.msgText}>{m.text}</AppText> :
                     m.type === 'image' ? <Image source={{ uri: m.imageUrl! }} style={styles.missionImage} resizeMode="cover" /> :
-                    <AppText type='pretendard-m' style={m.mine ? styles.msgTextMine : styles.msgTextOther}>{m.text}</AppText>}
+                    <AppText type='pretendard-m' style={m.mine ? styles.msgTextMine : styles.msgTextOther}>{m.text}{Platform.OS === 'android' ? '\u200A' : ''}</AppText>}
                 </View>
 
                 {/* 상대방 메시지 시간  */}
@@ -630,9 +616,9 @@ export default function ChatScreen() {
       enabled={isIOS} 
       keyboardVerticalOffset={isIOS ? HEADER_HEIGHT + insets.top : 0}
     >
-      <View style={[styles.header, { paddingTop: insets.top }]}>
+      <View style={[styles.header, { paddingTop: 0 }]}>
         <Pressable style={{ paddingHorizontal: 8 }} onPress={() => router.back()}><Ionicons name="chevron-back" size={24} color="#111" /></Pressable>
-        <AppText style={styles.headerTitle}>{userData?.partnerName}</AppText>
+        <AppText style={styles.headerTitle}>{userData?.partnerName}{Platform.OS === 'android' ? '\u200A' : ''}</AppText>
       </View>
 
       <FlatList<ChatMessage | DateMarker>
@@ -686,8 +672,8 @@ export default function ChatScreen() {
 const STICKER_SIZE = 128;
 const styles = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: '#FFFCF5' },
-  header: { height: HEADER_HEIGHT, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, justifyContent: 'flex-start', marginVertical: 25, gap:'37%' },
-  headerTitle: { fontSize: 16, color: '#111' },
+  header: { height: HEADER_HEIGHT, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, justifyContent: 'flex-start', marginVertical: 25, gap:'37%',},
+  headerTitle: { fontSize: 16, color: '#111', top:0,},
   row: { 
     width: '100%', 
     marginVertical: 2, 
@@ -765,8 +751,23 @@ const styles = StyleSheet.create({
   bubbleOther: { backgroundColor: '#FFADAD',  borderTopLeftRadius: 2, },
   missionImage: { width: STICKER_SIZE * 1.6, height: STICKER_SIZE * 2.5, borderRadius: 0, backgroundColor: '#DDE7FF' },
   msgText: { fontSize: 13, lineHeight: 20, color: '#fff', paddingVertical:12, paddingHorizontal:20},
-  msgTextMine: { fontSize: 12, color: '#3F3F3F',  },
-  msgTextOther: { fontSize: 12, color: '#3F3F3F',},
+  msgTextMine: { 
+  fontSize: 12, 
+  lineHeight: 16,
+  color: '#3F3F3F',
+  // [추가] 폰트 내부 패딩 계산 무시 (안드로이드 수직 정렬/잘림 해결 핵심)
+  includeFontPadding: false, 
+  textAlignVertical: 'center', 
+},
+
+msgTextOther: { 
+  fontSize: 12, 
+  lineHeight: 16,
+  color: '#3F3F3F',
+  // [추가]
+  includeFontPadding: false,
+  textAlignVertical: 'center',
+},
   SendingText:{fontSize:10, color:'#6198FF'},
   metaWrapRight: { alignItems: 'center', justifyContent: 'flex-end' },
   dateWrap: { alignItems: 'center', marginVertical: 26 },

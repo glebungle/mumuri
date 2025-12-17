@@ -1,15 +1,48 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React from 'react';
+import React, { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppText from '../components/AppText';
+// import { useUser } from './context/UserContext';
+
+// 백엔드 API 명세에 맞춘 타입 정의
+interface MyPageResponse {
+  name: string;
+  birthday: string;
+  anniversary: string;
+  birthdayCouple: string;
+  dDay: number;
+}
 
 export default function AccountSettingScreen() {
   const insets = useSafeAreaInsets();
+  // const { userData, refreshUserData } = useUser(); 
+  const [myPageData, setMyPageData] = useState<MyPageResponse | null>(null);
 
   const handleBack = () => router.back();
   const handleEdit = () => router.push('/edit');
+
+  const formatDate = (dateString?: string) => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return dateString;
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}. ${month}. ${day}`;
+};
+
+const formatBirthString = (raw?: string | null): string => {
+  if (!raw) return '--. --. --';
+  return formatDate(raw); 
+};
+  
+  const myName = myPageData?.name || '사용자';
+  const myBirth = formatBirthString(myPageData?.birthday);
+
+  const anniversaryDate = formatDate(myPageData?.anniversary);
+  
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -32,17 +65,17 @@ export default function AccountSettingScreen() {
         
         <View style={styles.menuItem}>
           <AppText type="semibold" style={styles.menuText}>이름</AppText>
-          <AppText type="regular" style={styles.subText}>25.12.1</AppText>
+          <AppText type="regular" style={styles.subText}>{myName}</AppText>
         </View>
 
         <View style={styles.menuItem}>
           <AppText type="semibold" style={styles.menuText}>생년월일</AppText>
-          <AppText type="regular" style={styles.subText}>25.12.1</AppText>
+          <AppText type="regular" style={styles.subText}>{myBirth}</AppText>
         </View>
 
         <View style={styles.menuItem}>
           <AppText type="semibold" style={styles.menuText}>기념일</AppText>
-          <AppText type="regular" style={styles.subText}>25.12.1</AppText>
+          <AppText type="regular" style={styles.subText}>{anniversaryDate}</AppText>
         </View>
       </View>
 
@@ -75,13 +108,11 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     color: '#444444',
-    fontWeight: '600',
   },
   content: {
     marginTop: 10,
     paddingHorizontal: 24,
   },
-  // 공통 섹션 스타일
   section: {
     marginTop: 32,
   },
