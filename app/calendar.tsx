@@ -412,8 +412,8 @@ export default function CalendarScreen() {
 }, []);
 
   // 닉네임 가져오기 
-    const myName = userData?.name || '나';
-    const partnerName = (userData as any)?.partnerName || '애인'; //추후 수정필요!
+    const myName = userData?.myName || '나';
+    const partnerName = userData?.partnerName || '애인'; 
 
 
   const fetchSchedules = useCallback(async (targetMonth: string) => {
@@ -772,7 +772,8 @@ const styles = StyleSheet.create({
   legendContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12, 
+    gap: 10, 
+    flexShrink: 1, 
   },
   legendItem: {
     flexDirection: 'row',
@@ -781,6 +782,7 @@ const styles = StyleSheet.create({
   },
   legendText: {
     fontSize: 12,
+    textAlign: 'right',
   },
   legendDot: {
     width: 12,

@@ -15,7 +15,6 @@ export interface MainPhoto {
 // [2] 홈 메인 데이터 타입 수정
 export interface HomeData {
   anniversary: string;
-  name: string | null;
   date: number; // dDay
   roomId: number;
   userId: number; 
@@ -24,6 +23,8 @@ export interface HomeData {
   mainPhoto: MainPhoto | null; 
   myProfileImageUrl: string | null;
   partnerProfileImageUrl: string | null;
+  myName: string | null;
+  partnerName: string | null;
 }
 
 export interface TodayMission {
@@ -65,7 +66,10 @@ async function fetchHomeMain(token: string) {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) throw new Error(`Home Main Fetch Error: ${res.status}`);
-    return res.json();
+    const json = await res.json();
+    // 디버깅용
+    // console.log("[DEBUG] fetchHomeMain 응답:", JSON.stringify(json, null, 2));
+    return json;
   } catch (error) {
     console.error('❌ fetchHomeMain 실패:', error);
     return null; 
@@ -111,7 +115,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
 
-      // 🟢 [STEP 1] 기본 정보(홈, 유저)만 먼저 호출하여 커플 여부를 확인합니다.
+      //  [STEP 1] 기본 정보(홈, 유저)만 먼저 호출하여 커플 여부를 확인합니다.
       const [homeResponse, userInfo] = await Promise.all([
         fetchHomeMain(token),
         fetchUserInfo(token),
@@ -141,7 +145,6 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
       if (homeResponse && extractedUserId !== null) {
         mergedData = {
           anniversary: homeResponse.anniversary,
-          name: homeResponse.name,
           date: homeResponse.dDay || 0,
           roomId: homeResponse.roomId,
           coupleId: homeResponse.coupleId, 
@@ -150,6 +153,8 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
           mainPhoto: homeResponse.mainPhoto || null,
           myProfileImageUrl: homeResponse.myProfileImageUrl || null,
           partnerProfileImageUrl: homeResponse.partnerProfileImageUrl || null,
+          myName: homeResponse.myName || null,
+          partnerName: homeResponse.partnerName || null,
         };
         setUserData(mergedData);
       } else {

@@ -7,6 +7,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ListRenderItem } from 'react-native';
 import {
   Alert,
+  Dimensions,
   FlatList,
   Image,
   InputAccessoryView,
@@ -44,20 +45,26 @@ const HEADER_HEIGHT = 56;
 
 const USE_STOMP = true;
 const cameraImg = require('../assets/images/Camera.png');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // ================== 내부 유틸(API) ==================
 const CHAT_CACHE_KEY = (roomId: string) => `chat_cache_${roomId}`;
 const MISSION_CACHE_KEY = 'performed_missions_cache';
 const CACHE_VERSION = 'v1'; 
 
-async function saveChatCache(roomId: string, messages: ChatMessage[]) {
-  try {
-    const toSave = messages
-      .filter(m => m.status !== 'failed' && !String(m.id).startsWith('mission_')) 
-      .slice(-100); 
-    await AsyncStorage.setItem(CHAT_CACHE_KEY(roomId), JSON.stringify({ version: CACHE_VERSION, data: toSave }));
-  } catch (e) { console.warn('[cache save]', e); }
-}
+
+// async function saveChatCache(roomId: string, messages: ChatMessage[]) {
+//   try {
+//     const toSave = messages
+//       .filter(m => 
+//         m.status !== 'failed' && 
+//         !String(m.id).startsWith('mission_') && 
+//         !String(m.id).includes('_opt_') 
+//       )
+//       .slice(-100); 
+//     await AsyncStorage.setItem(CHAT_CACHE_KEY(roomId), JSON.stringify({ version: CACHE_VERSION, data: toSave }));
+//   } catch (e) { console.warn('[cache save]', e); }
+// }
 async function loadChatCache(roomId: string): Promise<ChatMessage[]> {
   try {
     const cached = await AsyncStorage.getItem(CHAT_CACHE_KEY(roomId));
@@ -110,6 +117,7 @@ type ChatMessage = {
   id: string; text?: string; imageUrl?: string; mine: boolean;
   createdAt: number; type: 'text' | 'image' | 'mission_text';
   status?: SendStatus; clientMsgId?: string | null; alt?: string; 
+  isFirstInGroup?: boolean; 
 };
 type DateMarker = { __type: 'date'; key: string; ts: number };
 function isDateMarker(x: ChatMessage | DateMarker): x is DateMarker { return (x as any).__type === 'date'; }
@@ -205,7 +213,7 @@ export default function ChatScreen() {
   useEffect(() => {
     return () => {
       if (ROOM_KEY) {
-        saveChatCache(ROOM_KEY, latestMessages.current);
+        // saveChatCache(ROOM_KEY, latestMessages.current);
         saveMissionCache(latestPerformedMissions.current);
       }
     };
@@ -217,7 +225,7 @@ export default function ChatScreen() {
     }
   }, []);
 
-  // [수정] 키보드 리스너: 높이 직접 계산 및 스크롤
+  // 키보드 리스너
   useEffect(() => {
     const onShow = (e: KeyboardEvent) => {
         setKeyboardHeight(e.endCoordinates.height);
@@ -264,7 +272,7 @@ export default function ChatScreen() {
           type: p.imageUrl ? 'image' : 'text', status: 'sent',
         });
       }
-      if (ROOM_KEY) saveChatCache(ROOM_KEY, updated);
+      // if (ROOM_KEY) saveChatCache(ROOM_KEY, updated);
       return updated;
     });
     setTimeout(scrollToBottom, 100); 
@@ -443,14 +451,9 @@ export default function ChatScreen() {
     const missionMsgs: ChatMessage[] = [];
     
     performedMissions.forEach(m => {
-        // 🟢 [1차 방어] 파라미터로 받은 ID와 같다면 스킵
         if (justCompletedMissionId && String(m.missionId) === String(justCompletedMissionId)) {
             return;
         }
-
-        // 🟢 [2차 방어 - 핵심] 이미 baseMsgs(화면에 떠있는 메시지들) 안에 
-        // 이 미션 ID를 가진 임시 메시지(mission_text_opt_... 등)가 존재한다면 서버 데이터 무시
-        // 임시 메시지 ID 포맷: `mission_text_opt_${id}_...`
         const alreadyHasLocal = baseMsgs.some(msg => 
             String(msg.id).includes(`mission_text_opt_${m.missionId}`) || 
             String(msg.id).includes(`mission_img_opt_${m.missionId}`)
@@ -464,7 +467,7 @@ export default function ChatScreen() {
         const mtId = `mission_text_${m.missionId}`;
         
         // 1. 미션 텍스트 추가
-        const hasSameText = baseMsgs.some(msg => msg.id === mtId); // ID로만 체크해도 충분
+        const hasSameText = baseMsgs.some(msg => msg.id === mtId); 
         if (!hasSameText) {
             missionMsgs.push({ 
                 id: mtId, 
@@ -511,15 +514,25 @@ export default function ChatScreen() {
         }
     });
 
-    // ... (이하 동일) ...
     const merged = [...baseMsgs, ...missionMsgs].sort((a, b) => a.createdAt - b.createdAt);
+
+    const groupedMessages: ChatMessage[] = [];
+    for (let i = 0; i < merged.length; i++) {
+        const current = merged[i];
+        const prev = i > 0 ? merged[i - 1] : null;
+
+        const isFirst = !prev || prev.mine !== current.mine || !sameMinute(prev.createdAt, current.createdAt);
+        
+        groupedMessages.push({ ...current, isFirstInGroup: isFirst });
+    }
     
     const withDate: (ChatMessage | DateMarker)[] = [];
     let lastTs: number | null = null;
     
-    for (const m of merged) {
+    for (const m of groupedMessages) {
         if (lastTs == null || !sameYMD(lastTs, m.createdAt)) {
             withDate.push({ __type: 'date', key: `date_${m.createdAt}`, ts: m.createdAt });
+            m.isFirstInGroup = true; 
         }
         withDate.push(m);
         lastTs = m.createdAt;
@@ -540,35 +553,71 @@ export default function ChatScreen() {
 
   const renderItem: ListRenderItem<ChatMessage | DateMarker> = useCallback(({ item, index }) => {
     if (isDateMarker(item)) return <View style={styles.dateWrap}><ChatText style={styles.dateText}>{formatDate(item.ts)}</ChatText></View>;
+    
     const m = item as ChatMessage;
-    const showTime = shouldShowTime(index);
+    const showTime = shouldShowTime(index); 
+    
     const bubbleStyle = m.type === 'mission_text' ? (m.mine ? styles.bubbleMissionMine : styles.bubbleMissionOther) : (m.mine ? styles.bubbleMine : styles.bubbleOther);
     const containerStyle = m.type === 'image' ? (m.mine ? styles.imageBoxMine : styles.imageBoxOther) : [styles.bubble, bubbleStyle];
 
+    const partnerName = userData?.partnerName || '애인';
+    const partnerProfile = userData?.partnerProfileImageUrl 
+        ? { uri: userData.partnerProfileImageUrl } 
+        : require('../assets/images/userprofile.png');
+
     return (
       <View style={[styles.row, m.mine ? styles.rowMine : styles.rowOther]}>
-        <View style={[styles.msgCol, m.mine ? { flexDirection: 'row', justifyContent: 'flex-end' } : { flexDirection: 'row', justifyContent: 'flex-start' }]}>
-          {m.mine && showTime && <ChatText style={styles.timeTextMine}>{formatTime(m.createdAt)}</ChatText>}
-          <View style={containerStyle}>
-             {m.type === 'mission_text' ? <AppText type='pretendard-b' style={styles.msgText}>{m.text}</AppText> :
-              m.type === 'image' ? <Image source={{ uri: m.imageUrl! }} style={styles.missionImage} resizeMode="cover" /> :
-              <AppText type='pretendard-m' style={m.mine ? styles.msgTextMine : styles.msgTextOther}>{m.text}</AppText>}
-          </View>
-          {!m.mine && showTime && <ChatText style={styles.timeTextOther}>{formatTime(m.createdAt)}</ChatText>}
+        
+        {/* 1. 상대방 메시지 프로필 영역 */}
+        {!m.mine && (
+            <View style={styles.profileContainer}>
+                {m.isFirstInGroup ? (
+                    <Image source={partnerProfile} style={styles.profileImage} />
+                ) : (
+                    <View style={styles.profileSpacer} /> 
+                )}
+            </View>
+        )}
+
+        {/* 2. 메시지 내용*/}
+        <View style={[styles.msgContentWrapper, !m.mine && { alignItems: 'flex-start' }]}>
+            
+            {/* 이름 */}
+            {!m.mine && m.isFirstInGroup && (
+                <AppText type='pretendard-m' style={styles.partnerName}>{partnerName}</AppText>
+            )}
+
+            {/* 말풍선 + 시간 */}
+            <View style={[styles.msgContainer, m.mine ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }]}>
+                
+                {/* 내 메시지 시간  */}
+                {m.mine && showTime && <ChatText style={styles.timeTextMine}>{formatTime(m.createdAt)}</ChatText>}
+                
+                {/* 말풍선  */}
+                <View style={containerStyle}>
+                    {m.type === 'mission_text' ? <AppText type='pretendard-b' style={styles.msgText}>{m.text}</AppText> :
+                    m.type === 'image' ? <Image source={{ uri: m.imageUrl! }} style={styles.missionImage} resizeMode="cover" /> :
+                    <AppText type='pretendard-m' style={m.mine ? styles.msgTextMine : styles.msgTextOther}>{m.text}</AppText>}
+                </View>
+
+                {/* 상대방 메시지 시간  */}
+                {!m.mine && showTime && <ChatText style={styles.timeTextOther}>{formatTime(m.createdAt)}</ChatText>}
+            </View>
         </View>
-        <View style={styles.metaWrapRight}>
-            {m.status === 'failed' && <Ionicons name="alert-circle" size={14} color="#FF4D4F" />}
-            {m.status === 'sending' && <AppText type='pretendard-b' style={styles.SendingText}>...</AppText>}
-        </View>
+
+        {/* 전송 상태 표시 (내 메시지용) */}
+        {m.mine && (
+            <View style={styles.metaWrapRight}>
+                {m.status === 'failed' && <Ionicons name="alert-circle" size={14} color="#FF4D4F" />}
+                {m.status === 'sending' && <AppText type='pretendard-b' style={styles.SendingText}>...</AppText>}
+            </View>
+        )}
       </View>
     );
-  }, [shouldShowTime]);
+  }, [shouldShowTime, userData]); 
 
   const isIOS = Platform.OS === 'ios';
 
-  // Android 패딩 계산 로직 (수동 제어)
-  // 키보드가 없으면 안전영역(insets.bottom)을 더해준다.
-  // 키보드가 있으면 키보드 높이만큼만 올린다. (OS에 따라 키보드 높이에 네비게이션바가 포함될 수 있으므로 insets.bottom을 빼서 중복 제거)
   const androidPadding = keyboardHeight > 0 
     ? 60 + keyboardHeight// 키보드 올라옴: 키보드 높이 + 기본패딩 - 네비바(중복방지)
     : 12 + insets.bottom; // 키보드 내려감: 기본패딩 + 네비바(안전영역)
@@ -583,13 +632,13 @@ export default function ChatScreen() {
     >
       <View style={[styles.header, { paddingTop: insets.top }]}>
         <Pressable style={{ paddingHorizontal: 8 }} onPress={() => router.back()}><Ionicons name="chevron-back" size={24} color="#111" /></Pressable>
-        <AppText style={styles.headerTitle}>애인</AppText>
+        <AppText style={styles.headerTitle}>{userData?.partnerName}</AppText>
       </View>
 
       <FlatList<ChatMessage | DateMarker>
         ref={listRef}
         inverted={true}
-        contentContainerStyle={{ paddingHorizontal: 12, paddingTop: 12, paddingBottom: 20 }}
+        contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 12, }}
         data={listData}
         renderItem={renderItem}
         keyExtractor={(item, i) => isDateMarker(item) ? item.key : item.id ?? String(i)}
@@ -620,7 +669,6 @@ export default function ChatScreen() {
           </View>
         </InputAccessoryView>
       ) : (
-        // [핵심] Android: 수동으로 계산된 패딩 적용
         <View style={[styles.inputBar, { paddingBottom: androidPadding }]}> 
           <Pressable onPress={() => router.push('/camera')} style={{ paddingHorizontal: 8 }}><Image source={cameraImg} style={styles.cameraImage} resizeMode="contain" /></Pressable>
           <TextInput
@@ -640,29 +688,103 @@ const styles = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: '#FFFCF5' },
   header: { height: HEADER_HEIGHT, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, justifyContent: 'flex-start', marginVertical: 25, gap:'37%' },
   headerTitle: { fontSize: 16, color: '#111' },
-  row: { width: '100%', marginVertical: 6 },
-  rowMine: { alignItems: 'flex-end' }, 
-  rowOther: { alignItems: 'flex-start' }, 
-  msgCol: { maxWidth: '80%', alignItems: 'flex-end' },
-  bubble: { paddingHorizontal: 12, paddingVertical: 10, borderRadius: 16 },
-  bubbleMine: { backgroundColor: '#BED5FF', borderBottomRightRadius: 2 },
-  bubbleOther: { backgroundColor: '#FFADAD', borderWidth: StyleSheet.hairlineWidth, borderTopLeftRadius: 2 },
-  imageBoxMine: { borderRadius: 18, overflow: 'hidden', alignSelf: 'flex-end' },
-  imageBoxOther: { borderRadius: 18, overflow: 'hidden', alignSelf: 'flex-start' },
-  bubbleMissionMine: { backgroundColor: '#6198FF', borderBottomRightRadius: 0,width:'80%',},
-  bubbleMissionOther: { backgroundColor: '#FFADAD', borderTopRightRadius: 0, width:'80%' },
+  row: { 
+    width: '100%', 
+    marginVertical: 2, 
+    flexDirection: 'row', 
+    alignItems: 'flex-start' ,
+  },
+  rowMine: { justifyContent: 'flex-end',  }, 
+  rowOther: { justifyContent: 'flex-start', }, 
+
+  profileContainer: { 
+    width: 40, 
+    marginRight: 8, 
+    alignItems: 'center',
+    justifyContent: 'flex-start' 
+  },
+  profileImage: { width: 40, height: 40, borderRadius: 99, backgroundColor: '#DDD' },
+  profileSpacer: { width: 40 }, // 빈 공간
+
+  msgContentWrapper: { 
+    maxWidth: '100%',
+    flexDirection: 'column' 
+  },
+
+  partnerName: { 
+    fontSize: 12, 
+    color: '#3F3F3F', 
+    marginBottom: 4, 
+  },
+
+  msgCol: { 
+    alignItems: 'flex-end',
+  }, 
+
+  bubble: { 
+    paddingHorizontal: 18, 
+    paddingVertical: 12, 
+    borderRadius: 12,
+    maxWidth: SCREEN_WIDTH * 0.63, 
+  },
+  
+  imageBoxMine: { 
+    borderRadius: 18, 
+    overflow: 'hidden', 
+    alignSelf: 'flex-end',
+    maxWidth: SCREEN_WIDTH * 0.6,
+  },
+  imageBoxOther: { 
+    borderRadius: 18, 
+    overflow: 'hidden', 
+    alignSelf: 'flex-start',
+    maxWidth: SCREEN_WIDTH * 0.6, 
+  },
+
+  bubbleMissionMine: { 
+    backgroundColor: '#6198FF', 
+    borderBottomRightRadius: 0,
+    width: 'auto', 
+    maxWidth: SCREEN_WIDTH * 0.63, 
+  },
+  bubbleMissionOther: { 
+    backgroundColor: '#FFADAD', 
+    borderTopRightRadius: 0, 
+    width: 'auto',
+    maxWidth: SCREEN_WIDTH * 0.63, 
+  },
+  msgContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end', 
+    marginBottom:4,
+  },
+  timeTextMine: { marginRight: 4, fontSize: 9, color: '#75787B', fontFamily:'Pretendard-Regular' },
+  timeTextOther: { marginLeft: 4, fontSize: 9, color: '#75787B', fontFamily:'Pretendard-Regular'  },
+
+  bubbleMine: { backgroundColor: '#BED5FF', borderBottomRightRadius: 2, },
+  bubbleOther: { backgroundColor: '#FFADAD',  borderTopLeftRadius: 2, },
   missionImage: { width: STICKER_SIZE * 1.6, height: STICKER_SIZE * 2.5, borderRadius: 0, backgroundColor: '#DDE7FF' },
   msgText: { fontSize: 13, lineHeight: 20, color: '#fff', paddingVertical:12, paddingHorizontal:20},
-  msgTextMine: { fontSize: 13, color: '#3F3F3F' },
-  msgTextOther: { fontSize: 13, color: '#3F3F3F' },
+  msgTextMine: { fontSize: 12, color: '#3F3F3F',  },
+  msgTextOther: { fontSize: 12, color: '#3F3F3F',},
   SendingText:{fontSize:10, color:'#6198FF'},
-  timeTextMine: { marginRight: 6, marginBottom: 0, fontSize: 10, color: '#75787B', alignSelf: 'flex-end' },
-  timeTextOther: { marginLeft: 6, marginBottom: 0, fontSize: 10, color: '#75787B', alignSelf: 'flex-end' },
-  metaWrapRight: { marginLeft: 6, alignItems: 'center', justifyContent: 'flex-end' },
+  metaWrapRight: { alignItems: 'center', justifyContent: 'flex-end' },
   dateWrap: { alignItems: 'center', marginVertical: 26 },
   dateText: { fontSize: 12, color: '#4D5053', backgroundColor: '#F8F4EA', paddingHorizontal: 18, paddingVertical: 8, borderRadius: 100 },
   inputBar: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 10, gap: 8, backgroundColor: '#FFFCF5',paddingTop:8},
-  input: { flex: 1, minHeight: 40, maxHeight: 120, backgroundColor: '#fff', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, borderColor: '#e5e7eb', color: '#111' },
+  input: { 
+    flex: 1, 
+    minHeight: 40, 
+    maxHeight: 120, 
+    backgroundColor: '#fff', 
+    paddingHorizontal: 12, 
+    paddingVertical: 8, 
+    borderRadius: 12, 
+    borderWidth: StyleSheet.hairlineWidth, 
+    borderColor: '#e5e7eb', 
+    color: '#111', 
+    fontFamily: 'Pretendard-Regular' 
+  },
   sendBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: '#EEEFEF' },
   cameraImage: { width: 24, height: 24, tintColor: '#6198FF', marginBottom:10 },
 });

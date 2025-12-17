@@ -3,8 +3,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
-import { useRouter } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router'; // useFocusEffect 확인
+import React, { useCallback, useEffect, useRef, useState } from 'react'; // useCallback 추가
 import {
   Alert,
   Dimensions,
@@ -19,6 +19,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import ViewShot from 'react-native-view-shot';
 import AppText from '../components/AppText';
+import { useUser } from './context/UserContext';
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 const BASE_URL = 'https://mumuri.shop';
@@ -47,6 +48,8 @@ type TodayMission = { missionId: number; title: string; description: string; dif
 
 export default function CameraHome() {
   const router = useRouter();
+  const { userData, refreshUserData } = useUser(); 
+  
   const cameraRef = useRef<CameraView>(null);
   const viewShotRef = useRef<ViewShot>(null);
   const insets = useSafeAreaInsets();
@@ -61,8 +64,8 @@ export default function CameraHome() {
 
   const [isLayoutMode, setIsLayoutMode] = useState(false);
   const [layoutPhotos, setLayoutPhotos] = useState<string[]>([]);
+  const dday = userData?.date ?? 0; 
 
-  const [dday, setDday] = useState<number>(100);
   const [missions, setMissions] = useState<TodayMission[]>([]);
   const [sel, setSel] = useState(0);
 
@@ -71,7 +74,13 @@ export default function CameraHome() {
   const onCameraWrapLayout = (e: LayoutChangeEvent) => { const { width, height } = e.nativeEvent.layout; setViewW(width); setViewH(height); };
 
   useEffect(() => { (async () => { if (!camPerm?.granted) await requestCamPerm(); })(); }, []);
-  useEffect(() => { const fetchDday = async () => { try { const token = await AsyncStorage.getItem('token'); if (!token) return; const res = await fetch(`${BASE_URL}/user/main`, { method: 'GET', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } }); if (!res.ok) return; const json = await res.json(); if (typeof json.dday === 'number') setDday(json.dday); } catch { } }; fetchDday(); }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+        refreshUserData();
+    }, [])
+  );
+
   useEffect(() => { const fetchTodayMission = async () => { try { const json = await authedFetch('/api/couples/missions/today', { method: 'GET' }); let missionsData: TodayMission[] = []; if (Array.isArray(json)) missionsData = json as TodayMission[]; else if (json && Array.isArray((json as any).missions)) missionsData = (json as any).missions; if (missionsData.length > 0) { setMissions(missionsData); setSel(0); } else { setMissions([]); } } catch (e) { setMissions([]); } }; fetchTodayMission(); }, []);
 
   if (!camPerm) return <View style={styles.loadingScreen} />;
@@ -147,12 +156,11 @@ export default function CameraHome() {
     }
   };
 
-  // 🟢 [갤러리 선택 - 시스템 피커 사용]
   const pickFromGallery = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true, // 크롭(편집) 허용
+        allowsEditing: true, // 크롭 허용
         aspect: [screenWidth, Math.round(screenHeight * 0.8)], // 화면 비율대로 자르기
         quality: 1,
       });
@@ -181,7 +189,6 @@ export default function CameraHome() {
   const confirm = async () => {
     let uriToSend = previewUri;
     
-    // ViewShot으로 현재 보이는 화면(크롭/배치된 상태)을 최종 저장
     if (viewShotRef.current?.capture) {
       try { 
         uriToSend = await viewShotRef.current.capture(); 
@@ -260,7 +267,7 @@ export default function CameraHome() {
           </Pressable>
           <View style={styles.ddayBadge}>
             <Image source={heartImg} style={[styles.heartImage]} />
-            <AppText style={styles.ddayText}>{dday}</AppText>
+            <AppText style={styles.ddayText}>{dday-1}</AppText>
           </View>
           <Pressable style={[styles.headerBtn, isLayoutMode && { backgroundColor: '#6198FF' }]} onPress={toggleLayoutMode}>
             <MaterialCommunityIcons name="view-grid-plus" size={22} color={isLayoutMode ? "#fff" : "#6198FF"} />
@@ -328,7 +335,7 @@ const styles = StyleSheet.create({
   hintBubble: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 11, paddingVertical: 12, zIndex: 15, backgroundColor: 'rgba(255,255,255,0.7)', borderRadius: 12, maxWidth: '85%' },
   innerArrowArea: { width: 32, alignItems: 'center', justifyContent: 'center' },
   hintTextWrap: { flex: 1, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center' },
-  hintText: { color: '#444444', fontSize: 12, textAlign: 'center', fontWeight: '600' },
+  hintText: { color: '#444444', fontSize: 12, textAlign: 'center'},
   bottomOverlay: { position: 'absolute', left: 0, right: 0, bottom: -40, alignItems: 'center', justifyContent: 'center', zIndex: 50 },
   bottomButtonsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%', paddingHorizontal: 40 },
   galleryBtn: { width: 50, height: 50, borderRadius: 28, alignItems: 'center', justifyContent: 'center', position: 'absolute', left: 40 },
@@ -341,9 +348,9 @@ const styles = StyleSheet.create({
   topIconBtnRetake: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' },
   confirmBtn: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#FF9191', alignItems: 'center', justifyContent: 'center' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
-  permissionTitle: { fontSize: 18, marginBottom: 16, fontWeight: 'bold' },
+  permissionTitle: { fontSize: 18, marginBottom: 16,  },
   permBtn: { paddingHorizontal: 20, paddingVertical: 12, backgroundColor: '#6198FF', borderRadius: 12 },
-  permBtnText: { color: '#fff', fontWeight: '700' },
+  permBtnText: { color: '#fff', },
   heartImage: { width: 20, height: 20, tintColor: '#ffffffff' },
 
   layoutUnderlay: { ...StyleSheet.absoluteFillObject, zIndex: 0 },

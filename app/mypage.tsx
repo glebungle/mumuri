@@ -92,7 +92,7 @@ export default function MyPage() {
   const myName = myPageData?.name || '사용자';
   const myBirth = formatBirthString(myPageData?.birthday);
 
-  const partnerName = '애인'; 
+  const partnerName = userData?.partnerName||'애인'; 
   const partnerBirth = formatBirthString(myPageData?.birthdayCouple);
   
   const dDayCount = myPageData?.dDay ?? 0;

@@ -134,7 +134,7 @@ export default function GalleryView({ onBackToHome }: GalleryViewProps) {
   const loadPhotos = useCallback(async (pageNum: number, shouldRefresh: boolean = false) => {
     try {
       const token = await AsyncStorage.getItem('token');
-      if (!token) return;
+      if (!token||!coupleId) return;
       if (pageNum === 0) setLoading(true);
 
       const url = `${BASE_URL}/photos/gallery?page=${pageNum}&size=20&sort=createdAt,desc`; 

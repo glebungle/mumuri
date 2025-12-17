@@ -69,7 +69,7 @@ export default function HomeScreen() {
 
   const displayTitle = mainPhoto?.uploaderNickname 
     ? mainPhoto.uploaderNickname 
-    : (userData?.name||'사용자');
+    : (userData?.myName||'사용자');
 
   let displayDateText = '';
   if (mainPhoto?.createdAt) {
@@ -205,7 +205,7 @@ export default function HomeScreen() {
             <View style={styles.homeContentContainer}>
               <View style={{ height: HEADER_HEIGHT }} /> 
 
-              {mainPhoto!=defaultBgImg ? (
+              { backgroundSource!=defaultBgImg ? (
                 <View style={styles.infoSection}>
                   <View style={styles.nameDateContainer}>
                     <AppText style={styles.userName}>{displayTitle}</AppText>
