@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "377362410470",
+    "project_id": "mumuri-4bca0",
+    "storage_bucket": "mumuri-4bca0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:377362410470:android:bd6ea8f7a3a5e86f18c427",
+        "android_client_info": {
+          "package_name": "mumuri.test"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBrJS4t40_kmElezpUp3UsyNCIIP4apEcE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
