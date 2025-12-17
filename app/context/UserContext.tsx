@@ -12,7 +12,16 @@ export interface MainPhoto {
   createdAt: string;
 }
 
-// [2] 홈 메인 데이터 타입 수정
+// [추가] 마이페이지 API 응답 타입
+interface MyPageResponse {
+  name: string;
+  birthday: string;
+  anniversary: string;
+  birthdayCouple: string;
+  dDay: number;
+}
+
+// [2] 홈 메인 데이터 타입 수정 (생일 정보 추가)
 export interface HomeData {
   anniversary: string;
   date: number; // dDay
@@ -25,6 +34,9 @@ export interface HomeData {
   partnerProfileImageUrl: string | null;
   myName: string | null;
   partnerName: string | null;
+  // 👇 새로 추가된 필드
+  birthday: string | null;        
+  partnerBirthday: string | null; 
 }
 
 export interface TodayMission {
@@ -67,8 +79,6 @@ async function fetchHomeMain(token: string) {
     });
     if (!res.ok) throw new Error(`Home Main Fetch Error: ${res.status}`);
     const json = await res.json();
-    // 디버깅용
-    // console.log("[DEBUG] fetchHomeMain 응답:", JSON.stringify(json, null, 2));
     return json;
   } catch (error) {
     console.error('❌ fetchHomeMain 실패:', error);
@@ -85,6 +95,20 @@ async function fetchUserInfo(token: string) {
     return res.json();
   } catch (error) {
     console.error('❌ fetchUserInfo 실패:', error);
+    return null;
+  }
+}
+
+// [추가] 마이페이지 정보 호출 함수
+async function fetchMyPage(token: string) {
+  try {
+    const res = await fetch(`${BASE_URL}/api/mypage`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error(`MyPage Fetch Error: ${res.status}`);
+    return res.json();
+  } catch (error) {
+    console.error('❌ fetchMyPage 실패:', error);
     return null;
   }
 }
@@ -115,16 +139,16 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
 
-      //  [STEP 1] 기본 정보(홈, 유저)만 먼저 호출하여 커플 여부를 확인합니다.
-      const [homeResponse, userInfo] = await Promise.all([
+      // [STEP 1] 홈, 유저정보, 마이페이지 정보를 병렬로 호출
+      const [homeResponse, userInfo, myPageResponse] = await Promise.all([
         fetchHomeMain(token),
         fetchUserInfo(token),
+        fetchMyPage(token), // 👈 추가됨
       ]);
 
       // [STEP 2] 커플 연결 여부에 따라 미션 API 호출 분기
       let missionResponse: TodayMission[] = [];
       
-      // homeResponse가 정상이고, coupleId가 0보다 커야(커플임) 미션 API를 호출
       if (homeResponse && homeResponse.coupleId && homeResponse.coupleId > 0) {
           const missions = await fetchTodayMissions(token);
           if (Array.isArray(missions)) {
@@ -143,6 +167,9 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       if (homeResponse && extractedUserId !== null) {
+        // myPageResponse 데이터 안전하게 추출
+        const myPageData = myPageResponse as MyPageResponse | null;
+
         mergedData = {
           anniversary: homeResponse.anniversary,
           date: homeResponse.dDay || 0,
@@ -155,13 +182,16 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
           partnerProfileImageUrl: homeResponse.partnerProfileImageUrl || null,
           myName: homeResponse.myName || null,
           partnerName: homeResponse.partnerName || null,
+          
+          // 👇 마이페이지 API에서 가져온 정보 병합
+          birthday: myPageData?.birthday || null,
+          partnerBirthday: myPageData?.birthdayCouple || null,
         };
         setUserData(mergedData);
       } else {
         console.warn('⚠️ [UserContext] 데이터 로드 실패 (필수 정보 누락)');
       }
 
-      // 미션 상태 업데이트 (커플이 아니면 위에서 빈 배열로 설정됨)
       setTodayMissions(missionResponse);
 
     } catch (e) {

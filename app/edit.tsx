@@ -24,7 +24,6 @@ import { useUser } from './context/UserContext';
 const BASE_URL = 'https://mumuri.shop';
 const defaultProfileImg = require('../assets/images/userprofile.png');
 
-
 export default function EditProfileScreen() {
   const { userData, refreshUserData } = useUser();
   const insets = useSafeAreaInsets();
@@ -41,7 +40,7 @@ export default function EditProfileScreen() {
   });
 
   // [유틸] "2024-01-01" -> "2024. 01. 01." 변환
-  const formatToDisplay = (dateStr: string) => {
+  const formatToDisplay = (dateStr: string | null) => {
     if (!dateStr) return '';
     return dateStr.replace(/-/g, '. ');
   };
@@ -64,50 +63,28 @@ export default function EditProfileScreen() {
   };
 
   useEffect(() => {
-    const fetchProfileData = async () => {
-      try {
-        const token = await AsyncStorage.getItem('token');
-        if (!token) return;
+    if (userData) {
+      const loadedName = userData.myName || '';
+      const loadedBirth = userData.birthday ? formatToDisplay(userData.birthday) : '';
+      const loadedAnni = userData.anniversary ? formatToDisplay(userData.anniversary) : '';
 
-        const res = await fetch(`${BASE_URL}/api/mypage`, {
-          method: 'GET',
-          headers: { Authorization: `Bearer ${token}` },
-        });
+      setName(loadedName);
+      setBirthday(loadedBirth);
+      setAnniversary(loadedAnni);
 
-        if (res.ok) {
-          const data = await res.json();
-          // 데이터 예시: { name: "형원", birthday: "2004-04-23", anniversary: "2025-11-29", ... }
-          
-          const loadedName = data.name || '';
-          const loadedBirth = data.birthday ? formatToDisplay(data.birthday) : '';
-          const loadedAnni = data.anniversary ? formatToDisplay(data.anniversary) : '';
+      setInitialValues({
+        name: loadedName,
+        birthday: loadedBirth,
+        anniversary: loadedAnni,
+      });
+    }
+  }, [userData]);
 
-          // 상태 업데이트
-          setName(loadedName);
-          setBirthday(loadedBirth);
-          setAnniversary(loadedAnni);
-
-          // 변경 여부 확인을 위해 초기값 저장
-          setInitialValues({
-            name: loadedName,
-            birthday: loadedBirth,
-            anniversary: loadedAnni,
-          });
-        }
-      } catch (e) {
-        console.warn('Failed to load profile:', e);
-      }
-    };
-
-    fetchProfileData();
-  }, []);
-
-  // 이미지는 UserContext에서 가져옴 (api/mypage에 이미지 URL이 없다면)
   const currentImage = userData?.myProfileImageUrl
     ? { uri: userData.myProfileImageUrl }
     : defaultProfileImg;
 
-  // --- 이미지 관련 함수 (기존 유지) ---
+  // --- 이미지 업로드/삭제 로직 (유지) ---
   const pickAndUploadImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
@@ -190,6 +167,7 @@ export default function EditProfileScreen() {
     ]);
   };
 
+  // --- 저장 로직 (유지 - 변경 사항 서버 전송용) ---
   const handleSaveAll = async () => {
     if (!name.trim()) {
         Alert.alert('알림', '이름을 입력해주세요.');
@@ -213,19 +191,16 @@ export default function EditProfileScreen() {
         const token = await AsyncStorage.getItem('token');
         const promises = [];
 
-        // 1. 이름 변경 (초기값과 다를 때만)
         if (name !== initialValues.name) {
             const url = `${BASE_URL}/api/setting/name?name=${encodeURIComponent(name)}`;
             promises.push(fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${token}` } }));
         }
 
-        // 2. 생일 변경
         if (apiBirth && birthday !== initialValues.birthday) {
              const url = `${BASE_URL}/api/setting/birthday?birthday=${apiBirth}`;
              promises.push(fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${token}` } }));
         }
 
-        // 3. 기념일 변경
         if (apiAnni && anniversary !== initialValues.anniversary) {
             const url = `${BASE_URL}/api/setting/anniversary?anniversary=${apiAnni}`;
             promises.push(fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${token}` } }));
@@ -238,7 +213,7 @@ export default function EditProfileScreen() {
         }
 
         await Promise.all(promises);
-        await refreshUserData(); // 컨텍스트 갱신
+        await refreshUserData(); // 🟢 저장 후 Context 갱신
         
         Alert.alert('성공', '정보가 수정되었습니다.', [
             { text: '확인', onPress: () => router.back() }
@@ -293,7 +268,6 @@ export default function EditProfileScreen() {
 
             {/* 입력 폼 영역 */}
             <View style={styles.formContainer}>
-                {/* 이름 */}
                 <View style={styles.inputRow}>
                     <AppText type="semibold" style={styles.label}>이름</AppText>
                     <TextInput 
@@ -305,7 +279,6 @@ export default function EditProfileScreen() {
                     />
                 </View>
 
-                {/* 생년월일 */}
                 <View style={styles.inputRow}>
                     <AppText type="semibold" style={styles.label}>생년월일</AppText>
                     <TextInput 
@@ -319,7 +292,6 @@ export default function EditProfileScreen() {
                     />
                 </View>
 
-                {/* 기념일 */}
                 <View style={styles.inputRow}>
                     <AppText type="semibold" style={styles.label}>기념일</AppText>
                     <TextInput 

@@ -1,28 +1,16 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
-import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, Platform, Pressable, ScrollView, StyleSheet, View, } from 'react-native';
+import React, { useCallback, useMemo } from 'react';
+import { Image, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppText from '../components/AppText';
-import { useUser } from './context/UserContext';
-
-// 백엔드 API 명세에 맞춘 타입 정의
-interface MyPageResponse {
-  name: string;
-  birthday: string;
-  anniversary: string;
-  birthdayCouple: string;
-  dDay: number;
-}
-
-const BASE_URL = 'https://mumuri.shop'; 
+import { useUser } from './context/UserContext'; // 🟢 Context
 
 const profileImg = require('../assets/images/userprofile.png');
 const settingsImg = require('../assets/images/Settings.png');
 const heartImg = require('../assets/images/Heart.png');
 
-const formatDate = (dateString?: string) => {
+const formatDate = (dateString?: string | null) => {
   if (!dateString) return '';
   const date = new Date(dateString);
   if (isNaN(date.getTime())) return dateString;
@@ -40,43 +28,12 @@ const formatBirthString = (raw?: string | null): string => {
 export default function MyPage() {
   const { userData, refreshUserData } = useUser(); 
   
-  const [myPageData, setMyPageData] = useState<MyPageResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-
   const displayProfileImage = userData?.myProfileImageUrl 
     ? { uri: userData.myProfileImageUrl } 
     : profileImg;
 
-  const fetchMyPageData = async () => {
-    try {
-      setLoading(true);
-      const token = await AsyncStorage.getItem('token');
-      if (!token) return;
-
-      const res = await fetch(`${BASE_URL}/api/mypage`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-        },
-      });
-
-      if (!res.ok) {
-        console.error('마이페이지 조회 실패:', res.status);
-        return;
-      }
-
-      const data = await res.json();
-      setMyPageData(data);
-    } catch (e) {
-      console.error('마이페이지 에러:', e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useFocusEffect(
     useCallback(() => {
-      fetchMyPageData();
       refreshUserData(); 
     }, [])
   );
@@ -89,20 +46,20 @@ export default function MyPage() {
     router.push('/edit'); 
   };
 
-  const myName = myPageData?.name || '사용자';
-  const myBirth = formatBirthString(myPageData?.birthday);
+  const myName = userData?.myName || '사용자';
+  const myBirth = formatBirthString(userData?.birthday);
 
-  const partnerName = userData?.partnerName||'애인'; 
-  const partnerBirth = formatBirthString(myPageData?.birthdayCouple);
+  const partnerName = userData?.partnerName || '애인'; 
+  const partnerBirth = formatBirthString(userData?.partnerBirthday); // Context에 추가된 partnerBirthday
   
-  const dDayCount = myPageData?.dDay ?? 0;
-  const anniversaryDate = formatDate(myPageData?.anniversary);
+  const dDayCount = userData?.date ?? 0; // Context의 date가 dDay임
+  const anniversaryDate = formatDate(userData?.anniversary);
 
   const upcomingAnniversaries = useMemo(() => [50, 100, 200, 300], []);
   
   const getAnniversaryDate = (days: number) => {
-    if (!myPageData?.anniversary) return '';
-    const start = new Date(myPageData.anniversary);
+    if (!userData?.anniversary) return '';
+    const start = new Date(userData.anniversary);
     if (isNaN(start.getTime())) return '';
     
     const target = new Date(start);
@@ -134,83 +91,75 @@ export default function MyPage() {
             </Pressable>
           </View>
 
-          {loading && !myPageData ? (
-            <View style={{flex:1, justifyContent:'center', alignItems:'center'}}>
-                <ActivityIndicator size="large" color="#FF9E9E" />
+          {/* 2. 프로필 섹션 */}
+          <View style={styles.profileSection}>
+            <View style={styles.avatarContainer}>
+              <View style={styles.avatarPlaceholder}>
+                <Image 
+                    source={displayProfileImage} 
+                    style={styles.profileImage} 
+                    resizeMode="cover"
+                />
+              </View>
             </View>
-          ) : (
-            <>
-              {/* 2. 프로필 섹션 */}
-              <View style={styles.profileSection}>
-                <View style={styles.avatarContainer}>
-                  <View style={styles.avatarPlaceholder}>
-                    <Image 
-                        source={displayProfileImage} 
-                        style={styles.profileImage} 
-                        resizeMode="cover"
-                    />
-                  </View>
-                </View>
 
-                <AppText type="pretendard-b" style={styles.nameText}>
-                  {myName}{Platform.OS === 'android' ? '\u200A' : ''}
+            <AppText type="pretendard-b" style={styles.nameText}>
+              {myName}{Platform.OS === 'android' ? '\u200A' : ''}
+            </AppText>
+            <AppText type="pretendard-m" style={styles.birthText}>{myBirth}</AppText>
+
+            <Pressable style={styles.editButton} onPress={handlePressEditProfile}>
+              <AppText type="pretendard-m" style={styles.editButtonText}>
+                프로필 편집
+              </AppText>
+            </Pressable>
+          </View>
+
+          {/* 3. 흰색 카드 영역 */}
+          <View style={styles.whiteCard}>
+            <View style={styles.dashboardRow}>
+              <View style={styles.dashboardItem}>
+                <AppText type="pretendard-m" style={styles.bigNumberText}>
+                  {partnerBirth}
                 </AppText>
-                <AppText type="pretendard-m" style={styles.birthText}>{myBirth}</AppText>
-
-                <Pressable style={styles.editButton} onPress={handlePressEditProfile}>
-                  <AppText type="pretendard-m" style={styles.editButtonText}>
-                    프로필 편집
-                  </AppText>
-                </Pressable>
+                <AppText type="pretendard-m" style={styles.subLabelText}>
+                  {partnerName}님의 생일
+                </AppText>
               </View>
 
-              {/* 3. 흰색 카드 영역 */}
-              <View style={styles.whiteCard}>
-                <View style={styles.dashboardRow}>
-                  <View style={styles.dashboardItem}>
-                    <AppText type="pretendard-m" style={styles.bigNumberText}>
-                      {partnerBirth}
-                    </AppText>
-                    <AppText type="pretendard-m" style={styles.subLabelText}>
-                      {partnerName}님의 생일
-                    </AppText>
-                  </View>
+              <View style={styles.verticalDivider} />
 
-                  <View style={styles.verticalDivider} />
-
-                  <View style={styles.dashboardItem}>
-                    <AppText type="pretendard-m" style={styles.smallDateText}>
-                      {anniversaryDate || '---. --. --'}
-                    </AppText>
-                    <AppText type="pretendard-m" style={styles.bigNumberText}>
-                      {dDayCount > 0 ? `${dDayCount-1}일째` : 'D-Day'}
-                    </AppText>
-                    <AppText type="pretendard-m" style={styles.subLabelText}>
-                      기념일
-                    </AppText>
-                  </View>
-                </View>
-
-                {dDayCount > 0 && (
-                  <View style={styles.listContainer}>
-                    {upcomingAnniversaries.map((days) => (
-                      <View key={days} style={styles.listItem}>
-                        <View style={styles.listItemLeft}>
-                          <Image source={heartImg} style={[styles.heartImage]} />
-                          <AppText type="pretendard-b" style={styles.dayLabel}>
-                            {days}일
-                          </AppText>
-                        </View>
-                        <AppText type="pretendard-m" style={styles.dateValue}>
-                          {getAnniversaryDate(days)}
-                        </AppText>
-                      </View>
-                    ))}
-                  </View>
-                )}
+              <View style={styles.dashboardItem}>
+                <AppText type="pretendard-m" style={styles.smallDateText}>
+                  {anniversaryDate || '---. --. --'}
+                </AppText>
+                <AppText type="pretendard-m" style={styles.bigNumberText}>
+                  {dDayCount > 0 ? `${dDayCount-1}일째` : 'D-Day'}
+                </AppText>
+                <AppText type="pretendard-m" style={styles.subLabelText}>
+                  기념일
+                </AppText>
               </View>
-            </>
-          )}
+            </View>
+
+            {dDayCount > 0 && (
+              <View style={styles.listContainer}>
+                {upcomingAnniversaries.map((days) => (
+                  <View key={days} style={styles.listItem}>
+                    <View style={styles.listItemLeft}>
+                      <Image source={heartImg} style={[styles.heartImage]} />
+                      <AppText type="pretendard-b" style={styles.dayLabel}>
+                        {days}일
+                      </AppText>
+                    </View>
+                    <AppText type="pretendard-m" style={styles.dateValue}>
+                      {getAnniversaryDate(days)}
+                    </AppText>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
         </ScrollView>
       </SafeAreaView>
     </LinearGradient>

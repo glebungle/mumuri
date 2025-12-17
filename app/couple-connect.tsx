@@ -54,7 +54,6 @@ export default function CoupleConnectScreen() {
           const userData = await userRes.json();
           if (userData && userData.anniversary) {
             Anniversary = userData.anniversary;
-            console.log("📅 [Connect] 서버에서 가져온 내 기념일:", Anniversary);
           }
         }
       } catch (err) {

@@ -603,7 +603,7 @@ export default function CalendarScreen() {
               <View style={[styles.legendDot, { backgroundColor: '#49DC95' }]} />
             </View>
             <View style={styles.legendItem}>
-              <AppText type='semibold' style={[styles.legendText, { color: '#FFF' }]}>함께</AppText>
+              <AppText type='semibold' style={[styles.legendText, { color: '#FFF' }]}>함께 </AppText>
               <View style={[styles.legendDot, { backgroundColor: '#FF9191' }]} />
             </View>
           </View>
@@ -721,7 +721,7 @@ export default function CalendarScreen() {
                             <AppText type="medium" style={styles.scheduleTitleText}>{item.title}</AppText>
                           </View>
 
-                          {/* ✅ 상대방 단독 일정이면 X 버튼 숨김 */}
+                          {/* 상대방 단독 일정이면 X 버튼 숨김 */}
                           {!isPartnerOnly && (
                             <TouchableOpacity
                               onPress={() => handleDeleteSchedule(item)}

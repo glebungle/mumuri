@@ -1,48 +1,36 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
+import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppText from '../components/AppText';
-// import { useUser } from './context/UserContext';
-
-// 백엔드 API 명세에 맞춘 타입 정의
-interface MyPageResponse {
-  name: string;
-  birthday: string;
-  anniversary: string;
-  birthdayCouple: string;
-  dDay: number;
-}
+import { useUser } from './context/UserContext';
 
 export default function AccountSettingScreen() {
   const insets = useSafeAreaInsets();
-  // const { userData, refreshUserData } = useUser(); 
-  const [myPageData, setMyPageData] = useState<MyPageResponse | null>(null);
+  const { userData } = useUser();
 
   const handleBack = () => router.back();
   const handleEdit = () => router.push('/edit');
 
-  const formatDate = (dateString?: string) => {
-  if (!dateString) return '';
-  const date = new Date(dateString);
-  if (isNaN(date.getTime())) return dateString;
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}. ${month}. ${day}`;
-};
+  const formatDate = (dateString?: string | null) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return dateString;
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}. ${month}. ${day}`;
+  };
 
-const formatBirthString = (raw?: string | null): string => {
-  if (!raw) return '--. --. --';
-  return formatDate(raw); 
-};
-  
-  const myName = myPageData?.name || '사용자';
-  const myBirth = formatBirthString(myPageData?.birthday);
+  const formatBirthString = (raw?: string | null): string => {
+    if (!raw) return '--. --. --';
+    return formatDate(raw);
+  };
 
-  const anniversaryDate = formatDate(myPageData?.anniversary);
-  
+  const myName = userData?.myName || '사용자';
+  const myBirth = formatBirthString(userData?.birthday); // Context에 추가된 birthday 사용
+  const anniversaryDate = formatDate(userData?.anniversary);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>

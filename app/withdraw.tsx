@@ -69,19 +69,19 @@ export default function WithdrawScreen() {
 
       {/* 하단 영역 */}
       <View style={[styles.bottomContainer, { paddingBottom: insets.bottom + 20 }]}>
-        
-        {/* 체크박스 영역 */}
-        <Pressable 
-          style={styles.checkboxRow} 
-          onPress={() => setChecked(!checked)}
-        >
-          <AppText type='medium' style={styles.checkLabel}>
+        <View style={styles.checkboxRow} >
+        <AppText type='medium' style={styles.checkLabel}>
             위 유의사항을 모두 확인하였고, 탈퇴를 진행합니다.
           </AppText>
+        {/* 체크박스 영역 */}
+        <Pressable 
+          onPress={() => setChecked(!checked)}
+        >
           <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
             {checked && <Ionicons name="checkmark" size={20} color="#000" />}
           </View>
         </Pressable>
+        </View>
 
         {/* 탈퇴 버튼 */}
         <Pressable 
@@ -120,7 +120,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     color: '#444444',
-    fontWeight: '600',
   },
   content: {
     flex: 1,
@@ -170,6 +169,5 @@ const styles = StyleSheet.create({
   withdrawButtonText: {
     color: '#FFF',
     fontSize: 16,
-    fontWeight: '600',
   },
 });
