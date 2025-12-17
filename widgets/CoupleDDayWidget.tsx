@@ -20,7 +20,7 @@ const CoupleDDayWidget = () => {
       />
       <TextWidget
         text={`D-${dday}`}
-        style={{ fontSize: 28, fontWeight: 'bold', color: '#FF9191' }}
+        style={{ fontSize: 28, color: '#FF9191' }}
       />
     </FlexWidget>
   );

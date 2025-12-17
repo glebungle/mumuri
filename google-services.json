@@ -7,9 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:377362410470:android:bd6ea8f7a3a5e86f18c427",
+        "mobilesdk_app_id": "1:377362410470:android:d1bbae12e0964dd018c427",
         "android_client_info": {
-          "package_name": "mumuri.test"
+          "package_name": "com.growdy.mumuri"
         }
       },
       "oauth_client": [],
