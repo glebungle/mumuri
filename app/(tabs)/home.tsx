@@ -276,7 +276,7 @@ const styles = StyleSheet.create({
   dDayText: { fontSize: 14 },
   missionCountBadge: { marginLeft: 2 },
   missionCountText: { fontSize: 12, color: 'rgba(255,255,255,0.8)' },
-  backgroundLayer: { position: 'absolute', top: 0, left: 0, right: 0, height: '60%', zIndex: 0 },
+  backgroundLayer: { position: 'absolute', top: 0, left: 0, right: 0, height: '75%', zIndex: 0 },
   backgroundImage: { width: '100%', height: '100%' },
   dimOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.2)' },
   gradientOverlay: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '30%' },

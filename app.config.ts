@@ -1,4 +1,3 @@
-// app.config.ts
 import 'dotenv/config';
 import { ConfigContext, ExpoConfig } from 'expo/config';
 
@@ -7,10 +6,10 @@ const kakaoNativeAppKey = process.env.EXPO_PUBLIC_NATIVE_APP_KEY;
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   owner: 'starsam',
-  name: 'mumuri',
+  name: 'mumuri', // 스토어에 표시될 이름
   slug: 'mumuri',
   version: '1.0.0',
-  orientation: 'portrait',
+  orientation: 'portrait', // 세로 모드 고정
   icon: './assets/images/logo.png',
   scheme: 'mumuri',
   userInterfaceStyle: 'automatic',
@@ -21,10 +20,16 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     backgroundColor: '#FFFCF5',
   },
   ios: {
-    supportsTablet: true,
-    bundleIdentifier: 'com.mumuri.app', 
-    googleServicesFile: "./GoogleService-Info.plist" ,
+    supportsTablet: false, 
+    bundleIdentifier: 'com.growdy.mumuri', 
+    googleServicesFile: "./GoogleService-Info.plist",
     infoPlist: {
+      CFBundleURLTypes: [
+        {
+          CFBundleURLSchemes: [`kakao${kakaoNativeAppKey}`],
+        },
+      ],
+      ITSAppUsesNonExemptEncryption: false,
       NSCameraUsageDescription: '미션 사진 촬영을 위해 카메라 접근이 필요합니다.',
       NSPhotoLibraryAddUsageDescription: '촬영한 사진을 앨범에 저장합니다.',
       NSLocationWhenInUseUsageDescription: '사진 촬영 시 촬영 장소를 기록하기 위해 위치 정보가 필요합니다.',
@@ -32,7 +37,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     },
   },
   android: {
-    package: 'com.mumuri.app',
+    package: 'com.growdy.mumuri',
     googleServicesFile: './google-services.json', 
     adaptiveIcon: {
       foregroundImage: './assets/images/logo.png',
@@ -67,15 +72,16 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         android: {
           extraMavenRepos: ['https://devrepo.kakao.com/nexus/content/groups/public/'],
         },
+        ios: {
+          useFrameworks: 'static',
+        }
       },
     ],
-    // ✅ [활성화] 푸시 알림 플러그인 설정
     [
       'expo-notifications',
       {
-        icon: './assets/images/logo.png', // 알림바 아이콘 (투명 배경의 단색 아이콘 권장)
-        color: '#FFFCF5', // 알림 아이콘 색상
-        sounds: [], // 커스텀 사운드 필요 시 경로 추가
+        icon: './assets/images/logo.png', 
+        color: '#FFFCF5', 
       },
     ],
     [

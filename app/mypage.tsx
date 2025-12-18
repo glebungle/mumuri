@@ -1,10 +1,11 @@
+import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useMemo } from 'react';
 import { Image, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppText from '../components/AppText';
-import { useUser } from './context/UserContext'; // 🟢 Context
+import { useUser } from './context/UserContext';
 
 const profileImg = require('../assets/images/userprofile.png');
 const settingsImg = require('../assets/images/Settings.png');
@@ -46,13 +47,15 @@ export default function MyPage() {
     router.push('/edit'); 
   };
 
+  const handleBack = () => router.back();
+
   const myName = userData?.myName || '사용자';
   const myBirth = formatBirthString(userData?.birthday);
 
   const partnerName = userData?.partnerName || '애인'; 
-  const partnerBirth = formatBirthString(userData?.partnerBirthday); // Context에 추가된 partnerBirthday
+  const partnerBirth = formatBirthString(userData?.partnerBirthday); 
   
-  const dDayCount = userData?.date ?? 0; // Context의 date가 dDay임
+  const dDayCount = userData?.date ?? 0; 
   const anniversaryDate = formatDate(userData?.anniversary);
 
   const upcomingAnniversaries = useMemo(() => [50, 100, 200, 300], []);
@@ -81,6 +84,9 @@ export default function MyPage() {
         >
           {/* 1. 상단 헤더 */}
           <View style={styles.header}>
+              <Pressable onPress={handleBack} >
+                    <Ionicons name="chevron-back" size={24} color="#1E1E1E" />
+                    </Pressable>
             <View style={{ width: 24 }} />
             <Pressable onPress={handlePressSetting}>
               <Image 

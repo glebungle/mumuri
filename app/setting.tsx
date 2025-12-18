@@ -17,6 +17,7 @@ export default function SettingScreen() {
 
   // 뒤로가기
   const handleBack = () => router.back();
+  
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>

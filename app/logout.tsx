@@ -99,12 +99,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20, paddingVertical: 14, backgroundColor: '#FFF',
   },
   backButton: { padding: 4 },
-  headerTitle: { fontSize: 18, color: '#444444', fontWeight: '600' },
+  headerTitle: { fontSize: 18, color: '#444444',  },
   content: { flex: 1 },
   bottomContainer: { paddingHorizontal: 24 },
   logoutButton: {
     backgroundColor: '#6198FF', borderRadius: 12, height: 56,
     alignItems: 'center', justifyContent: 'center',
   },
-  logoutButtonText: { color: '#FFF', fontSize: 16, fontWeight: '600' },
+  logoutButtonText: { color: '#FFF', fontSize: 16, },
 });

@@ -185,13 +185,45 @@ const AddScheduleModal = ({ visible, onClose, onSave, selectedDate }: any) => {
   const [endHour, setEndHour] = useState('15');
   const [endMin, setEndMin] = useState('00');
 
-  const panY = useRef(new Animated.Value(0)).current;
+  // 💡 시작 위치를 화면 밖(SCREEN_HEIGHT)으로 설정하여 먹통 버그 방지
+  const panY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+
+  useEffect(() => {
+    if (visible) {
+      // 모달이 열릴 때 위로 올라오는 애니메이션
+      Animated.timing(panY, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+
+      // 데이터 초기화
+      setTitle('');
+      setStartHour('13');
+      setStartMin('00');
+      setEndHour('15');
+      setEndMin('00');
+      setIsCouple(false);
+      setIsAllDay(false);
+    }
+  }, [visible]);
+
+  // 💡 모달을 내릴 때 애니메이션이 끝난 후 onClose를 실행하는 함수
+  const handleClose = () => {
+    Animated.timing(panY, {
+      toValue: SCREEN_HEIGHT,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(() => {
+      onClose();
+    });
+  };
 
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (_, gestureState) => {
-        return gestureState.dy > 0;
+        return gestureState.dy > 10; // 미세한 떨림 방지
       },
       onPanResponderMove: (_, gestureState) => {
         if (gestureState.dy > 0) {
@@ -199,12 +231,8 @@ const AddScheduleModal = ({ visible, onClose, onSave, selectedDate }: any) => {
         }
       },
       onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dy > 150) {
-          Animated.timing(panY, {
-            toValue: SCREEN_HEIGHT,
-            duration: 200,
-            useNativeDriver: true,
-          }).start(onClose);
+        if (gestureState.dy > 150 || gestureState.vy > 0.5) {
+          handleClose();
         } else {
           Animated.spring(panY, {
             toValue: 0,
@@ -215,19 +243,6 @@ const AddScheduleModal = ({ visible, onClose, onSave, selectedDate }: any) => {
       },
     })
   ).current;
-
-  useEffect(() => {
-    if(visible) {
-        panY.setValue(0);
-        setTitle('');
-        setStartHour('13');
-        setStartMin('00');
-        setEndHour('15');
-        setEndMin('00');
-        setIsCouple(false);
-        setIsAllDay(false);
-    }
-  }, [visible]);
 
   const handleSave = () => {
     if (!title.trim()) {
@@ -244,77 +259,93 @@ const AddScheduleModal = ({ visible, onClose, onSave, selectedDate }: any) => {
   };
 
   const formattedDate = React.useMemo(() => {
-      if(!selectedDate) return '';
-      const date = new Date(selectedDate);
-      const days = ['일', '월', '화', '수', '목', '금', '토'];
-      return `${format(date, 'MM월 dd일')} (${days[date.getDay()]})`;
+    if (!selectedDate) return '';
+    const date = new Date(selectedDate);
+    const days = ['일', '월', '화', '수', '목', '금', '토'];
+    return `${format(date, 'MM월 dd일')} (${days[date.getDay()]})`;
   }, [selectedDate]);
-  
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal 
+      visible={visible} 
+      transparent 
+      animationType="none" // 💡 자체 제작 애니메이션을 사용하므로 none 설정
+      onRequestClose={handleClose}
+    >
       <View style={styles.modalOverlay}>
-        <Animated.View 
-          style={[styles.modalContent, { transform: [{ translateY: panY }] }]} 
+        {/* 💡 배경 터치 시 모달 닫기 */}
+        <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
+
+        <Animated.View
+          style={[styles.modalContent, { transform: [{ translateY: panY }] }]}
           {...panResponder.panHandlers}
         >
-          <View style={styles.dragHandleContainer}><View style={styles.dragHandle} /></View>
+          <View style={styles.dragHandleContainer}>
+            <View style={styles.dragHandle} />
+          </View>
           <View style={styles.titleInputRow}>
-             <View style={styles.blueDot} />
-             <TextInput style={[styles.modalTitleInput,{fontFamily:'Pretendard-Bold'}]} placeholder="제목" placeholderTextColor="#999" value={title} onChangeText={setTitle} autoFocus={false} />
+            <View style={styles.blueDot} />
+            <TextInput
+              style={[styles.modalTitleInput, { fontFamily: 'Pretendard-Bold' }]}
+              placeholder="제목"
+              placeholderTextColor="#999"
+              value={title}
+              onChangeText={setTitle}
+              autoFocus={false}
+            />
           </View>
-          <View style={{height: 20}} />
+          <View style={{ height: 20 }} />
           <View style={styles.timeSection}>
-             <View style={styles.timeRow}>
+            <View style={styles.timeRow}>
               <Image source={clockImg} style={[styles.clockImage]} />
-                <View style={styles.timeInputContainer}>
-                    <AppText type='semibold' style={styles.timeDateText}>{formattedDate}</AppText>
-                    {!isAllDay && (
-                        <View style={styles.timeInputBox}>
-                            <TextInput style={[styles.timeInput,{fontFamily:'Pretendard-SemiBold'}]} keyboardType="number-pad" value={startHour} onChangeText={setStartHour} maxLength={2} selectTextOnFocus />
-                            <AppText type='semibold'style={styles.timeColon}>:</AppText>
-                            <TextInput style={[styles.timeInput,{fontFamily:'Pretendard-SemiBold'}]} keyboardType="number-pad" value={startMin} onChangeText={setStartMin} maxLength={2} selectTextOnFocus />
-                        </View>
-                    )}
-                </View>
-             </View>
-             <View style={styles.timeConnector} />
-             <View style={styles.timeRow}>
-                <Image source={clockImg} style={[styles.clockImage]} /> 
-                <View style={styles.timeInputContainer}>
-                    <AppText type='semibold' style={styles.timeDateText}>{formattedDate}</AppText>
-                    {!isAllDay && (
-                        <View style={styles.timeInputBox}>
-                            <TextInput style={[styles.timeInput,{fontFamily:'Pretendard-SemiBold'}]} keyboardType="number-pad" value={endHour} onChangeText={setEndHour} maxLength={2} selectTextOnFocus />
-                            <AppText type='semibold' style={styles.timeColon}>:</AppText>
-                            <TextInput style={[styles.timeInput,{fontFamily:'Pretendard-SemiBold'}]} keyboardType="number-pad" value={endMin} onChangeText={setEndMin} maxLength={2} selectTextOnFocus />
-                        </View>
-                    )}
-                </View>
-             </View>
+              <View style={styles.timeInputContainer}>
+                <AppText type='semibold' style={styles.timeDateText}>{formattedDate}</AppText>
+                {!isAllDay && (
+                  <View style={styles.timeInputBox}>
+                    <TextInput style={[styles.timeInput, { fontFamily: 'Pretendard-SemiBold' }]} keyboardType="number-pad" value={startHour} onChangeText={setStartHour} maxLength={2} selectTextOnFocus />
+                    <AppText type='semibold' style={styles.timeColon}>:</AppText>
+                    <TextInput style={[styles.timeInput, { fontFamily: 'Pretendard-SemiBold' }]} keyboardType="number-pad" value={startMin} onChangeText={setStartMin} maxLength={2} selectTextOnFocus />
+                  </View>
+                )}
+              </View>
+            </View>
+            <View style={styles.timeConnector} />
+            <View style={styles.timeRow}>
+              <Image source={clockImg} style={[styles.clockImage]} />
+              <View style={styles.timeInputContainer}>
+                <AppText type='semibold' style={styles.timeDateText}>{formattedDate}</AppText>
+                {!isAllDay && (
+                  <View style={styles.timeInputBox}>
+                    <TextInput style={[styles.timeInput, { fontFamily: 'Pretendard-SemiBold' }]} keyboardType="number-pad" value={endHour} onChangeText={setEndHour} maxLength={2} selectTextOnFocus />
+                    <AppText type='semibold' style={styles.timeColon}>:</AppText>
+                    <TextInput style={[styles.timeInput, { fontFamily: 'Pretendard-SemiBold' }]} keyboardType="number-pad" value={endMin} onChangeText={setEndMin} maxLength={2} selectTextOnFocus />
+                  </View>
+                )}
+              </View>
+            </View>
           </View>
-          <View style={{height: 20}} />
+          <View style={{ height: 20 }} />
           <View style={styles.toggleRow}>
             <AppText type='semibold' style={styles.modalLabel}>하루종일</AppText>
             <Pressable onPress={() => setIsAllDay(!isAllDay)} style={styles.checkboxArea}>
-                <View style={[styles.checkbox, isAllDay && styles.checkboxChecked]}>
-                    {isAllDay && <Ionicons name="checkmark" size={14} color="#333" />}
-                </View>
+              <View style={[styles.checkbox, isAllDay && styles.checkboxChecked]}>
+                {isAllDay && <Ionicons name="checkmark" size={14} color="#333" />}
+              </View>
             </Pressable>
           </View>
           <View style={styles.toggleRow}>
-            <View style={{flexDirection:'row', alignItems:'center', gap: 6}}>
-                <Image source={heartImg} style={[styles.heartImage]} />
-                <AppText type='semibold' style={styles.modalLabel}>커플 일정으로 등록</AppText>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Image source={heartImg} style={[styles.heartImage]} />
+              <AppText type='semibold' style={styles.modalLabel}>커플 일정으로 등록</AppText>
             </View>
             <Pressable onPress={() => setIsCouple(!isCouple)} style={styles.checkboxArea}>
-                <View style={[styles.checkbox, isCouple && styles.checkboxChecked]}>
-                    {isCouple && <Ionicons name="checkmark" size={14} color="#333" />}
-                </View>
+              <View style={[styles.checkbox, isCouple && styles.checkboxChecked]}>
+                {isCouple && <Ionicons name="checkmark" size={14} color="#333" />}
+              </View>
             </Pressable>
           </View>
-          <View style={{flex: 1}} />
-          <Pressable style={[styles.saveButton, {marginBottom: insets.bottom + 20}]} onPress={handleSave}>
+          <View style={{ flex: 1 }} />
+          <Pressable style={[styles.saveButton, { marginBottom: insets.bottom + 20 }]} onPress={handleSave}>
             <AppText type="bold" style={styles.saveButtonText}>저장</AppText>
           </Pressable>
         </Animated.View>
@@ -603,7 +634,7 @@ export default function CalendarScreen() {
               <View style={[styles.legendDot, { backgroundColor: '#49DC95' }]} />
             </View>
             <View style={styles.legendItem}>
-              <AppText type='semibold' style={[styles.legendText, { color: '#FFF' }]}>함께 </AppText>
+              <AppText type='semibold' style={[styles.legendText, { color: '#FFF' }]}>함께</AppText>
               <View style={[styles.legendDot, { backgroundColor: '#FF9191' }]} />
             </View>
           </View>

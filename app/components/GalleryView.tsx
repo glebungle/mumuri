@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { addHours, format, parseISO } from 'date-fns';
 import * as FileSystem from 'expo-file-system/legacy';
-// import { LinearGradient } from 'expo-linear-gradient'; 
 import * as MediaLibrary from 'expo-media-library';
 import { useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -79,7 +78,6 @@ const ToastMessage = ({ message, visible, onHide }: { message: string, visible: 
   );
 };
 
-
 interface GalleryViewProps {
   onBackToHome?: () => void; 
 }
@@ -97,7 +95,6 @@ export default function GalleryView({ onBackToHome }: GalleryViewProps) {
   const [loadingMore, setLoadingMore] = useState(false);
 
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
-  
   const [isMenuVisible, setIsMenuVisible] = useState(false);
   const [saving, setSaving] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
@@ -107,25 +104,20 @@ export default function GalleryView({ onBackToHome }: GalleryViewProps) {
 
   const showToast = (msg: string) => { setToastMsg(msg); setToastVisible(true); };
 
-  // 뒤로가기 버튼 핸들링
+  // 뒤로가기 핸들링
   useFocusEffect(
     useCallback(() => {
       const onBackPress = () => {
-        // 1. 뷰어가 열려있으면 뷰어를 닫음
         if (selectedPhotoIndex !== null) {
           handleCloseViewer();
-          return true; // 이벤트 소비
+          return true;
         }
-        
-        // 2. 뷰어가 닫혀있고 홈으로 갈 함수가 있다면 -> 홈으로 이동
         if (onBackToHome) {
           onBackToHome();
-          return true; // 이벤트 소비
+          return true;
         }
-
-        return false; // 기본 동작 수행
+        return false;
       };
-
       const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
       return () => subscription.remove();
     }, [selectedPhotoIndex, onBackToHome])
@@ -134,7 +126,7 @@ export default function GalleryView({ onBackToHome }: GalleryViewProps) {
   const loadPhotos = useCallback(async (pageNum: number, shouldRefresh: boolean = false) => {
     try {
       const token = await AsyncStorage.getItem('token');
-      if (!token||!coupleId) return;
+      if (!token || !coupleId) return;
       if (pageNum === 0) setLoading(true);
 
       const url = `${BASE_URL}/photos/gallery?page=${pageNum}&size=20&sort=createdAt,desc`; 
@@ -155,13 +147,24 @@ export default function GalleryView({ onBackToHome }: GalleryViewProps) {
       }
       setHasMore(!data.last);
       setPage(pageNum);
-    } catch (e) { console.warn('[Gallery] Load failed:', e); } 
-    finally { setLoading(false); setRefreshing(false); setLoadingMore(false); }
-  }, []);
+    } catch (e) { 
+      console.warn('[Gallery] Load failed:', e); 
+    } finally { 
+      setLoading(false); 
+      setRefreshing(false); 
+      setLoadingMore(false); 
+    }
+  }, [coupleId]);
 
   useFocusEffect(useCallback(() => { loadPhotos(0, true); }, [loadPhotos]));
+
   const onRefresh = () => { setRefreshing(true); setHasMore(true); loadPhotos(0, true); };
-  const onEndReached = () => { if (!hasMore || loadingMore || loading) return; setLoadingMore(true); loadPhotos(page + 1); };
+  
+  const onEndReached = () => { 
+    if (!hasMore || loadingMore || loading) return; 
+    setLoadingMore(true); 
+    loadPhotos(page + 1); 
+  };
 
   const handleDownload = async () => {
     if (selectedPhotoIndex === null) return;
@@ -169,7 +172,10 @@ export default function GalleryView({ onBackToHome }: GalleryViewProps) {
     try {
       setSaving(true);
       const { status } = await MediaLibrary.requestPermissionsAsync();
-      if (status !== 'granted') { Alert.alert('권한 필요', '갤러리 권한이 필요합니다.'); return; }
+      if (status !== 'granted') { 
+        Alert.alert('권한 필요', '갤러리 권한이 필요합니다.'); 
+        return; 
+      }
       
       const filename = `mumuri_${photo.id}.jpg`;
       const fileUri = `${getWritableDir()}${filename}`;
@@ -178,7 +184,11 @@ export default function GalleryView({ onBackToHome }: GalleryViewProps) {
       
       setIsMenuVisible(false);
       showToast('앨범에 저장되었습니다.');
-    } catch (e) { Alert.alert('오류', '저장 실패'); } finally { setSaving(false); }
+    } catch (e) { 
+      Alert.alert('오류', '저장 실패'); 
+    } finally { 
+      setSaving(false); 
+    }
   };
 
   const handlePostToHome = async () => { 
@@ -191,41 +201,54 @@ export default function GalleryView({ onBackToHome }: GalleryViewProps) {
         method: 'PUT',
         headers: { Authorization: `Bearer ${token}` }
       });
-      if (res.ok) { setIsMenuVisible(false); showToast('홈 화면에 게시되었습니다.'); refreshUserData(); } 
-      else { Alert.alert('실패', '홈 화면 게시에 실패했습니다.'); }
-    } catch (e) { Alert.alert('오류', '통신 중 오류가 발생했습니다.'); }
+      if (res.ok) { 
+        setIsMenuVisible(false); 
+        showToast('홈 화면에 게시되었습니다.'); 
+        refreshUserData(); 
+      } else { 
+        Alert.alert('실패', '홈 화면 게시에 실패했습니다.'); 
+      }
+    } catch (e) { 
+      Alert.alert('오류', '통신 중 오류가 발생했습니다.'); 
+    }
   };
 
+  // ✅ 수정된 닫기 로직
   const handleCloseViewer = () => {
-    setSelectedPhotoIndex(null);
     setIsMenuVisible(false);
+    setSelectedPhotoIndex(null);
   };
 
   const closeMenu = () => { if (isMenuVisible) setIsMenuVisible(false); };
 
-  // 현재 표시중인 사진 정보
-  const currentPhoto = selectedPhotoIndex !== null ? photos[selectedPhotoIndex] : null;
+  const currentPhoto = (selectedPhotoIndex !== null && photos[selectedPhotoIndex]) ? photos[selectedPhotoIndex] : null;
   const formattedDate = currentPhoto ? format(addHours(parseISO(currentPhoto.createdAt), 9), 'yyyy. MM. dd.') : '';
   const nickname = currentPhoto?.ownerNickname || '알 수 없음';
 
-  // 뷰어에서 스크롤이 끝났을 때 현재 인덱스 계산
+  // ✅ 수정된 스크롤 엔드 핸들러
   const handleViewerScrollEnd = (event: any) => {
+    if (selectedPhotoIndex === null) return; // 모달이 닫히는 중이면 무시
+
     const offsetX = event.nativeEvent.contentOffset.x;
     const index = Math.round(offsetX / SCREEN_WIDTH);
-    if (!isNaN(index) && index >= 0 && index < photos.length) {
+    
+    if (!isNaN(index) && index >= 0 && index < photos.length && index !== selectedPhotoIndex) {
       setSelectedPhotoIndex(index);
     }
   };
 
-  // 모달이 열릴 때, 해당 인덱스로 스크롤 맞추기
+  // ✅ 인덱스 동기화 
   useEffect(() => {
     if (selectedPhotoIndex !== null && viewerListRef.current) {
-      viewerListRef.current.scrollToIndex({
-        index: selectedPhotoIndex,
-        animated: false,
-      });
+      const timer = setTimeout(() => {
+        viewerListRef.current?.scrollToIndex({
+          index: selectedPhotoIndex,
+          animated: false,
+        });
+      }, 10);
+      return () => clearTimeout(timer);
     }
-  }, [selectedPhotoIndex]);
+  }, [selectedPhotoIndex === null]);
 
   if (loading && page === 0 && !refreshing) return <View style={styles.center}><ActivityIndicator size="large" color="#333" /></View>;
 
@@ -264,12 +287,11 @@ export default function GalleryView({ onBackToHome }: GalleryViewProps) {
       <Modal 
         visible={selectedPhotoIndex !== null} 
         transparent={true} 
-        onRequestClose={handleCloseViewer} // 안드로이드 하드웨어 뒤로가기 대응
-        animationType="fade"               // 등장/퇴장 모두 페이드
+        onRequestClose={handleCloseViewer}
+        animationType="fade"
       >
         <View style={styles.modalBackground}>
           <View style={styles.modalContentContainer}>
-            {/* 이미지 배경 (슬라이드 가능) */}
             <View style={styles.imageWrapper}>
               {photos.length > 0 && (
                 <FlatList
@@ -285,6 +307,12 @@ export default function GalleryView({ onBackToHome }: GalleryViewProps) {
                     offset: SCREEN_WIDTH * index,
                     index,
                   })}
+                  onScrollToIndexFailed={(info) => {
+                    const wait = new Promise(resolve => setTimeout(resolve, 100));
+                    wait.then(() => {
+                      viewerListRef.current?.scrollToIndex({ index: info.index, animated: false });
+                    });
+                  }}
                   renderItem={({ item }) => (
                     <View style={styles.viewerItem}>
                       <Image
@@ -297,7 +325,6 @@ export default function GalleryView({ onBackToHome }: GalleryViewProps) {
                 />
               )}
 
-              {/* 헤더 정보 (닉네임, 날짜, 메뉴/닫기 버튼) */}
               <View style={[styles.viewerHeader, { paddingTop: insets.top + 10 }]}>
                 <View style={styles.headerInfo}>
                   <View style={styles.nicknameRow}>
@@ -313,15 +340,12 @@ export default function GalleryView({ onBackToHome }: GalleryViewProps) {
                 </View>
 
                 <View style={styles.headerButtons}>
-                  {/* 메뉴 버튼 */}
                   <Pressable
                     onPress={() => setIsMenuVisible(!isMenuVisible)}
                     style={styles.iconButton}
                   >
                     <Ionicons name="ellipsis-vertical" size={24} color="#FFF" />
                   </Pressable>
-
-                  {/* 닫기 버튼 */}
                   <Pressable onPress={handleCloseViewer} style={styles.iconButton}>
                     <Ionicons name="close" size={28} color="#FFF" />
                   </Pressable>
@@ -329,20 +353,16 @@ export default function GalleryView({ onBackToHome }: GalleryViewProps) {
               </View>
             </View>
 
-            {/* 메뉴 바깥 클릭 시 닫히는 투명 오버레이 */}
             {isMenuVisible && (
               <TouchableWithoutFeedback onPress={closeMenu}>
                 <View style={[StyleSheet.absoluteFillObject, { zIndex: 15 }]} />
               </TouchableWithoutFeedback>
             )}
 
-            {/* 우측 상단 메뉴 팝업 */}
             {isMenuVisible && (
               <View style={[styles.menuPopup, { top: insets.top + 50 }]}>
                 <Pressable style={styles.menuItem} onPress={handlePostToHome}>
-                  <AppText type="semibold" style={styles.menuText}>
-                    홈화면 게시
-                  </AppText>
+                  <AppText type="semibold" style={styles.menuText}>홈화면 게시</AppText>
                 </Pressable>
                 <View style={styles.menuDivider} />
                 <Pressable
@@ -357,7 +377,6 @@ export default function GalleryView({ onBackToHome }: GalleryViewProps) {
               </View>
             )}
 
-            {/* 토스트 메시지 */}
             <ToastMessage
               message={toastMsg}
               visible={toastVisible}
@@ -376,16 +395,10 @@ const styles = StyleSheet.create({
   emptyText: { color: '#D9D9D9', fontSize: 16, marginBottom:'50%' },
   gridItem: { width: SCREEN_WIDTH / 3, height: SCREEN_WIDTH/1.5, borderWidth: 0.5, borderColor: '#FFF' },
   gridImage: { width: '100%', height: '100%' },
-  
   modalBackground: { flex: 1, backgroundColor: '#000' },
   modalContentContainer: { flex: 1, backgroundColor: '#000' },
   imageWrapper: { flex: 1, position: 'relative' },
   fullScreenImage: { width: '100%', height: '100%' },
-  
-  // 그라데이션 헤더
-  gradientHeader: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 1 },
-  
-  // 헤더 내용물
   viewerHeader: { 
     position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, 
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', 
@@ -397,11 +410,8 @@ const styles = StyleSheet.create({
   nicknameText: { color: '#FFF', fontSize: 12 },
   dateText: { color: '#fff', fontSize: 12 },
   calendarImage: { width: 16, height: 16, tintColor: '#fff',},
-  
   headerButtons: { flexDirection: 'row', gap: 10, alignItems: 'center', },
   iconButton: { padding: 4 },
-
-  // 메뉴 및 토스트
   menuPopup: { position: 'absolute', right: 20, zIndex: 20, backgroundColor: '#FFF', borderRadius: 12, paddingVertical: 4, width: 120, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 3.84, elevation: 5 },
   menuItem: { paddingVertical: 16, paddingHorizontal:'15%' },
   menuDivider: { height: 1, backgroundColor: '#9B9B9B', marginHorizontal: 10 },

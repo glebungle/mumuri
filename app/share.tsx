@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as MediaLibrary from 'expo-media-library';
@@ -44,6 +45,7 @@ export default function ShareScreen() {
 
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
+  const handleBack = () => router.back();
 
   // ===== 앨범 저장 =====
   const saveToAlbum = async () => {
@@ -172,9 +174,9 @@ export default function ShareScreen() {
 
   if (!photoUri) {
     return (
-      <View style={styles.center}>
+      <View >
         <AppText>사진 정보가 없어요.</AppText>
-        <Pressable style={styles.backBtn} onPress={() => router.replace('/')}>
+        <Pressable  onPress={() => router.replace('/')}>
           <AppText style={{ color: '#fff' }}>홈으로</AppText>
         </Pressable>
       </View>
@@ -188,17 +190,34 @@ export default function ShareScreen() {
         <Image source={{ uri: photoUri }} style={styles.image} resizeMode="contain" />
       </View>
 
+      {/* 하단 버튼 영역 */}
       <View style={styles.bottomActions}>
+        {/* 뒤로가기 영역 (왼쪽) */}
+        <View style={styles.sideAction}>
+          <Pressable style={styles.iconCircle} onPress={handleBack}>
+            <Ionicons name="chevron-back" size={28} color="#1E1E1E" />
+          </Pressable>
+        </View>
+
+        {/* 전송 버튼 (중앙) */}
         <Pressable
           style={styles.sendBtn}
           onPress={sendToPartner}
           disabled={sending || !coupleId || !userId}
         >
-          <Image source={sendImg} style={styles.sendImage} resizeMode="cover" />
+          <Image source={sendImg} style={styles.sendImage} resizeMode="contain" />
         </Pressable>
-        <Pressable style={styles.saveBtn} onPress={saveToAlbum} disabled={saving || sending}>
-          <Image source={downloadImg} style={styles.downloadImage} resizeMode="cover" />
-        </Pressable>
+
+        {/* 저장 버튼 (오른쪽) */}
+        <View style={styles.sideAction}>
+          <Pressable 
+            style={styles.iconCircle} 
+            onPress={saveToAlbum} 
+            disabled={saving || sending}
+          >
+            <Image source={downloadImg} style={styles.downloadImage} resizeMode="contain" />
+          </Pressable>
+        </View>
       </View>
     </View>
   );
@@ -209,48 +228,45 @@ const styles = StyleSheet.create({
   title: { color: '#3279FF', fontSize: 12, marginTop: '5%', marginBottom: 12, textAlign: 'center' },
   imageContainer: {
     width: '100%',
-    height: '75.8%',
+    height: '76%',
     borderRadius: 16,  
     overflow: 'hidden',   
     backgroundColor: '#000',
   },
   image: { width: '100%', height: '100%' },
+  
   bottomActions: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 40,
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginTop: 'auto', 
+    marginBottom: 50,  
+  },
+  
+  sideAction: {
+    flex: 1,
     alignItems: 'center',
   },
-  sendBtn: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    backgroundColor: '#1A1A1A',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom:'3%'
-  },
-  saveBtn: {
-    position: 'absolute',
-    right: 40,
+
+  iconCircle: {
     width: 50,
     height: 50,
     borderRadius: 25,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom:'5%'
   },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  backBtn: {
-    marginTop: 14,
-    backgroundColor: '#2563eb',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 8,
+
+  sendBtn: {
+    width: 72,
+    height: 72,
+    borderRadius: 40,
+    backgroundColor: '#1A1A1A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
   },
-  sendImage: { width: 40, height: 40 },
-  downloadImage: { width: 32, height: 32 },
+  
+  sendImage: { width: 40, height: 40, paddingTop:3},
+  downloadImage: { width: 30, height: 30 },
 });
