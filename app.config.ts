@@ -21,7 +21,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     backgroundColor: '#FFFCF5',
   },
   ios: {
-    supportsTablet: true,
+    supportsTablet: false,
     bundleIdentifier: 'com.growdy.mumuri', 
     googleServicesFile: "./GoogleService-Info.plist" ,
     infoPlist: {
@@ -34,6 +34,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       NSPhotoLibraryAddUsageDescription: '촬영한 사진을 앨범에 저장합니다.',
       NSLocationWhenInUseUsageDescription: '사진 촬영 시 촬영 장소를 기록하기 위해 위치 정보가 필요합니다.',
       UIBackgroundModes: ['remote-notification'], 
+      "ITSAppUsesNonExemptEncryption": false
     },
   },
   android: {
