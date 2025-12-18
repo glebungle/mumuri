@@ -33,7 +33,7 @@ export default function KakaoLoginButton() {
 
     if (wasLoggedOut === 'true') {
       console.log('🔒 [LoginButton] 로그아웃 기록 확인 -> 아이디/비번 입력 강제');
-      // ✅ [핵심] 로그아웃 직후일 때만 입력창을 강제합니다. (쿠키 무시)
+      // 로그아웃 직후일 때만 입력창을 강제합니다. (쿠키 무시)
       // 깃발을 여기서 지우지 않습니다. (실수로 창 닫았을 때 대비)
       setCurrentUrl(`${BASE_AUTH_URL}&prompt=login`);
     } else {
@@ -44,20 +44,26 @@ export default function KakaoLoginButton() {
     setWebViewVisible(true);
   };
 
-  const handleWebViewChange = async (url: string) => { // async
-    // 2. 로그인 성공 (딥링크 감지)
+  const handleWebViewChange = async (url: string) => {
     if (url.startsWith('mumuri:')) {
       if (isHandled.current) return false;
+
+      // mumuri:// 형식을 강제
+      const fixedUrl = url.replace(/^mumuri:\/+/ , 'mumuri://');
       
-      console.log('🚀 [WebView] 로그인 성공! 깃발 제거 후 핸들러 이동');
+      console.log('🚀 [WebView] 교정된 URL:', fixedUrl);
       isHandled.current = true;
       
-      // ✅ [핵심] 로그인이 확실히 성공했으니 이제 방어막(깃발)을 제거합니다.
-      // 이걸 먼저 하고 openURL을 해야 핸들러가 차단을 안 합니다.
       await AsyncStorage.removeItem('isLoggingOut');
       
       setWebViewVisible(false);
-      Linking.openURL(url); 
+      
+      // 교정된 URL로 실행
+      Linking.openURL(fixedUrl).catch(err => {
+        console.error('❌ Linking Error:', err);
+        Alert.alert('오류', '앱으로 돌아올 수 없습니다. 설정을 확인해주세요.');
+      });
+      
       return false;
     }
     return true;
@@ -106,7 +112,7 @@ export default function KakaoLoginButton() {
               startInLoadingState={true}
               renderLoading={() => (
                 <View style={styles.loadingOverlay}>
-                   <ActivityIndicator size="large" color="#FAE100" />
+                  <ActivityIndicator size="large" color="#FAE100" />
                 </View>
               )}
             />
