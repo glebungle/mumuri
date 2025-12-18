@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useMemo } from 'react';
-import { Image, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Dimensions, Image, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppText from '../components/AppText';
 import { useUser } from './context/UserContext';
@@ -10,6 +10,8 @@ import { useUser } from './context/UserContext';
 const profileImg = require('../assets/images/userprofile.png');
 const settingsImg = require('../assets/images/Settings.png');
 const heartImg = require('../assets/images/Heart.png');
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const formatDate = (dateString?: string | null) => {
   if (!dateString) return '';
@@ -86,7 +88,7 @@ export default function MyPage() {
           <View style={styles.header}>
               <Pressable onPress={handleBack} >
                     <Ionicons name="chevron-back" size={24} color="#1E1E1E" />
-                    </Pressable>
+              </Pressable>
             <View style={{ width: 24 }} />
             <Pressable onPress={handlePressSetting}>
               <Image 
@@ -190,14 +192,13 @@ const styles = StyleSheet.create({
   },
   profileSection: {
     alignItems: 'center',
-    marginVertical: 20,
   },
   avatarContainer: {
     marginBottom: 12,
   },
   avatarPlaceholder: {
-    width: 110,
-    height: 110,
+    width: SCREEN_WIDTH*0.25,
+    height: SCREEN_WIDTH*0.25,
     borderRadius: 99,
     justifyContent: 'center',
     alignItems: 'center',
@@ -222,6 +223,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 8,
+    marginBottom:SCREEN_HEIGHT*0.02
   },
   editButtonText: {
     fontSize: 13,

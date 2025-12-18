@@ -29,7 +29,7 @@ export default function AccountSettingScreen() {
   };
 
   const myName = userData?.myName || '사용자';
-  const myBirth = formatBirthString(userData?.birthday); // Context에 추가된 birthday 사용
+  const myBirth = formatBirthString(userData?.birthday); 
   const anniversaryDate = formatDate(userData?.anniversary);
 
   return (
@@ -53,7 +53,7 @@ export default function AccountSettingScreen() {
         
         <View style={styles.menuItem}>
           <AppText type="semibold" style={styles.menuText}>이름</AppText>
-          <AppText type="regular" style={styles.subText}>{myName}</AppText>
+          <AppText type="pretendard-r" style={styles.subText}>{myName}</AppText>
         </View>
 
         <View style={styles.menuItem}>

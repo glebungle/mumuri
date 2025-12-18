@@ -166,24 +166,24 @@ export default function HomeScreen() {
             <Animated.View style={[styles.activeIndicator, { backgroundColor: headerTintColor, width: indicatorWidth, transform: [{ translateX: indicatorTranslateX }] }]} />
           </View>
           <Pressable onPress={() => router.push('/mypage')} style={styles.profileButton}>
-             <Ionicons name="person-circle-outline" size={32} color={activeTab === 0 ? "#FFF" : "#000"} />
+            <Ionicons name="person-circle-outline" size={32} color={activeTab === 0 ? "#FFF" : "#000"} />
           </Pressable>
         </View>
 
         {/* D-Day & 미션 카운트 */}
         <Animated.View style={[styles.dDayContainer, { opacity: dDayOpacity }]}>
-           <View style={[styles.divider, { backgroundColor: activeTab === 0 ? '#EAEAEA' : 'rgba(0,0,0,0.1)' }]} />
-           <View style={styles.dDayBadgeRow}>
-             <View style={styles.dDayBadge}>
+          <View style={[styles.divider, { backgroundColor: activeTab === 0 ? '#EAEAEA' : 'rgba(0,0,0,0.1)' }]} />
+          <View style={styles.dDayBadgeRow}>
+            <View style={styles.dDayBadge}>
                 <Image source={heartImg} style={[styles.heartImage]} />
                 <AppText type="bold" style={[styles.dDayText, { color: '#FFF' }]}>{isCoupled ? `${dDay-1}일째` : '연결 대기중'}</AppText>
-             </View>
-             {isCoupled && (
-                 <View style={styles.missionCountBadge}>
+            </View>
+            {isCoupled && (
+                <View style={styles.missionCountBadge}>
                     <AppText type="medium" style={styles.missionCountText}>지금까지 한 미션: {totalMissionCount}개</AppText>
-                 </View>
-             )}
-           </View>
+                </View>
+            )}
+          </View>
         </Animated.View>
       </View>
 
@@ -208,7 +208,7 @@ export default function HomeScreen() {
               { backgroundSource!=defaultBgImg ? (
                 <View style={styles.infoSection}>
                   <View style={styles.nameDateContainer}>
-                    <AppText style={styles.userName}>{displayTitle}</AppText>
+                    <AppText type='pretendard-b' style={styles.userName}>{displayTitle}</AppText>
                     <View style={styles.datewrap}>
                       <Image source={calendarImg} style={[styles.calendarImage]} />
                       <AppText type='semibold' style={styles.dateText}>{displayDateText}</AppText>
@@ -219,15 +219,17 @@ export default function HomeScreen() {
                 <View style={{ marginBottom: 20 }} /> 
               )}
 
-              <View style={[styles.dashboard, { paddingBottom: insets.bottom + 10 }]}>
+              <View style={[styles.dashboard, { paddingBottom: insets.bottom }]}>
                 <Pressable
                   style={({ pressed }) => [styles.missionCard, pressed && styles.pressedCard, !isCoupled && styles.disabledMissionCard]}
                   onPress={handlePressCamera}
                 >
-                  <View style={styles.missionHeader}><AppText type="semibold" style={styles.cardTitle}>오늘의 미션</AppText></View>
-                  <AppText type="regular" style={[styles.missionContent, !isCoupled && { color: '#FF6B6B', fontSize: 13 }]} numberOfLines={2}>
-                    {isCoupled ? todayMissionTitle || '오늘의 미션이 도착했어요!' : '커플을 연결해주세요.'}
-                  </AppText>
+                  <View style={styles.missionwrap}>
+                    <View style={styles.missionHeader}><AppText type="semibold" style={styles.cardTitle}>오늘의 미션</AppText></View>
+                    <AppText type="regular" style={[styles.missionContent, !isCoupled && { color: '#FF6B6B', fontSize: 13 }]} numberOfLines={2}>
+                      {isCoupled ? todayMissionTitle || '오늘의 미션이 도착했어요!' : '커플을 연결해주세요.'}
+                    </AppText>
+                    </View>
                   <View style={styles.cameraLabelBox}><AppText type='semibold' style={styles.cameraLabel}>카메라</AppText></View>
                 </Pressable>
 
@@ -247,7 +249,7 @@ export default function HomeScreen() {
         ) : (
           <View style={{ flex: 1, backgroundColor: '#FFFCF5' }}>
             <View style={{ flex: 1, paddingTop: HEADER_HEIGHT - 30 }}> 
-               <GalleryView onBackToHome={() => switchTab(0)} />
+              <GalleryView onBackToHome={() => switchTab(0)} />
             </View>
           </View>
         )}
@@ -276,27 +278,28 @@ const styles = StyleSheet.create({
   dDayText: { fontSize: 14 },
   missionCountBadge: { marginLeft: 2 },
   missionCountText: { fontSize: 12, color: 'rgba(255,255,255,0.8)' },
-  backgroundLayer: { position: 'absolute', top: 0, left: 0, right: 0, height: '75%', zIndex: 0 },
+  backgroundLayer: { position: 'absolute', top: 0, left: 0, right: 0, height: '70%', zIndex: 0 },
   backgroundImage: { width: '100%', height: '100%' },
   dimOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.2)' },
   gradientOverlay: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '30%' },
-  homeContentContainer: { flex: 1, zIndex: 1, justifyContent: 'flex-end', paddingBottom: 20, },
-  infoSection: { paddingHorizontal: 24, marginBottom: '5%' },
+  homeContentContainer: { flex: 1, zIndex: 1, justifyContent: 'flex-end',  },
+  infoSection: { paddingHorizontal: 24,  marginBottom:'5%'},
   nameDateContainer: { gap: 2, },
   userName: { color: '#FFF', fontSize: 10, textShadowRadius: 4 },
   dateText: { color: '#fff', fontSize: 10 , alignItems:'flex-start',},
   datewrap:{ flexDirection: 'row', alignItems: 'center', },
-  dashboard: { paddingHorizontal: 16, gap: 12,  },
+  dashboard: { paddingHorizontal: 16, gap: 12, height: '55%'},
   pressedCard: { opacity: 0.9, transform: [{ scale: 0.98 }] },
   disabledCard: { opacity: 0.5, backgroundColor: '#DDD' },
   disabledMissionCard: { opacity: 0.7, backgroundColor: '#EEE' },
-  missionCard: { backgroundColor: 'rgba(247,245,241,0.8)', borderRadius: 12, padding: 20, minHeight: 220, justifyContent: 'space-between' },
+  missionCard: { backgroundColor: 'rgba(247,245,241,0.8)', borderRadius: 12, padding: 20, minHeight: '30%', justifyContent: 'space-between' },
+  missionwrap:{marginBottom: '30%' },
   missionHeader: {},
   cardTitle: { fontSize: 13, color: '#000' },
-  missionContent: { fontSize: 13, color: '#444', marginBottom: 150 },
+  missionContent: { fontSize: 13, color: '#444', },
   cameraLabelBox: { position: 'absolute', bottom: 20, left: 20 },
   cameraLabel: { fontSize: 22, color: '#000' },
-  bottomRow: { flexDirection: 'row', gap: 12, height: 160 },
+  bottomRow: { flexDirection: 'row', gap: 12, height: '35%'},
   squareCard: { borderRadius: 12, padding: 20, justifyContent: 'space-between' },
   calendarCard: { flex: 1.7, backgroundColor: '#3E3C3C' },
   chatCard: { flex: 1, backgroundColor: '#EAE8E3' },

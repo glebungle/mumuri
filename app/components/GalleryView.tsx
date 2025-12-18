@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { addHours, format, parseISO } from 'date-fns';
 import * as FileSystem from 'expo-file-system/legacy';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as MediaLibrary from 'expo-media-library';
 import { useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -213,7 +214,6 @@ export default function GalleryView({ onBackToHome }: GalleryViewProps) {
     }
   };
 
-  // ✅ 수정된 닫기 로직
   const handleCloseViewer = () => {
     setIsMenuVisible(false);
     setSelectedPhotoIndex(null);
@@ -225,7 +225,6 @@ export default function GalleryView({ onBackToHome }: GalleryViewProps) {
   const formattedDate = currentPhoto ? format(addHours(parseISO(currentPhoto.createdAt), 9), 'yyyy. MM. dd.') : '';
   const nickname = currentPhoto?.ownerNickname || '알 수 없음';
 
-  // ✅ 수정된 스크롤 엔드 핸들러
   const handleViewerScrollEnd = (event: any) => {
     if (selectedPhotoIndex === null) return; // 모달이 닫히는 중이면 무시
 
@@ -237,7 +236,6 @@ export default function GalleryView({ onBackToHome }: GalleryViewProps) {
     }
   };
 
-  // ✅ 인덱스 동기화 
   useEffect(() => {
     if (selectedPhotoIndex !== null && viewerListRef.current) {
       const timer = setTimeout(() => {
@@ -293,6 +291,10 @@ export default function GalleryView({ onBackToHome }: GalleryViewProps) {
         <View style={styles.modalBackground}>
           <View style={styles.modalContentContainer}>
             <View style={styles.imageWrapper}>
+              <LinearGradient
+                colors={['rgba(0,0,0,0.6)', 'rgba(0,0,0,0.3)', 'transparent']}
+                style={styles.gradientHeader}
+              />
               {photos.length > 0 && (
                 <FlatList
                   ref={viewerListRef}
@@ -329,7 +331,7 @@ export default function GalleryView({ onBackToHome }: GalleryViewProps) {
                 <View style={styles.headerInfo}>
                   <View style={styles.nicknameRow}>
                     <View style={styles.dot} />
-                    <AppText type="bold" style={styles.nicknameText}>
+                    <AppText type='pretendard-b' style={styles.nicknameText}>
                       {nickname}
                     </AppText>
                   </View>
@@ -399,9 +401,24 @@ const styles = StyleSheet.create({
   modalContentContainer: { flex: 1, backgroundColor: '#000' },
   imageWrapper: { flex: 1, position: 'relative' },
   fullScreenImage: { width: '100%', height: '100%' },
+  gradientHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 120, 
+    zIndex: 5,   
+  },
+  
   viewerHeader: { 
-    position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, 
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', 
+    position: 'absolute', 
+    top: 0, 
+    left: 0, 
+    right: 0, 
+    zIndex: 10, 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
     paddingHorizontal: 20 
   },
   headerInfo: { flexDirection:'row',gap: 13 },

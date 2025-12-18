@@ -79,6 +79,7 @@ async function fetchHomeMain(token: string) {
     });
     if (!res.ok) throw new Error(`Home Main Fetch Error: ${res.status}`);
     const json = await res.json();
+    // console.log('Home Main Data:', JSON.stringify(json, null, 2));
     return json;
   } catch (error) {
     console.error('❌ fetchHomeMain 실패:', error);
@@ -143,7 +144,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
       const [homeResponse, userInfo, myPageResponse] = await Promise.all([
         fetchHomeMain(token),
         fetchUserInfo(token),
-        fetchMyPage(token), // 👈 추가됨
+        fetchMyPage(token), 
       ]);
 
       // [STEP 2] 커플 연결 여부에 따라 미션 API 호출 분기
