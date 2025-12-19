@@ -168,7 +168,7 @@ export default function ChatScreen() {
       try {
         const token = await AsyncStorage.getItem('token');
         const res: any = await authedFetch(`/chat/${ROOM_KEY}/history?size=50`);
-        console.log('📜 [HISTORY API RESPONSE]:', JSON.stringify(res, null, 2));
+        console.log('[HISTORY API RESPONSE]:', JSON.stringify(res, null, 2));
         const rows = Array.isArray(res) ? res : (res?.messages || []);
         const historyMsgs = rows.map((r: any) => ({
           id: String(r.id), text: r.message, imageUrl: r.imageUrl,
@@ -272,7 +272,6 @@ export default function ChatScreen() {
       <KeyboardAvoidingView 
         style={{ flex: 1 }} 
         behavior={isIOS ? 'padding' : undefined} 
-        // 💡 [해결] iOS 간격 문제: offset 값을 HEADER_HEIGHT 정도로 낮춤
         keyboardVerticalOffset={isIOS ? HEADER_HEIGHT + 10 : 0}
       >
         {loading ? (
@@ -328,7 +327,7 @@ const styles = StyleSheet.create({
   imageBoxMine: { borderRadius: 18, overflow: 'hidden', alignSelf: 'flex-end', maxWidth: SCREEN_WIDTH * 0.6 },
   imageBoxOther: { borderRadius: 18, overflow: 'hidden', alignSelf: 'flex-start', maxWidth: SCREEN_WIDTH * 0.6 },
   bubbleMissionMine: { backgroundColor: '#6198FF', borderBottomRightRadius: 0 },
-  bubbleMissionOther: { backgroundColor: '#FFADAD', borderTopRightRadius: 0 },
+  bubbleMissionOther: { backgroundColor: '#f28484ff', borderTopLeftRadius: 0 },
   msgContainer: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: 4 },
   timeTextMine: { marginRight: 4, fontSize: 9, color: '#75787B' },
   timeTextOther: { marginLeft: 4, fontSize: 9, color: '#75787B' },
