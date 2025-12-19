@@ -107,14 +107,14 @@ export default function SettingScreen() {
         {/* 섹션 5: 여유공간 (장식용) */}
         <View style={styles.storageSection}>
           <AppText style={styles.storageTitle}>여유공간</AppText>
-          
-          <View style={styles.storageContent}>
-            <AppText type='medium' style={styles.storageUsageText}>65.43GB / 100GB</AppText>
+            <AppText type='medium' style={styles.text}> 추가 예정이에요. </AppText>
+          {/* <View style={styles.storageContent}>
+            <AppText type='medium' style={styles.storageUsageText}>65.43GB / 100GB</AppText> */}
             {/* 프로그레스 바 */}
-            <View style={styles.progressBarBg}>
+            {/* <View style={styles.progressBarBg}>
               <View style={[styles.progressBarFill, { width: '65%' }]} />
-            </View>
-          </View>
+            </View> */}
+          {/* </View> */}
         </View>
 
       </ScrollView>
@@ -216,4 +216,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#363636', 
     borderRadius: 6,
   },
+  text:{
+    color:'#b3b3b3ff'
+  }
 });

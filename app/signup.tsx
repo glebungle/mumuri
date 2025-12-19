@@ -1,5 +1,6 @@
-// app/signup.tsx
+import { Ionicons } from '@expo/vector-icons'; // ✅ 아이콘 추가
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Clipboard from 'expo-clipboard'; // ✅ 클립보드 추가
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -42,7 +43,6 @@ async function authedFetch(path: string, init: RequestInit = {}) {
   try { return JSON.parse(text); } catch { return text; }
 }
 
-// API 함수들
 export const postName = (name: string) =>
   authedFetch(`/user/name?name=${encodeURIComponent(name)}`, { method: 'POST' });
 
@@ -80,7 +80,6 @@ function toIsoDate(s: string): string {
 type StepKey = 'name' | 'birthday' | 'anniversary' | 'preferences' | 'partnerCode';
 const HEART_ICON = require('../assets/images/BlueHeart.png');
 
-// 지난 카드 컴포넌트
 const PastCard = React.memo(({ label, value }: { label: string; value: string }) => (
   <View style={[styles.pastCardBase, { height: 90 }]}>
     <AppText style={styles.pastCardLabel}>{label}</AppText>
@@ -117,7 +116,6 @@ const InputField = React.memo(({
 
 const HOBBIES = ['운동/스포츠', '예술/창작', '문화생활', '게임/오락', '여행/탐험', '맛집/카페', '집콕/힐링', '학습/자기계발'];
 const DATE_STYLES = ['활동적인', '문화/감성', '미식/카페', '휴식/힐링', '체험/창작', '홈데이트', '여행/탐험'];
-// ✅ [추가] 사랑의 언어 데이터
 const LOVE_LANGUAGES = [
   '"사랑해", "보고싶어" 등 말로 표현해줄 때',
   '안아주고 스킨십 해줄 때',
@@ -143,10 +141,14 @@ export default function Signup() {
 
   const [selectedHobbies, setSelectedHobbies] = useState<string[]>([]);
   const [selectedDateStyles, setSelectedDateStyles] = useState<string[]>([]);
-  // ✅ [추가] 사랑의 언어 선택 상태
   const [selectedLoveLanguages, setSelectedLoveLanguages] = useState<string[]>([]);
+  const [myCoupleCode, setMyCoupleCode] = useState<string>('');
 
-  const myCode = useMemo(() => Math.random().toString(36).slice(2, 10), []);
+  const copyToClipboard = async () => {
+    if (!myCoupleCode) return;
+    await Clipboard.setStringAsync(myCoupleCode);
+    Alert.alert('복사 완료', '커플 코드가 복사되었습니다!');
+  };
 
   const steps: { key: StepKey; title: string; hint: string; accent: string; placeholder: string }[] = useMemo(() => [
     { key: 'name',        title: '이름 입력',   hint: '연인과 부르는 애칭도 좋아요. 사용자님을 어떻게 부를까요?', accent: '#6198FF', placeholder: '이름을 입력해주세요' },
@@ -163,7 +165,6 @@ export default function Signup() {
       case 'name':        return values.name.trim().length >= 1;
       case 'birthday':    return isDate(values.birthday);
       case 'anniversary': return isDate(values.anniversary);
-      // ✅ [수정] 3가지 설문 모두 최소 1개 이상 선택해야 함
       case 'preferences': return selectedHobbies.length > 0 && selectedDateStyles.length > 0 && selectedLoveLanguages.length > 0;
       case 'partnerCode': return values.partnerCode.trim().length > 0;
     }
@@ -196,10 +197,8 @@ export default function Signup() {
         const fallbackCid = me?.coupleId ?? me?.couple_id ?? null;
         if (fallbackCid != null) {
           await AsyncStorage.setItem('coupleId', String(fallbackCid));
-          console.log('💾 [onSkip] Auto-matched coupleId saved:', fallbackCid);
         }
       } catch {}
-
       router.replace('/signup-finish');
     } catch (e) {
       console.warn(e);
@@ -214,29 +213,23 @@ export default function Signup() {
       setIsPosting(true);
 
       if (current.key === 'name') {
-        console.log('👉 [onNext] Name:', values.name); 
         await postName(values.name.trim());
-
       } else if (current.key === 'birthday') {
-        console.log('👉 [onNext] Birthday:', values.birthday); 
         await postBirthday(toIsoDate(values.birthday));
-
       } else if (current.key === 'anniversary') {
         await postTestGo();
-        console.log('👉 [onNext] Anniversary:', values.anniversary);
-        const coupleCode = await postAnniversary(toIsoDate(values.anniversary));
-        
-        if (coupleCode) {
-          await AsyncStorage.setItem('coupleCode', coupleCode);
+        const code = await postAnniversary(toIsoDate(values.anniversary));
+        if (code) {
+          setMyCoupleCode(code);
+          await AsyncStorage.setItem('coupleCode', code);
         }
 
         try {
           const me: any = await authedFetch('/user/getuser', { method: 'GET' });
-          const userId   = me?.userId   ?? me?.id        ?? me?.memberId ?? null;
+          const userId   = me?.userId   ?? me?.id ?? me?.memberId ?? null;
           const coupleId = me?.coupleId ?? me?.couple_id ?? null;
-
           const sets: [string, string][] = [];
-          if (userId   != null) sets.push(['userId', String(userId)]);
+          if (userId != null) sets.push(['userId', String(userId)]);
           if (coupleId != null) sets.push(['coupleId', String(coupleId)]);
           if (sets.length) await AsyncStorage.multiSet(sets);
         } catch (e) {
@@ -245,27 +238,18 @@ export default function Signup() {
 
       } else if (current.key === 'preferences') {
         console.log('👉 [onNext] Preferences Saved');
-        // 추후 API 연동 시 selectedLoveLanguages 도 함께 전송
-
       } else if (current.key === 'partnerCode') {
         const code = values.partnerCode.trim();
-        console.log('👉 [onNext] PartnerCode:', code); 
-
         const resp: any = await postCouple(code);
-        console.log('✅ [postCouple] Response:', resp); 
-
         const rawCid = resp?.memberName ?? resp?.coupleId ?? resp?.couple_id ?? null;
         const cidNum = rawCid != null ? Number(rawCid) : NaN;
-
         if (Number.isFinite(cidNum)) {
           await AsyncStorage.setItem('coupleId', String(cidNum));
         } else {
           try {
             const me: any = await authedFetch('/user/getuser', { method: 'GET' });
             const fallbackCid = me?.coupleId ?? me?.couple_id ?? null;
-            if (fallbackCid != null) {
-              await AsyncStorage.setItem('coupleId', String(fallbackCid));
-            }
+            if (fallbackCid != null) await AsyncStorage.setItem('coupleId', String(fallbackCid));
           } catch {}
         }
       }
@@ -292,7 +276,6 @@ export default function Signup() {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         
-        {/* 헤더 영역 */}
         <View style={styles.headerContainer}>
           <View style={styles.iconRow}>
             <Image source={HEART_ICON} style={[styles.heartImage, { tintColor: current.accent }]} />
@@ -311,12 +294,10 @@ export default function Signup() {
               />
             </View>
           </View>
-          
           <AppText type="bold" style={[styles.title, { color: current.accent }]}>{current.title}</AppText>
           <AppText type="medium" style={styles.hintText}>{current.hint}</AppText>
         </View>
 
-        {/* 메인 컨텐츠 영역 */}
         <View>
           {current.key === 'preferences' ? (
             <View>
@@ -325,14 +306,8 @@ export default function Signup() {
                 {HOBBIES.map((hobby) => {
                   const isSelected = selectedHobbies.includes(hobby);
                   return (
-                    <TouchableOpacity
-                      key={hobby}
-                      style={[styles.chip, isSelected && styles.chipSelected]}
-                      onPress={() => toggleSelection(selectedHobbies, setSelectedHobbies, hobby)}
-                    >
-                      <AppText type='regular' style={[styles.chipText, isSelected && styles.chipTextSelected]}>
-                        {hobby}
-                      </AppText>
+                    <TouchableOpacity key={hobby} style={[styles.chip, isSelected && styles.chipSelected]} onPress={() => toggleSelection(selectedHobbies, setSelectedHobbies, hobby)}>
+                      <AppText type='regular' style={[styles.chipText, isSelected && styles.chipTextSelected]}>{hobby}</AppText>
                     </TouchableOpacity>
                   );
                 })}
@@ -343,14 +318,8 @@ export default function Signup() {
                 {DATE_STYLES.map((style) => {
                   const isSelected = selectedDateStyles.includes(style);
                   return (
-                    <TouchableOpacity
-                      key={style}
-                      style={[styles.chip, isSelected && styles.chipSelected]}
-                      onPress={() => toggleSelection(selectedDateStyles, setSelectedDateStyles, style)}
-                    >
-                      <AppText type='regular'style={[styles.chipText, isSelected && styles.chipTextSelected]}>
-                        {style}
-                      </AppText>
+                    <TouchableOpacity key={style} style={[styles.chip, isSelected && styles.chipSelected]} onPress={() => toggleSelection(selectedDateStyles, setSelectedDateStyles, style)}>
+                      <AppText type='regular'style={[styles.chipText, isSelected && styles.chipTextSelected]}>{style}</AppText>
                     </TouchableOpacity>
                   );
                 })}
@@ -361,14 +330,8 @@ export default function Signup() {
                 {LOVE_LANGUAGES.map((item) => {
                   const isSelected = selectedLoveLanguages.includes(item);
                   return (
-                    <TouchableOpacity
-                      key={item}
-                      style={[styles.chip, isSelected && styles.chipSelected, { width: '100%' }]}
-                      onPress={() => toggleSelection(selectedLoveLanguages, setSelectedLoveLanguages, item)}
-                    >
-                      <AppText type='regular' style={[styles.chipText, isSelected && styles.chipTextSelected]}>
-                        {item}
-                      </AppText>
+                    <TouchableOpacity key={item} style={[styles.chip, isSelected && styles.chipSelected, { width: '100%' }]} onPress={() => toggleSelection(selectedLoveLanguages, setSelectedLoveLanguages, item)}>
+                      <AppText type='regular' style={[styles.chipText, isSelected && styles.chipTextSelected]}>{item}</AppText>
                     </TouchableOpacity>
                   );
                 })}
@@ -379,8 +342,15 @@ export default function Signup() {
             <View style={[styles.codeStepContainer, { borderColor: current.accent }]}>
               <View style={{ marginBottom: 50 }}>
                 <AppText type="bold" style={styles.inputLabel}>나의 코드</AppText>
-                <View style={styles.grayInputBox}>
-                  <AppText type="bold" style={{ fontSize: 12, color: '#4D5053' }} selectable>{myCode}</AppText>
+                <View style={styles.myCodeRow}>
+                  <View style={[styles.grayInputBox, { flex: 1, marginRight: 10 }]}>
+                    <AppText type="bold" style={{ fontSize: 12, color: '#4D5053' }} selectable>
+                      {myCoupleCode || '발급 중...'}
+                    </AppText>
+                  </View>
+                  <TouchableOpacity onPress={copyToClipboard} style={styles.copyIconButton}>
+                    <Ionicons name="copy-outline" size={20} color="#6198FF" />
+                  </TouchableOpacity>
                 </View>
               </View>
 
@@ -396,13 +366,11 @@ export default function Signup() {
                 />
               </View>
               
-              {/* 건너뛰기 텍스트 링크 */}
               <TouchableOpacity onPress={onSkip} activeOpacity={0.7} style={{ marginTop: 16, alignItems:'center' }}>
                 <AppText style={{ color: '#9CA3AF', fontSize: 12 }}>
                   아직 커플코드가 없으신가요? <AppText style={{ textDecorationLine: 'underline', color: '#6B7280', fontSize: 12  }}>건너뛰기</AppText>
                 </AppText>
               </TouchableOpacity>
-
               {isPosting && <AppText style={{ color: '#6B7280', marginTop: 10, textAlign:'center' }}>연결 중...</AppText>}
             </View>
 
@@ -420,36 +388,21 @@ export default function Signup() {
           )}
         </View>
 
-        {/* 하단 누적 카드 */}
         {current.key !== 'partnerCode' && current.key !== 'preferences' && (
           <View style={{ marginTop: 14 }}>
             {steps.slice(0, step).filter(s => s.key !== 'preferences').reverse().map((s) => (
-              <PastCard
-                key={s.key}
-                label={s.title.replace(' 입력', '')}
-                value={values[s.key as keyof typeof values]}
-              />
+              <PastCard key={s.key} label={s.title.replace(' 입력', '')} value={values[s.key as keyof typeof values]} />
             ))}
           </View>
         )}
       </ScrollView>
 
-      {/* 하단 버튼 */}
       <View style={styles.buttonContainer}>
         <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <AppText type="semibold" style={styles.backButtonText}>
-            {step === 0 ? '닫기' : '이전'}
-          </AppText>
+          <AppText type="semibold" style={styles.backButtonText}>{step === 0 ? '닫기' : '이전'}</AppText>
         </TouchableOpacity>
-
-        <TouchableOpacity
-          disabled={!canNext || isPosting}
-          onPress={onNext}
-          style={[styles.nextButton, { backgroundColor: (!canNext || isPosting) ? '#D1D5DB' : current.accent }]}
-        >
-          <AppText type="bold" style={styles.nextButtonText}>
-            {step < steps.length - 1 ? '다음' : '완료'}
-          </AppText>
+        <TouchableOpacity disabled={!canNext || isPosting} onPress={onNext} style={[styles.nextButton, { backgroundColor: (!canNext || isPosting) ? '#D1D5DB' : current.accent }]}>
+          <AppText type="bold" style={styles.nextButtonText}>{step < steps.length - 1 ? '다음' : '완료'}</AppText>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -460,103 +413,33 @@ export default function Signup() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#FFFCF5' },
   scrollContent: { padding: 20, paddingBottom: 40 },
-  
   headerContainer: { marginTop: 16, marginBottom: 30 },
   iconRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   heartImage: { width: 24, height: 24, resizeMode: 'contain', marginRight: 10 },
-  
-  // 진행바 
-  progressBarBg: {
-    flex: 1,
-    height: 6,
-    backgroundColor: '#DDDDDD',
-    borderRadius: 3,
-  },
-  progressBarFill: {
-    height: '100%',
-    borderRadius: 3,
-  },
-
+  progressBarBg: { flex: 1, height: 6, backgroundColor: '#DDDDDD', borderRadius: 3 },
+  progressBarFill: { height: '100%', borderRadius: 3 },
   title: { fontSize: 18, marginBottom: 6, marginLeft:4 },
   hintText: { color: '#4D5053', fontSize: 11, lineHeight: 18 },
-
-  // 기본 입력 카드
   currentCardBase: { borderWidth: 2, borderRadius: 16, padding: 20, backgroundColor: 'transparent' },
-
-  // 과거 카드
-  pastCardBase: {
-    borderWidth: 2, borderColor: '#75787B', borderRadius: 16,
-    paddingHorizontal: 20, paddingVertical: 14,
-    marginTop: 10, justifyContent: 'center', overflow: 'hidden',
-  },
+  pastCardBase: { borderWidth: 2, borderColor: '#75787B', borderRadius: 16, paddingHorizontal: 20, paddingVertical: 14, marginTop: 10, justifyContent: 'center', overflow: 'hidden' },
   pastCardLabel: { fontSize: 11, color: '#75787B', marginBottom: 4 },
   pastCardValue: { fontSize: 13, color: '#75787B' },
-
   inputLabel: { fontSize: 11, marginBottom: 8 },
   textInputBase: { color:'#CECECE', padding: 0, fontSize: 15 },
-
-  // === 취향 선택 스타일 ===
-  questionTitle: { fontSize: 14, color: '#3B82F6', marginBottom: 16 },
-  chipContainer: {
-    borderWidth:1,
-    borderColor:'#6198FF',
-    borderRadius:16,
-    padding:16,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  chip: {
-    width: '48%', // 2열 배치
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: '#6B7280',
-    borderRadius: 16, 
-    alignItems: 'center',
-    marginBottom: 4,
-    backgroundColor: 'transparent',
-  },
-  chipSelected: {
-    backgroundColor: '#3B82F6', 
-    borderColor: '#3B82F6',
-  },
-  chipText: {
-    fontSize: 14,
-    color: '#4B5563',
-  },
-  chipTextSelected: {
-    color: '#fff',
-  },
-
-  // === 코드 입력 단계 스타일 (회색 박스) ===
-  codeStepContainer: {
-    padding: 20,
-    paddingVertical:35,
-    borderWidth: 2,
-    borderRadius: 16,
-    backgroundColor: 'transparent',
-  },
-  grayInputBox: {
-    backgroundColor: '#E5E7EB', 
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    justifyContent: 'center',
-  },
-  myCodeBox: { borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, backgroundColor: '#EAEAEA' },
-  myCodeLabel: { fontSize: 12, color: '#6B7280', marginBottom: 6 },
-
-  // 하단 버튼
-  buttonContainer: {
-    padding: 20, gap: 10, flexDirection: 'row',
-    paddingBottom: 20, backgroundColor: '#FFFCF5', 
-  },
-  backButton: {
-    flex: 1, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#E5E7EB',
-  },
+  questionTitle: { fontSize: 14, color: '#6198FF', marginBottom: 16 },
+  chipContainer: { borderWidth:1, borderColor:'#6198FF', borderRadius:16, padding:16, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 10 },
+  chip: { width: '48%', paddingVertical: 10, borderWidth: 1, borderColor: '#6B7280', borderRadius: 16, alignItems: 'center', marginBottom: 4, backgroundColor: 'transparent' },
+  chipSelected: { backgroundColor: '#6198FF', borderColor: '#6198FF' },
+  chipText: { fontSize: 14, color: '#4B5563' },
+  chipTextSelected: { color: '#fff' },
+  codeStepContainer: { padding: 20, paddingVertical:35, borderWidth: 2, borderRadius: 16, backgroundColor: 'transparent' },
+  grayInputBox: { backgroundColor: '#E5E7EB', borderRadius: 12, paddingVertical: 14, paddingHorizontal: 16, justifyContent: 'center' },
+  buttonContainer: { padding: 20, gap: 10, flexDirection: 'row', paddingBottom: 20, backgroundColor: '#FFFCF5' },
+  backButton: { flex: 1, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: '#E5E7EB' },
   backButtonText: { color: '#6B7280', fontSize: 16 },
   nextButton: { flex: 2, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   nextButtonText: { color: '#FFF', fontSize: 16 },
+  
+  myCodeRow: { flexDirection: 'row', alignItems: 'center' },
+  copyIconButton: { padding: 12, backgroundColor: '#E5E7EB', borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
 });

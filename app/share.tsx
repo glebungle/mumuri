@@ -13,20 +13,6 @@ const BASE_URL = 'https://mumuri.shop';
 const sendImg = require('../assets/images/Send.png');
 const downloadImg = require('../assets/images/Download.png');
 
-// S3 URL에서 Key만 추출하는 함수 
-function extractS3KeyFromUrl(url?: string | null) {
-  if (!url) return null;
-  try {
-    const u = new URL(url);
-    return u.pathname.replace(/^\/+/, '');
-  } catch {
-    const marker = '.amazonaws.com/';
-    const idx = url.indexOf(marker);
-    if (idx >= 0) return url.substring(idx + marker.length);
-    return url;
-  }
-}
-
 export default function ShareScreen() {
   const { uri, missionId, missionTitle, missionDescription } =
     useLocalSearchParams<{
@@ -47,7 +33,6 @@ export default function ShareScreen() {
   const [sending, setSending] = useState(false);
   const handleBack = () => router.back();
 
-  // ===== 앨범 저장 =====
   const saveToAlbum = async () => {
     if (!photoUri || saving) return;
     try {
@@ -75,7 +60,6 @@ export default function ShareScreen() {
     }
   };
 
-  // ===== 전송 로직 (1단계 업로드 -> 2단계 미션 완료) =====
   const sendToPartner = async () => {
     if (!photoUri || sending) return;
     
@@ -85,7 +69,6 @@ export default function ShareScreen() {
 
     setSending(true);
     try {
-      // 1-1) 이미지 리사이즈
       let uploadUri = photoUri;
       try {
         const manipulated = await ImageManipulator.manipulateAsync(
@@ -95,8 +78,8 @@ export default function ShareScreen() {
         uploadUri = manipulated.uri;
       } catch (e) { console.warn('[RESIZE] failed', e); }
 
-      // 1-2) 사진 업로드 
-      const uploadUrl = `${BASE_URL}/photo/${encodeURIComponent(String(coupleId))}`;
+      // 1단계: 사진 업로드
+      const uploadUrl = `${BASE_URL}/photo/${coupleId}${missionId ? `?missionId=${missionId}` : ''}`;
       const uploadForm = new FormData();
       uploadForm.append('file', {
         uri: uploadUri,
@@ -104,15 +87,10 @@ export default function ShareScreen() {
         type: 'image/jpeg',
       } as any);
 
-      if (missionId) {
-        uploadForm.append('missionId', missionId.toString());
-      }
-
       const upRes = await fetch(uploadUrl, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
           'ngrok-skip-browser-warning': 'true',
         },
         body: uploadForm,
@@ -120,39 +98,25 @@ export default function ShareScreen() {
 
       if (!upRes.ok) throw new Error(`업로드 실패 (HTTP ${upRes.status})`);
 
-      // 2) 최신 업로드된 사진의 URL 조회 
-      const listUrl = `${BASE_URL}/photo/${encodeURIComponent(String(coupleId))}/all`;
-      const listRes = await fetch(listUrl, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'ngrok-skip-browser-warning': 'true',
-        },
-      });
-      const listJson = await listRes.json();
+      const fileKeyRaw = await upRes.text();
+      const fileKey = fileKeyRaw.replace(/^"|"$/g, ''); 
       
-      let latestPhoto = listJson[0];
-      for (const it of listJson) {
-        if (it.id > (latestPhoto?.id || 0)) latestPhoto = it;
-      }
+      console.log('🔥 획득한 FileKey:', fileKey);
 
-      const photoUrlPresigned = latestPhoto?.presignedUrl;
-      if (!photoUrlPresigned) throw new Error('업로드된 사진 정보를 찾을 수 없습니다.');
-
-      // 3) 미션 완료 API 호출 
+      // 2단계: 미션 완료 API 호출
       if (missionId) {
         const mid = Number(missionId);
-        const completeUrl = `${BASE_URL}/api/couples/missions/${mid}/complete-v2`;
-        const s3Key = extractS3KeyFromUrl(photoUrlPresigned) || photoUrlPresigned;
+        
+        const completeUrl = `${BASE_URL}/api/couples/missions/${mid}/complete-v2?fileKey=${encodeURIComponent(fileKey)}`;
+
+        console.log('📤 완료 API 호출 (Query 방식):', completeUrl);
 
         const compRes = await fetch(completeUrl, {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
             'ngrok-skip-browser-warning': 'true',
           },
-          body: JSON.stringify({ file: s3Key }),
         });
 
         if (!compRes.ok) {
@@ -161,7 +125,6 @@ export default function ShareScreen() {
         }
       }
 
-      // 모든 과정 성공 시 채팅방으로 이동
       router.replace('/chat');
 
     } catch (e: any) {
@@ -174,10 +137,10 @@ export default function ShareScreen() {
 
   if (!photoUri) {
     return (
-      <View >
+      <View style={styles.wrap}>
         <AppText>사진 정보가 없어요.</AppText>
-        <Pressable  onPress={() => router.replace('/')}>
-          <AppText style={{ color: '#fff' }}>홈으로</AppText>
+        <Pressable onPress={() => router.replace('/')}>
+          <AppText style={{ color: '#3279FF', marginTop: 20 }}>홈으로</AppText>
         </Pressable>
       </View>
     );
@@ -190,16 +153,13 @@ export default function ShareScreen() {
         <Image source={{ uri: photoUri }} style={styles.image} resizeMode="contain" />
       </View>
 
-      {/* 하단 버튼 영역 */}
       <View style={styles.bottomActions}>
-        {/* 뒤로가기 영역 (왼쪽) */}
         <View style={styles.sideAction}>
           <Pressable style={styles.iconCircle} onPress={handleBack}>
             <Ionicons name="chevron-back" size={28} color="#1E1E1E" />
           </Pressable>
         </View>
 
-        {/* 전송 버튼 (중앙) */}
         <Pressable
           style={styles.sendBtn}
           onPress={sendToPartner}
@@ -208,7 +168,6 @@ export default function ShareScreen() {
           <Image source={sendImg} style={styles.sendImage} resizeMode="contain" />
         </Pressable>
 
-        {/* 저장 버튼 (오른쪽) */}
         <View style={styles.sideAction}>
           <Pressable 
             style={styles.iconCircle} 
@@ -234,7 +193,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#000',
   },
   image: { width: '100%', height: '100%' },
-  
   bottomActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -243,12 +201,7 @@ const styles = StyleSheet.create({
     marginTop: 'auto', 
     marginBottom: 50,  
   },
-  
-  sideAction: {
-    flex: 1,
-    alignItems: 'center',
-  },
-
+  sideAction: { flex: 1, alignItems: 'center' },
   iconCircle: {
     width: 50,
     height: 50,
@@ -256,7 +209,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-
   sendBtn: {
     width: 72,
     height: 72,
@@ -266,7 +218,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     zIndex: 10,
   },
-  
-  sendImage: { width: 40, height: 40, paddingTop:3},
+  sendImage: { width: 40, height: 40, paddingTop: 3 },
   downloadImage: { width: 30, height: 30 },
 });

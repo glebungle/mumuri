@@ -1,9 +1,11 @@
 // app/onboarding/finish.tsx
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef } from 'react';
 import {
   Animated,
-  Easing, // Image import 추가
+  Dimensions,
+  Easing,
   Pressable,
   StyleSheet,
   View
@@ -11,19 +13,20 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppText from '../../components/AppText';
 
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
 const AnimatedImage = Animated.Image;
 
-// 공 이미지 경로 (프로젝트에 맞게 수정 필요)
 const pinkBall = require('../../assets/images/ball_pink.png');
 const greenBall = require('../../assets/images/ball_green.png');
 
-// 공 데이터 배열 (초기 위치 및 크기)
 const ballData = [
-  { id: 1, initialX: 50, initialY: 250, size: 20 },
-  { id: 2, initialX: 280, initialY: 180, size: 25 },
-  { id: 3, initialX: 80, initialY: 500, size: 18 },
-  { id: 4, initialX: 300, initialY: 580, size: 22 },
-  { id: 5, initialX: 180, initialY: 100, size: 20 },
+  { id: 1, initialX: SCREEN_WIDTH * 0.1,  initialY: SCREEN_HEIGHT * 0.2,  size: 22 }, // 좌측 상단
+  { id: 2, initialX: SCREEN_WIDTH * 0.4,  initialY: SCREEN_HEIGHT * 0.1,  size: 18 }, // 중앙 상단
+  { id: 3, initialX: SCREEN_WIDTH * 0.8,  initialY: SCREEN_HEIGHT * 0.18, size: 24 }, // 우측 상단
+  { id: 4, initialX: SCREEN_WIDTH * 0.08, initialY: SCREEN_HEIGHT * 0.55, size: 20 }, // 좌측 중앙 
+  { id: 5, initialX: SCREEN_WIDTH * 0.85, initialY: SCREEN_HEIGHT * 0.62, size: 22 }, // 우측 중앙 
+  { id: 6, initialX: SCREEN_WIDTH * 0.05, initialY: SCREEN_HEIGHT * 0.88, size: 24 }, // 좌측 하단 
 ];
 
 export default function OnboardingFinish() {
@@ -49,9 +52,7 @@ export default function OnboardingFinish() {
     outputRange: ['0%', '100%'],
   });
 
-  // --- 캐릭터 회전 애니메이션 (gentle) ---
   const rotateVal = useRef(new Animated.Value(0)).current;
-  // 공 애니메이션을 위한 값
   const ballAnimVal = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -59,42 +60,41 @@ export default function OnboardingFinish() {
 
     const runAnimation = () => {
       Animated.sequence([
-        // 1. 회전 시작 (0 -> 1) & 공 튕김 시작 (분홍 -> 초록으로 이동)
+        // 회전 및 공 이동 시작 (
         Animated.parallel([
           Animated.timing(rotateVal, {
             toValue: 1,
-            duration: 800,
+            duration: 1200, 
             easing: gentleEasing,
             useNativeDriver: true,
           }),
           Animated.spring(ballAnimVal, {
             toValue: 1,
-            friction: 4,
-            tension: 80,
+            friction: 6, 
+            tension: 60,
             useNativeDriver: true,
           }),
         ]),
-        // 2. 초록색 상태 유지 (4초)
-        Animated.delay(4000),
+        
+        Animated.delay(7000),
 
-        // 3. 회전 복귀 (1 -> 0) & 공 복귀 (초록 -> 분홍으로 이동)
         Animated.parallel([
           Animated.timing(rotateVal, {
             toValue: 0,
-            duration: 800,
+            duration: 1200,
             easing: gentleEasing,
             useNativeDriver: true,
           }),
           Animated.spring(ballAnimVal, {
             toValue: 0,
-            friction: 4,
-            tension: 80,
+            friction: 6,
+            tension: 60,
             useNativeDriver: true,
           }),
         ]),
-        // 4. 분홍색 상태 유지 (4초)
-        Animated.delay(4000),
-      ]).start(() => runAnimation()); // 무한 반복
+        
+        Animated.delay(7000),
+      ]).start(() => runAnimation());
     };
 
     runAnimation();
@@ -105,8 +105,14 @@ export default function OnboardingFinish() {
     outputRange: ['0deg', '180deg'],
   });
 
-  const onStart = () => {
-    router.replace('/(auth)');
+  const onStart = async () => { 
+    try {
+      await AsyncStorage.setItem('hasSeenOnboarding', 'true');
+      router.replace('/(auth)');
+    } catch (e) {
+      console.error('온보딩 상태 저장 실패:', e);
+      router.replace('/(auth)');
+    }
   };
 
   return (
@@ -118,7 +124,6 @@ export default function OnboardingFinish() {
 
       {/* 공 애니메이션 */}
       {ballData.map((ball, index) => {
-        // 각 공마다 다른 방향으로 튕기도록 설정 (예시)
         const moveX = ballAnimVal.interpolate({
           inputRange: [0, 1],
           outputRange: [0, (index % 2 === 0 ? 1 : -1) * ( 0 + index * 5)],
@@ -151,13 +156,13 @@ export default function OnboardingFinish() {
               },
             ]}
           >
-            {/* 분홍색 공 (기본) */}
+            {/* 분홍색 공  */}
             <Animated.Image
               source={pinkBall}
               style={[styles.ballImage, { opacity: pinkOpacity }]}
               resizeMode="contain"
             />
-            {/* 초록색 공 (회전 시 나타남) */}
+            {/* 초록색 공 */}
             <Animated.Image
               source={greenBall}
               style={[styles.ballImage, { opacity: greenOpacity, position: 'absolute' }]}
@@ -222,16 +227,16 @@ const styles = StyleSheet.create({
   // 캐릭터
   character: {
     position: 'absolute',
-    top: 210,
-    width: 900,
-    height: 1200,
-    zIndex: 1, // 공보다 위에 오도록 설정
+    bottom: SCREEN_HEIGHT*(-0.7),
+    width: SCREEN_WIDTH*0.9,
+    height: SCREEN_HEIGHT*1.5,
+    zIndex: 1, 
   },
 
   // 공 스타일
   ballContainer: {
     position: 'absolute',
-    zIndex: 0, // 캐릭터 뒤에 위치
+    zIndex: 2, 
   },
   ballImage: {
     width: '100%',
@@ -239,10 +244,11 @@ const styles = StyleSheet.create({
   },
 
   textBox: {
-    marginTop: 600,
+    position:'absolute',
+    bottom:SCREEN_HEIGHT*0.17,
     alignItems: 'center',
     paddingHorizontal: 30,
-    zIndex: 2, // 텍스트가 가장 위에 오도록
+    zIndex: 2,
   },
   title: {
     fontSize: 22,

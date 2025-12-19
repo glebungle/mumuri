@@ -463,7 +463,7 @@ export default function CalendarScreen() {
                     <View style={styles.verticalBar} />
                     <AppText type="medium" style={[styles.scheduleTitleText, { flex: 1 }]}>{item.title}</AppText>
                     {!isPartnerOnly && (
-                      <TouchableOpacity onPress={() => handleDeleteSchedule(item)} style={{ padding: 8 }}>
+                      <TouchableOpacity onPress={() => handleDeleteSchedule(item)}>
                         <Ionicons name="close" size={20} color="#FFF" />
                       </TouchableOpacity>
                     )}

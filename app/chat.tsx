@@ -168,6 +168,7 @@ export default function ChatScreen() {
       try {
         const token = await AsyncStorage.getItem('token');
         const res: any = await authedFetch(`/chat/${ROOM_KEY}/history?size=50`);
+        console.log('📜 [HISTORY API RESPONSE]:', JSON.stringify(res, null, 2));
         const rows = Array.isArray(res) ? res : (res?.messages || []);
         const historyMsgs = rows.map((r: any) => ({
           id: String(r.id), text: r.message, imageUrl: r.imageUrl,

@@ -121,7 +121,11 @@ async function fetchTodayMissions(token: string) {
     });
     if (res.status === 404) return []; 
     if (!res.ok) throw new Error(`Today Mission Fetch Error: ${res.status}`);
-    return res.json();
+    // 🔥 수정: res가 아니라 실제 파싱된 데이터를 찍어야 합니다.
+    const data = await res.json();
+    console.log('✅ [REAL MISSION DATA]:', JSON.stringify(data, null, 2)); 
+    
+    return data;
   } catch (error) {
     console.error('❌ fetchTodayMissions 실패:', error);
     return [];

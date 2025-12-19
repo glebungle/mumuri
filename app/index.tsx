@@ -9,9 +9,25 @@ export default function Gate() {
 
   useEffect(() => {
     (async () => {
-      const token = await AsyncStorage.getItem('token');
-      if (token) router.replace('./(auth)');//router.replace('./(tabs)/camera');
-      else router.replace('./onboarding/intro');
+      
+      const [token, hasSeenOnboarding] = await Promise.all([
+        AsyncStorage.getItem('token'),
+        AsyncStorage.getItem('hasSeenOnboarding')
+      ]);
+
+      if (token) {
+        // 토큰 있음
+        router.replace('./(tabs)/home'); 
+      } else {
+        // 온보딩 이미 봄
+        if (hasSeenOnboarding === 'true') {
+          router.replace('./(auth)');
+        } 
+        // 맨 처음 접속엔 온보딩 이동
+        else {
+          router.replace('./onboarding/intro');
+        }
+      }
     })();
   }, [router]);
 
@@ -21,4 +37,3 @@ export default function Gate() {
     </View>
   );
 }
-

@@ -1,9 +1,11 @@
 // app/onboarding/detail.tsx
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Image, Pressable, StyleSheet, View } from 'react-native';
+import { Animated, Dimensions, Image, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppText from '../../components/AppText';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const onboardingImg = require('../../assets/images/onboarding.png');
 const onboardingWinkImg = require('../../assets/images/onboarding_wink.png');
@@ -287,7 +289,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFCF5',
   },
   progressBarBg: {
-    height: 4,
+    height: 4, 
     width: '88%',
     backgroundColor: '#E3E7EB',
     borderRadius: 999,
@@ -335,11 +337,11 @@ const styles = StyleSheet.create({
   // 초록 점 컨테이너
   confettiContainer: {
     position: 'absolute',
-    width: 100,
-    height: 100,
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 3, // 배경 이미지 뒤
+    zIndex: 3, 
   },
   dot: {
     position: 'absolute',
@@ -365,7 +367,7 @@ const styles = StyleSheet.create({
   },
   bottomBox: {
     position: 'absolute',
-    bottom: 170,
+    bottom: SCREEN_HEIGHT*0.17,
     width: '100%',
     alignItems: 'center',
     zIndex: 10,
@@ -426,12 +428,11 @@ const styles = StyleSheet.create({
   },
   arrow: {
     position: 'absolute',
-    // 위치 조정: 말풍선(top:330) 아래, 버튼(bottom:약 50) 위쪽
-    bottom: 150, 
-    right:100,
+    bottom: SCREEN_HEIGHT*0.17, 
+    right:SCREEN_WIDTH*0.2,
     alignSelf: 'center',
     width: 80, 
-    height: 170,
+    height: SCREEN_HEIGHT*0.2,
     zIndex: 19, 
   },
 });

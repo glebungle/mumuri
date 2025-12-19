@@ -45,17 +45,14 @@ export default function KakaoDeepLinkHandler() {
     
     isProcessing.current = true;
 
-    // 🛑 좀비 토큰 방어 (아직 유효함)
     const logoutFlag = await AsyncStorage.getItem('isLoggingOut');
     if (logoutFlag === 'true') {
-        // 여기로 들어왔다는 건, LoginButton을 거치지 않고(쿠키청소 없이)
-        // 백그라운드에서 좀비 토큰이 날아왔다는 뜻이므로 무시합니다.
-        console.log('🛑 [Login Handler] 좀비 토큰 차단');
+        console.log('[Login Handler] 좀비 토큰 차단');
         router.replace({ pathname: '/', params: {} });
         return;
     }
 
-    console.log('🟢 [Login Handler] 정상 로그인 진행');
+    console.log(' [Login Handler] 정상 로그인 진행');
     
     try {
       // 1. 토큰 저장
@@ -68,8 +65,6 @@ export default function KakaoDeepLinkHandler() {
       const userId = await fetchUserId(String(params.accessToken));
       if (userId) await AsyncStorage.setItem('userId', String(userId));
 
-      // ✅ [핵심] 로그인이 "성공"했으므로 이제 방어막(깃발)을 제거합니다.
-      // 이제 다음번 로그인 때는 쿠키 청소 없이 바로 로그인됩니다.
       await AsyncStorage.removeItem('isLoggingOut');
 
       // 2. 이동

@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef } from 'react';
 import {
   Animated,
+  Dimensions,
   Pressable,
   StyleSheet,
   View
@@ -11,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppText from '../../components/AppText';
 
 const AnimatedAppText = Animated.createAnimatedComponent(AppText);
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function OnboardingDetail2() {
   const router = useRouter();
@@ -55,7 +57,7 @@ export default function OnboardingDetail2() {
     inputRange: [0, 1],
     outputRange: ['#BFBFBF', '#5F92FF'],
   });
-  // prog가 0에서 1로 갈 때 -11deg로 회전 (확실히 기울어짐)
+  // prog가 0에서 1로 갈 때 -11deg로 회전 
   const cardRotate = prog.interpolate({
     inputRange: [0, 1],
     outputRange: ['0deg', '11deg'],
@@ -96,7 +98,7 @@ export default function OnboardingDetail2() {
   // --- 편지지 좌우 기울기 애니메이션 (수정) ---
   // prog 값에 따라 편지지가 카드와 반대 방향으로 기울어지게 조정
   const letterRotate = prog.interpolate({
-    inputRange: [0, 1],
+    inputRange: [0, 1,],
     outputRange: ['-6deg', '6deg'], // prog가 0->1일 때, -6deg -> 6deg로 변화 (확실히 기울어짐)
   });
 
@@ -253,7 +255,8 @@ const styles = StyleSheet.create({
     bottom: CARD_SIZE * 0.02,
   },
   textBox: {
-    marginTop: 200,
+    position:'absolute',
+    bottom:SCREEN_HEIGHT*0.17,
     alignItems: 'center',
     paddingHorizontal: 20,
     marginBottom: 8,

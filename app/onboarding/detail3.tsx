@@ -1,11 +1,11 @@
 // app/onboarding/detail2.tsx
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Image, Pressable, StyleSheet, View } from 'react-native';
+import { Animated, Dimensions, Image, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppText from '../../components/AppText';
 
-// 🔥 이미지 에셋
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const imgFrame = require('../../assets/images/frame.png');
 const imgCh1 = require('../../assets/images/ch1.png');
 const imgCh2 = require('../../assets/images/ch2.png');
@@ -283,10 +283,10 @@ const styles = StyleSheet.create({
   },
 
   textBox: {
-    marginTop: 120,
+    position:'absolute',
+    bottom:SCREEN_HEIGHT*0.17,
     alignItems: 'center',
     paddingHorizontal: 20,
-    marginBottom: 8,
   },
   titleLine: { textAlign: 'center' },
   bold20: { fontSize: 20 },

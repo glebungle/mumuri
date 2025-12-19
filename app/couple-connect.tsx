@@ -28,13 +28,11 @@ export default function CoupleConnectScreen() {
   const [partnerCode, setPartnerCode] = useState<string>(''); 
   const [loading, setLoading] = useState(false); 
   
-  // 성공 모달 상태
   const [modalVisible, setModalVisible] = useState(false);
 
   const [testModalVisible, setTestModalVisible] = useState(false);
   const [testCode, setTestCode] = useState('');
 
-  // 1. 내 커플 코드 가져오기
   useEffect(() => {
     fetchMyCode();
   }, []);
@@ -83,35 +81,11 @@ export default function CoupleConnectScreen() {
     Alert.alert('복사 완료', '커플 코드가 복사되었습니다!');
   };
 
-  // 2. 가상 상대방 생성 (모달 적용)
-  const handleTestGo = async () => {
-    try {
-      const token = await AsyncStorage.getItem('token');
-      const res = await fetch(`${BASE_URL}/test/go`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      const text = await res.text();
-      if (res.ok) {
-        // ✅ [수정] Alert 대신 모달 띄우기
-        setTestCode(text);
-        setTestModalVisible(true);
-      } else {
-        Alert.alert("테스트 실패", text);
-      }
-    } catch (e) {
-      Alert.alert("에러", "테스트 호출 중 에러 발생");
-    }
-  };
-
-  // ✅ [추가] 테스트 모달 확인 핸들러
   const handleTestConfirm = () => {
     setPartnerCode(testCode);
     setTestModalVisible(false);
   };
 
-  // 3. 커플 연결 시도
   const handleConnect = async () => {
     if (!partnerCode.trim()) {
       Alert.alert('알림', '상대방의 코드를 입력해주세요.');
@@ -241,12 +215,6 @@ export default function CoupleConnectScreen() {
             )}
           </Pressable>
         </View>
-
-        <View style={{ marginTop: 40, alignItems: 'center' }}>
-          <Pressable onPress={handleTestGo} style={styles.testButton}>
-            <AppText style={{ color: '#FF6B6B', fontSize: 13 }}>(TEST) 가상 상대방 생성하기</AppText>
-          </Pressable>
-        </View>
       </ScrollView>
 
       {/* 1. 커플 연결 성공 모달 */}
@@ -272,7 +240,7 @@ export default function CoupleConnectScreen() {
         </View>
       </Modal>
 
-      {/* ✅ [추가] 2. 테스트 상대 생성 완료 모달 */}
+      {/* 2. 테스트 상대 생성 완료 모달 */}
       <Modal
         visible={testModalVisible}
         transparent
@@ -312,19 +280,19 @@ export default function CoupleConnectScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFF' },
+  container: { flex: 1, backgroundColor: '#FFF', },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14 },
   backButton: { padding: 4 },
   headerTitle: { fontSize: 18, color: '#444' },
   content: { paddingHorizontal: 24, paddingTop: 20, paddingBottom: 40 },
-  card: { backgroundColor: '#FFF', borderRadius: 16, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 3 },
+  card: { backgroundColor: '#FFF' },
   cardTitle: { fontSize: 18, color: '#333', marginBottom: 8 },
   cardDesc: { fontSize: 12, color: '#888', marginBottom: 20, lineHeight: 20 },
   codeContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F7F7F7', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14 },
   codeText: { fontSize: 12, color: '#4D5053'},
   copyButton: { flexDirection: 'row', alignItems: 'center', gap: 4, padding: 4 },
   copyText: { color: '#6198FF', fontSize: 14, },
-  input: { backgroundColor: '#F7F7F7', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, fontSize: 16, color: '#333', marginBottom: 20, fontFamily: 'Pretendard-Medium' },
+  input: { backgroundColor: '#F7F7F7', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, fontSize: 16, color: '#333', marginBottom: 20, fontFamily: 'Paperlogy-7Bold' },
   connectButton: { backgroundColor: '#6198FF', borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
   connectButtonText: { color: '#FFF', fontSize: 16 },
   testButton: { padding: 10, borderWidth: 1, borderColor: '#FF6B6B', borderRadius: 8, backgroundColor: '#FFF0F0' },

@@ -1,8 +1,9 @@
-// app/onboarding/detail2.tsx
+// app/onboarding/detail4.tsx
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef } from 'react';
 import {
   Animated,
+  Dimensions,
   Pressable,
   StyleSheet,
   View
@@ -10,6 +11,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppText from '../../components/AppText';
 
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const AnimatedAppText = Animated.createAnimatedComponent(AppText);
 
 export default function OnboardingDetail2() {
@@ -196,7 +198,7 @@ const styles = StyleSheet.create({
   // 버블 위치
   bubblesArea: {
     position: 'absolute',
-    top: 130,
+    top: SCREEN_HEIGHT*0.2,
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -214,10 +216,10 @@ const styles = StyleSheet.create({
   },
 
   textBox: {
-    marginTop: 520,
+    position:'absolute',
+    bottom:SCREEN_HEIGHT*0.17,
     alignItems: 'center',
     paddingHorizontal: 20,
-    marginBottom: 8,
   },
   titleLine: {
     textAlign: 'center',
