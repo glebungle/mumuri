@@ -81,6 +81,27 @@ export default function CoupleConnectScreen() {
     Alert.alert('복사 완료', '커플 코드가 복사되었습니다!');
   };
 
+  // 2. 가상 상대방 생성 (모달 적용)
+  const handleTestGo = async () => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      const res = await fetch(`${BASE_URL}/test/go`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const text = await res.text();
+      if (res.ok) {
+        setTestCode(text);
+        setTestModalVisible(true);
+      } else {
+        Alert.alert("테스트 실패", text);
+      }
+    } catch (e) {
+      Alert.alert("에러", "테스트 호출 중 에러 발생");
+    }
+  };
+
   const handleTestConfirm = () => {
     setPartnerCode(testCode);
     setTestModalVisible(false);
@@ -213,6 +234,12 @@ export default function CoupleConnectScreen() {
             ) : (
               <AppText type="bold" style={styles.connectButtonText}>연결하기</AppText>
             )}
+          </Pressable>
+        </View>
+
+        <View style={{ marginTop: 40, alignItems: 'center' }}>
+          <Pressable onPress={handleTestGo} style={styles.testButton}>
+            <AppText style={{ color: '#FF6B6B', fontSize: 13 }}>(TEST) 가상 상대방 생성하기</AppText>
           </Pressable>
         </View>
       </ScrollView>

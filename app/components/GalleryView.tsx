@@ -15,6 +15,7 @@ import {
   FlatList,
   Image,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -332,7 +333,7 @@ export default function GalleryView({ onBackToHome }: GalleryViewProps) {
                   <View style={styles.nicknameRow}>
                     <View style={styles.dot} />
                     <AppText type='pretendard-b' style={styles.nicknameText}>
-                      {nickname}
+                      {nickname}{Platform.OS === 'android' ? '\u200A' : ''}
                     </AppText>
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>

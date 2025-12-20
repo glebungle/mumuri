@@ -99,4 +99,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   experiments: {
     typedRoutes: true,
   },
+  updates: {
+    url: "https://u.expo.dev/92184daa-ec19-4fe6-af1a-f26a1f94be39"
+  },
+  runtimeVersion: {
+    policy: "appVersion"
+  },
+  
 });
