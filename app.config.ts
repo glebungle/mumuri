@@ -9,7 +9,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   owner: 'starsam',
   name: 'mumuri',
   slug: 'mumuri',
-  version: '1.0.0',
+  version: '1.0.1', 
   orientation: 'portrait',
   icon: './assets/images/logo.png',
   scheme: 'mumuri',
@@ -24,6 +24,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     supportsTablet: false,
     bundleIdentifier: 'com.growdy.mumuri', 
     googleServicesFile: "./GoogleService-Info.plist" ,
+    buildNumber: '3', 
     infoPlist: {
       CFBundleURLTypes: [
         {
@@ -39,6 +40,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: 'com.growdy.mumuri',
+    versionCode: 3, 
     googleServicesFile: './google-services.json', 
     adaptiveIcon: {
       foregroundImage: './assets/images/logo.png',
@@ -99,11 +101,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   experiments: {
     typedRoutes: true,
   },
+  // EAS Update 설정 유지
   updates: {
     url: "https://u.expo.dev/92184daa-ec19-4fe6-af1a-f26a1f94be39"
   },
   runtimeVersion: {
     policy: "appVersion"
   },
-  
 });
