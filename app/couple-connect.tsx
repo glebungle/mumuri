@@ -58,14 +58,14 @@ export default function CoupleConnectScreen() {
         console.warn("마이페이지 정보 조회 실패 (기본값 사용 예정)", err);
       }
 
-      const targetDate = Anniversary;
-      const res = await fetch(`${BASE_URL}/user/anniversary?anniversary=${targetDate}`, {
-        method: 'POST',
+      const res = await fetch(`${BASE_URL}/user/couple/code`, {
+        method: 'GET',
         headers: { Authorization: `Bearer ${token}` },
       });
 
       if (res.ok) {
         const code = await res.text(); 
+        console.log("내 코드:",code||null);
         setMyCode(code);
       } else {
         console.warn("커플 코드 발급 실패:", res.status);

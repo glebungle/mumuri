@@ -1,6 +1,6 @@
-import { Ionicons } from '@expo/vector-icons'; // ✅ 아이콘 추가
+import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Clipboard from 'expo-clipboard'; // ✅ 클립보드 추가
+import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -52,8 +52,8 @@ export const postBirthday = (iso: string) =>
 export const postAnniversary = (iso: string) =>
   authedFetch(`/user/anniversary?anniversary=${encodeURIComponent(iso)}`, { method: 'POST' });
 
-export const postTestGo = () =>
-  authedFetch(`/test/go`, { method: 'POST' });
+export const getCoupleCode = () =>
+  authedFetch(`/user/couple/code`, { method: 'GET' });
 
 export async function postCouple(code: string) {
   try {
@@ -217,9 +217,17 @@ export default function Signup() {
       } else if (current.key === 'birthday') {
         await postBirthday(toIsoDate(values.birthday));
       } else if (current.key === 'anniversary') {
-        await postTestGo();
-        const code = await postAnniversary(toIsoDate(values.anniversary));
+
+        await postAnniversary(toIsoDate(values.anniversary));
+
+        const codeResponse = await getCoupleCode();
+        
+        const code = (typeof codeResponse === 'object' && codeResponse !== null) 
+                    ? codeResponse.coupleCode 
+                    : codeResponse;
+
         if (code) {
+          console.log('✅ 발급된 내 코드:', code);
           setMyCoupleCode(code);
           await AsyncStorage.setItem('coupleCode', code);
         }
@@ -237,7 +245,7 @@ export default function Signup() {
         }
 
       } else if (current.key === 'preferences') {
-        console.log('👉 [onNext] Preferences Saved');
+        console.log(' [onNext] Preferences Saved');
       } else if (current.key === 'partnerCode') {
         const code = values.partnerCode.trim();
         const resp: any = await postCouple(code);
