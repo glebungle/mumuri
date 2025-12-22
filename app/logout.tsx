@@ -22,10 +22,11 @@ export default function LogoutScreen() {
     ]);
   };
 
+
   const performLogout = async () => {
     setLoading(true);
     try {
-      // 1. 백엔드 로그아웃 API (토큰 만료)
+  
       try {
         const accessToken = await AsyncStorage.getItem('token');
         const refreshToken = await AsyncStorage.getItem('refreshToken');
@@ -39,25 +40,21 @@ export default function LogoutScreen() {
             body: JSON.stringify({ refreshToken: refreshToken || '' }),
           });
         }
-      } catch (e) { /* 무시 */ }
+      } catch (e) {}
 
-      // 2. 앱 데이터 삭제
-      await AsyncStorage.clear();
+
+      const keysToRemove = ['token', 'refreshToken', 'coupleId', 'userData']; 
+      await AsyncStorage.multiRemove(keysToRemove); 
+
       setUserData(null);
       setTodayMissions([]);
 
-      // ✅ [핵심] "나 로그아웃 했음" 표시
-      // 이 표시가 있으면 다음 로그인 버튼 클릭 시 'prompt=login'이 발동됩니다.
       await AsyncStorage.setItem('isLoggingOut', 'true');
 
-      // 3. 홈으로 이동
       if (router.canDismiss()) {
         router.dismissAll();
       }
-      router.replace({
-        pathname: '/',
-        params: {} 
-      });
+      router.replace('/');
 
     } catch (error) {
       console.error('Logout error:', error);

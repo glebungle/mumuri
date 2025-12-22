@@ -40,7 +40,7 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const CALENDAR_HPADDING = 16;
 const DAY_WIDTH = (SCREEN_WIDTH - (CALENDAR_HPADDING * 5)) / 7;
-const DAY_HEIGHT = (SCREEN_HEIGHT*0.08);
+const DAY_HEIGHT = (SCREEN_HEIGHT * 0.08);
 
 type CalendarMode = 'MISSION' | 'SCHEDULE';
 type Photo = { id: string; url: string; createdAt: string; missionTitle?: string | null; ownerType?: 'ME' | 'PARTNER'; ownerNickname?: string; };
@@ -60,6 +60,7 @@ function normalizeMission(raw: any): Photo | null {
   };
 }
 
+// --- 메모이제이션된 날짜 컴포넌트 ---
 const MemoizedDay = React.memo(
   ({ date, state, photos, isSelected, onPress, mode, textColor }: any) => {
     if (!date) return <View style={[styles.dayCellContainer, { width: DAY_WIDTH, height: DAY_HEIGHT }]} />;
@@ -104,6 +105,7 @@ const MemoizedDay = React.memo(
   (p, n) => p.isSelected === n.isSelected && p.photos === n.photos && p.mode === n.mode && p.textColor === n.textColor
 );
 
+// --- 일정 추가 모달 ---
 const AddScheduleModal = ({ visible, onClose, onSave, selectedDate }: any) => {
   const insets = useSafeAreaInsets();
   const [title, setTitle] = useState('');
@@ -222,9 +224,15 @@ const AddScheduleModal = ({ visible, onClose, onSave, selectedDate }: any) => {
   );
 };
 
+// --- 메인 스크린 ---
 export default function CalendarScreen() {
   const insets = useSafeAreaInsets();
-  const { userData } = useUser();
+  const { userData, refreshUserData } = useUser(); // [수정] refreshUserData 추가
+
+  // [핵심 추가] 사용자 이름 변수 설정
+  const myName = userData?.myName || '나';
+  const partnerName = userData?.partnerName || '상대방';
+
   const [loading, setLoading] = useState(true);
   const [calendarMode, setCalendarMode] = useState<CalendarMode>('MISSION');
   const [photosByDate, setPhotosByDate] = useState<PhotosByDate>({});
@@ -331,7 +339,7 @@ export default function CalendarScreen() {
   useFocusEffect(useCallback(() => {
     (async () => {
       setLoading(true);
-      await Promise.all([fetchMissions(currentMonth), fetchSchedules(currentMonth)]);
+      await Promise.all([refreshUserData(), fetchMissions(currentMonth), fetchSchedules(currentMonth)]);
       setLoading(false);
     })();
   }, []));
@@ -347,6 +355,7 @@ export default function CalendarScreen() {
 
   return (
     <Animated.View style={[styles.container, { backgroundColor: bgColor, paddingTop: insets.top }]}>
+      {/* 헤더 */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Pressable onPress={() => router.back()} style={styles.backBtn}>
@@ -369,6 +378,7 @@ export default function CalendarScreen() {
         </Pressable>
       </View>
 
+      {/* 월 이동 네비게이션 */}
       <View style={styles.monthNavRow}>
         <View style={styles.monthNavControls}>
           <Pressable onPress={() => setCurrentMonth(format(subMonths(parseISO(currentMonth), 1), 'yyyy-MM-01'))} style={styles.monthNavBtn}>
@@ -381,8 +391,27 @@ export default function CalendarScreen() {
             <Animated.Text style={{ color: headerTextColor }}><Ionicons name="chevron-forward" size={20} /></Animated.Text>
           </Pressable>
         </View>
+
+        {/* [범례 추가] 일정 모드일 때만 표시 */}
+        {calendarMode === 'SCHEDULE' && (
+          <View style={styles.legendContainer}>
+            <View style={styles.legendItem}>
+              <AppText type='semibold' style={[styles.legendText, { color: '#FFF' }]}>{myName}</AppText>
+              <View style={[styles.legendDot, { backgroundColor: '#6198FF' }]} />
+            </View>
+            <View style={styles.legendItem}>
+              <AppText type='semibold' style={[styles.legendText, { color: '#FFF' }]}>{partnerName}</AppText>
+              <View style={[styles.legendDot, { backgroundColor: '#49DC95' }]} />
+            </View>
+            <View style={styles.legendItem}>
+              <AppText type='semibold' style={[styles.legendText, { color: '#FFF' }]}>함께</AppText>
+              <View style={[styles.legendDot, { backgroundColor: '#FF9191' }]} />
+            </View>
+          </View>
+        )}
       </View>
 
+      {/* 캘린더 본체 */}
       <View style={styles.CalenderContainer}>
         <Calendar
           key={currentMonth} current={currentMonth} hideArrows renderHeader={() => null}
@@ -410,6 +439,7 @@ export default function CalendarScreen() {
         />
       </View>
 
+      {/* 하단 상세 내용 */}
       <View style={[styles.bottomContainer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
         {calendarMode === 'MISSION' ? (
           selectedPhotos.length === 0 ? (
@@ -476,13 +506,14 @@ export default function CalendarScreen() {
         )}
       </View>
 
+      {/* 일정 추가 버튼 */}
       {calendarMode === 'SCHEDULE' && (
         <Pressable style={[styles.fabBtn, { bottom: insets.bottom + 20 }]} onPress={() => setAddModalVisible(true)}>
           <Ionicons name="add" size={40} color="#1E1E1E" />
         </Pressable>
       )}
 
-      {/* 💡 모달 컴포넌트 추가 */}
+      {/* 일정 추가 모달 */}
       <AddScheduleModal 
         visible={addModalVisible} 
         onClose={() => setAddModalVisible(false)} 
@@ -502,10 +533,14 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 20 },
   switchBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
   switchBtnText: { fontSize: 12 },
-  monthNavRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, height: 36, marginBottom: 2 },
+  monthNavRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, height: 36, marginBottom: 2 },
   monthNavControls: { flexDirection: 'row', alignItems: 'center' },
   monthNavBtn: { padding: 4 },
-  monthTitle: { fontSize: 16, fontWeight: '600' }, 
+  monthTitle: { fontSize: 16 }, 
+  legendContainer: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  legendText: { fontSize: 11, textAlign: 'right' },
+  legendDot: { width: 10, height: 10, borderRadius: 5 },
   CalenderContainer: { paddingHorizontal: CALENDAR_HPADDING, flex: 1.2, justifyContent: 'flex-start' },
   dayCellContainer: { alignItems: 'center', justifyContent: 'flex-start' },
   dayCellSelectedBorder: { borderWidth: 2, borderColor: '#6198FF', borderRadius: 10 },
@@ -539,7 +574,7 @@ const styles = StyleSheet.create({
   fabBtn: { position: 'absolute', right: 20, width: 56, height: 56, borderRadius: 28, backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center', elevation: 4 },
   calendarImage: { width: 14, height: 14, tintColor: '#fff' },
 
-  // --- 모달 스타일  ---
+  // --- 모달 스타일 ---
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
   modalContent: { width: '100%', height: '92%', backgroundColor: '#2C2C2E', borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingHorizontal: 20, paddingTop: 10 },
   dragHandleContainer: { alignItems: 'center', paddingVertical: 10, marginBottom: 10 },

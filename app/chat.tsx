@@ -272,7 +272,7 @@ export default function ChatScreen() {
       <KeyboardAvoidingView 
         style={{ flex: 1 }} 
         behavior={isIOS ? 'padding' : undefined} 
-        keyboardVerticalOffset={isIOS ? HEADER_HEIGHT + 10 : 0}
+        keyboardVerticalOffset={isIOS ? insets.top+HEADER_HEIGHT + 10 : 0}
       >
         {loading ? (
           <View style={{ flex: 1, justifyContent: 'center' }}><ActivityIndicator size="small" color="#6198FF" /></View>
