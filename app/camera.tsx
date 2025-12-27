@@ -89,11 +89,26 @@ export default function CameraHome() {
       try { 
         const json = await authedFetch('/api/couples/missions/today', { method: 'GET' }); 
         let missionsData: TodayMission[] = []; 
-        if (Array.isArray(json)) missionsData = json as TodayMission[]; 
-        else if (json && Array.isArray((json as any).missions)) missionsData = (json as any).missions; 
-        if (missionsData.length > 0) { setMissions(missionsData); setSel(0); } 
-        else { setMissions([]); } 
-      } catch (e) { setMissions([]); } 
+        
+        if (Array.isArray(json)) {
+          missionsData = json as TodayMission[]; 
+        } else if (json && Array.isArray((json as any).missions)) {
+          missionsData = (json as any).missions; 
+        }
+
+        const pendingMissions = missionsData.filter(mission => !mission.myDone);
+
+        if (pendingMissions.length > 0) { 
+          setMissions(pendingMissions); 
+          setSel(0); 
+        } else { 
+          // 모든 미션을 완료했을 경우 빈 배열로 세팅
+          setMissions([]); 
+        } 
+      } catch (e) { 
+        console.error("미션 로드 실패:", e);
+        setMissions([]); 
+      } 
     }; 
     fetchTodayMission(); 
   }, []);
@@ -263,28 +278,40 @@ export default function CameraHome() {
           )}
 
           {/* 미션 힌트 버블 */}
-          {!previewUri && layoutPhotos.length === 0 && missions.length > 0 && (
-            <View style={[styles.hintBubbleWrap, { top: screenHeight*0.1 }]}>
-              <View style={styles.missionDotsRow}>
-                {missions.map((_, i) => (<View key={i} style={[styles.missionDot, i === sel && styles.missionDotActive]} />))}
-              </View>
-              <View style={styles.hintRow}>
-                <View style={styles.hintBubble}>
-                  {missions.length > 1 && (
-                    <Pressable style={styles.innerArrowArea} onPress={prevMission} hitSlop={8}>
-                      <Ionicons name="caret-forward" size={20} color='rgba(50,121,255,0.7)' style={{ transform: [{ rotate: '180deg' }] }} />
-                    </Pressable>
-                  )}
-                  <View style={styles.hintTextWrap}>
-                    <AppText style={styles.hintText}>{missions[sel]?.description || missions[sel]?.title || '오늘의 미션을 찍어보내주세요'}</AppText>
+          {!previewUri && layoutPhotos.length === 0 && (
+            <View style={[styles.hintBubbleWrap, { top: screenHeight * 0.1 }]}>
+              {missions.length > 0 ? (
+                <>
+                  <View style={styles.missionDotsRow}>
+                    {missions.map((_, i) => (
+                      <View key={i} style={[styles.missionDot, i === sel && styles.missionDotActive]} />
+                    ))}
                   </View>
-                  {missions.length > 1 && (
-                    <Pressable style={styles.innerArrowArea} onPress={nextMission} hitSlop={8}>
-                      <Ionicons name="caret-forward" size={20} color='rgba(50,121,255,0.7)' />
-                    </Pressable>
-                  )}
+                  <View style={styles.hintRow}>
+                    <View style={styles.hintBubble}>
+                      {missions.length > 1 && (
+                        <Pressable style={styles.innerArrowArea} onPress={prevMission} hitSlop={8}>
+                          <Ionicons name="caret-forward" size={20} color='rgba(50,121,255,0.7)' style={{ transform: [{ rotate: '180deg' }] }} />
+                        </Pressable>
+                      )}
+                      <View style={styles.hintTextWrap}>
+                        <AppText style={styles.hintText}>
+                          {missions[sel]?.description || missions[sel]?.title}
+                        </AppText>
+                      </View>
+                      {missions.length > 1 && (
+                        <Pressable style={styles.innerArrowArea} onPress={nextMission} hitSlop={8}>
+                          <Ionicons name="caret-forward" size={20} color='rgba(50,121,255,0.7)' />
+                        </Pressable>
+                      )}
+                    </View>
+                  </View>
+                </>
+              ) : (
+                <View style={styles.hintBubble}>
+                  <AppText style={styles.hintText}>오늘의 모든 미션을 완료했습니다!</AppText>
                 </View>
-              </View>
+              )}
             </View>
           )}
 

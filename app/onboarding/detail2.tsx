@@ -137,7 +137,7 @@ export default function OnboardingDetail2() {
             style={[styles.letterBack, { transform: [{ scale: letterScale }] }]}
             resizeMode="contain"
           />
-          {/* 편지지 (노란 종이) : prog 값에 따라 '확.확.' 좌우 회전 */}
+          {/* 편지지 (노란 종이) : prog 좌우 회전 */}
           <Animated.Image
             source={require('../../assets/images/letter.png')}
             style={[
@@ -259,7 +259,6 @@ const styles = StyleSheet.create({
     bottom:SCREEN_HEIGHT*0.17,
     alignItems: 'center',
     paddingHorizontal: 20,
-    marginBottom: 8,
   },
   titleLine: {
     textAlign: 'center',

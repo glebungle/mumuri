@@ -67,7 +67,22 @@ export async function postCouple(code: string) {
 }
 
 // ===================== UI & Helpers =====================
+
+// 날짜 변환
+const formatBirthDate = (text: string) => {
+  const cleaned = text.replace(/\D/g, ''); 
+  let formatted = cleaned;
+  if (cleaned.length > 4) {
+    formatted = `${cleaned.slice(0, 4)}. ${cleaned.slice(4, 6)}`;
+  }
+  if (cleaned.length > 6) {
+    formatted = `${cleaned.slice(0, 4)}. ${cleaned.slice(4, 6)}. ${cleaned.slice(6, 8)}`;
+  }
+  return formatted.slice(0, 14); // 최대 길이 고정
+};
+
 const isDate = (s: string) => /^\d{4}\.\s?\d{2}\.\s?\d{2}$/.test(s.trim());
+
 function toIsoDate(s: string): string {
   const only = s.replace(/\D/g, '');
   if (only.length !== 8) throw new Error('잘못된 날짜 형식');
@@ -151,7 +166,7 @@ export default function Signup() {
   };
 
   const steps: { key: StepKey; title: string; hint: string; accent: string; placeholder: string }[] = useMemo(() => [
-    { key: 'name',        title: '이름 입력',   hint: '연인과 부르는 애칭도 좋아요. 사용자님을 어떻게 부를까요?', accent: '#6198FF', placeholder: '이름을 입력해주세요' },
+    { key: 'name',         title: '이름 입력',   hint: '연인과 부르는 애칭도 좋아요. 사용자님을 어떻게 부를까요?', accent: '#6198FF', placeholder: '이름을 입력해주세요' },
     { key: 'birthday',    title: '생일 입력',   hint: '생년월일을 입력해주세요. 생일은 나중에 변경할 수 있어요!', accent: '#49DC95', placeholder: '0000. 00. 00.' },
     { key: 'anniversary', title: '기념일 입력', hint: '우리의 사랑이 시작된 날! 기념일을 입력해주세요.', accent: '#FF9191', placeholder: '0000. 00. 00.' },
     { key: 'preferences', title: '질문에 답해주세요!', hint: '더 나은 서비스를 제공하기 위해,\n사용자님의 취향을 파악하는 질문을 몇가지 준비했어요.', accent: '#3B82F6', placeholder: '' },
@@ -388,8 +403,14 @@ export default function Signup() {
                 label={current.key === 'name' ? '이름' : current.key === 'birthday' ? '생년월일' : '기념일'}
                 value={values[current.key as keyof typeof values]}
                 placeholder={current.placeholder}
-                onChangeText={(t) => setValues((s) => ({ ...s, [current.key]: t }))}
-                keyboardType={current.key === 'name' ? 'default' : 'numbers-and-punctuation'}
+                onChangeText={(t) => {
+                  // [수정] 날짜 입력 단계일 때만 자동 포맷팅 적용
+                  const isDateStep = current.key === 'birthday' || current.key === 'anniversary';
+                  const nextValue = isDateStep ? formatBirthDate(t) : t;
+                  setValues((s) => ({ ...s, [current.key]: nextValue }));
+                }}
+                // [수정] 날짜 입력 시 숫자 키패드 유도
+                keyboardType={current.key === 'name' ? 'default' : 'number-pad'}
                 accentColor={current.accent} 
               />
             </View>

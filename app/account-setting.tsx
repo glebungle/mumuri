@@ -66,7 +66,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     color: '#444444',
-    fontWeight: '600',
   },
   content: {
     marginTop: 20,

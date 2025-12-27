@@ -15,7 +15,7 @@ const { width, height } = Dimensions.get('window');
 
 export default function StartScreen() {
   const handleSkipLogin = () => {
-    router.replace('/camera');
+    router.replace('/signup');
   };
   const handleOnboarding = () => {
     router.replace('/onboarding/intro');

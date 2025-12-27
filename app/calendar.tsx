@@ -60,7 +60,7 @@ function normalizeMission(raw: any): Photo | null {
   };
 }
 
-// --- 메모이제이션된 날짜 컴포넌트 ---
+// --- 날짜 컴포넌트 ---
 const MemoizedDay = React.memo(
   ({ date, state, photos, isSelected, onPress, mode, textColor }: any) => {
     if (!date) return <View style={[styles.dayCellContainer, { width: DAY_WIDTH, height: DAY_HEIGHT }]} />;
@@ -105,7 +105,7 @@ const MemoizedDay = React.memo(
   (p, n) => p.isSelected === n.isSelected && p.photos === n.photos && p.mode === n.mode && p.textColor === n.textColor
 );
 
-// --- 일정 추가 모달 ---
+// --- [수정] 일정 추가 모달 (깜빡임 및 진입 버그 해결) ---
 const AddScheduleModal = ({ visible, onClose, onSave, selectedDate }: any) => {
   const insets = useSafeAreaInsets();
   const [title, setTitle] = useState('');
@@ -116,30 +116,47 @@ const AddScheduleModal = ({ visible, onClose, onSave, selectedDate }: any) => {
   const [endHour, setEndHour] = useState('15');
   const [endMin, setEndMin] = useState('00');
 
-  const panY = useRef(new Animated.Value(0)).current;
+  // 시작 위치를 화면 하단(SCREEN_HEIGHT)으로 설정하여 깜빡임 방지
+  const panY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+
+  // 진입 애니메이션 (Slide Up)
+  useEffect(() => {
+    if (visible) {
+      Animated.timing(panY, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+      setTitle(''); setStartHour('13'); setStartMin('00'); setEndHour('15'); setEndMin('00');
+      setIsCouple(false); setIsAllDay(false);
+    }
+  }, [visible]);
+
+  // 퇴장 애니메이션 (Slide Down)
+  const handleDismiss = () => {
+    Animated.timing(panY, {
+      toValue: SCREEN_HEIGHT,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(() => {
+      onClose(); // 애니메이션이 완전히 끝난 후 모달 닫기
+    });
+  };
 
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gs) => gs.dy > 0,
+      onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 10,
       onPanResponderMove: (_, gs) => { if (gs.dy > 0) panY.setValue(gs.dy); },
       onPanResponderRelease: (_, gs) => {
         if (gs.dy > 150) {
-          Animated.timing(panY, { toValue: SCREEN_HEIGHT, duration: 200, useNativeDriver: true }).start(onClose);
+          handleDismiss();
         } else {
           Animated.spring(panY, { toValue: 0, bounciness: 5, useNativeDriver: true }).start();
         }
       },
     })
   ).current;
-
-  useEffect(() => {
-    if(visible) {
-        panY.setValue(0);
-        setTitle(''); setStartHour('13'); setStartMin('00'); setEndHour('15'); setEndMin('00');
-        setIsCouple(false); setIsAllDay(false);
-    }
-  }, [visible]);
 
   const handleSave = () => {
     if (!title.trim()) { Alert.alert('알림', '일정 제목을 입력해주세요.'); return; }
@@ -148,6 +165,7 @@ const AddScheduleModal = ({ visible, onClose, onSave, selectedDate }: any) => {
       start: { hour: parseInt(startHour, 10) || 0, minute: parseInt(startMin, 10) || 0 },
       end: { hour: parseInt(endHour, 10) || 0, minute: parseInt(endMin, 10) || 0 }
     });
+    handleDismiss(); // 저장 시에도 애니메이션과 함께 닫기
   };
 
   const formattedDate = React.useMemo(() => {
@@ -158,9 +176,12 @@ const AddScheduleModal = ({ visible, onClose, onSave, selectedDate }: any) => {
   }, [selectedDate]);
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={handleDismiss}>
       <View style={styles.modalOverlay}>
-        <Animated.View style={[styles.modalContent, { transform: [{ translateY: panY }] }]} {...panResponder.panHandlers}>
+        <Animated.View 
+          style={[styles.modalContent, { transform: [{ translateY: panY }] }]} 
+          {...panResponder.panHandlers}
+        >
           <View style={styles.dragHandleContainer}><View style={styles.dragHandle} /></View>
           <View style={styles.titleInputRow}>
              <View style={styles.blueDot} />
@@ -227,9 +248,8 @@ const AddScheduleModal = ({ visible, onClose, onSave, selectedDate }: any) => {
 // --- 메인 스크린 ---
 export default function CalendarScreen() {
   const insets = useSafeAreaInsets();
-  const { userData, refreshUserData } = useUser(); // [수정] refreshUserData 추가
+  const { userData, refreshUserData } = useUser();
 
-  // [핵심 추가] 사용자 이름 변수 설정
   const myName = userData?.myName || '나';
   const partnerName = userData?.partnerName || '상대방';
 
@@ -328,7 +348,7 @@ export default function CalendarScreen() {
         });
 
         if (res.ok) {
-            setAddModalVisible(false);
+            // handleAddSchedule 호출하는 쪽에서 바로 닫지 않고 처리하도록
             fetchSchedules(currentMonth); 
         } else {
             Alert.alert('실패', `등록 실패 (${res.status})`);
@@ -355,7 +375,6 @@ export default function CalendarScreen() {
 
   return (
     <Animated.View style={[styles.container, { backgroundColor: bgColor, paddingTop: insets.top }]}>
-      {/* 헤더 */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Pressable onPress={() => router.back()} style={styles.backBtn}>
@@ -378,7 +397,6 @@ export default function CalendarScreen() {
         </Pressable>
       </View>
 
-      {/* 월 이동 네비게이션 */}
       <View style={styles.monthNavRow}>
         <View style={styles.monthNavControls}>
           <Pressable onPress={() => setCurrentMonth(format(subMonths(parseISO(currentMonth), 1), 'yyyy-MM-01'))} style={styles.monthNavBtn}>
@@ -392,7 +410,6 @@ export default function CalendarScreen() {
           </Pressable>
         </View>
 
-        {/* [범례 추가] 일정 모드일 때만 표시 */}
         {calendarMode === 'SCHEDULE' && (
           <View style={styles.legendContainer}>
             <View style={styles.legendItem}>
@@ -411,7 +428,6 @@ export default function CalendarScreen() {
         )}
       </View>
 
-      {/* 캘린더 본체 */}
       <View style={styles.CalenderContainer}>
         <Calendar
           key={currentMonth} current={currentMonth} hideArrows renderHeader={() => null}
@@ -439,7 +455,6 @@ export default function CalendarScreen() {
         />
       </View>
 
-      {/* 하단 상세 내용 */}
       <View style={[styles.bottomContainer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
         {calendarMode === 'MISSION' ? (
           selectedPhotos.length === 0 ? (
@@ -481,7 +496,6 @@ export default function CalendarScreen() {
                 {selectedDate ? format(parseISO(selectedDate), 'yyyy. MM. dd.') : ''}
               </AppText>
             </View>
-
             <FlatList 
               data={selectedSchedules} keyExtractor={item => `schedule-${item.id}`}
               renderItem={({item}) => {
@@ -506,14 +520,12 @@ export default function CalendarScreen() {
         )}
       </View>
 
-      {/* 일정 추가 버튼 */}
       {calendarMode === 'SCHEDULE' && (
         <Pressable style={[styles.fabBtn, { bottom: insets.bottom + 20 }]} onPress={() => setAddModalVisible(true)}>
           <Ionicons name="add" size={40} color="#1E1E1E" />
         </Pressable>
       )}
 
-      {/* 일정 추가 모달 */}
       <AddScheduleModal 
         visible={addModalVisible} 
         onClose={() => setAddModalVisible(false)} 
@@ -574,7 +586,6 @@ const styles = StyleSheet.create({
   fabBtn: { position: 'absolute', right: 20, width: 56, height: 56, borderRadius: 28, backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center', elevation: 4 },
   calendarImage: { width: 14, height: 14, tintColor: '#fff' },
 
-  // --- 모달 스타일 ---
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
   modalContent: { width: '100%', height: '92%', backgroundColor: '#2C2C2E', borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingHorizontal: 20, paddingTop: 10 },
   dragHandleContainer: { alignItems: 'center', paddingVertical: 10, marginBottom: 10 },

@@ -1,10 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { router, useFocusEffect } from 'expo-router';
+import { Stack, router, useFocusEffect } from 'expo-router'; // [수정] Stack 추가
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent, ListRenderItem } from 'react-native';
 import {
   ActivityIndicator,
+  BackHandler,
   Dimensions,
   FlatList,
   Image,
@@ -108,7 +109,6 @@ export default function ChatScreen() {
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  // 이미지 크게 보기 상태
   const [viewerVisible, setViewerVisible] = useState(false);
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
 
@@ -120,7 +120,15 @@ export default function ChatScreen() {
     if (listRef.current) listRef.current.scrollToOffset({ offset: 0, animated: true });
   }, []);
 
-  // 키보드 리스너
+  // 1. 공통 네비게이션 함수: 모든 스택을 비우고 홈으로 이동
+  const goToHomeCompletely = useCallback(() => {
+    if (router.canDismiss()) {
+      router.dismissAll(); // 카메라, 공유 화면 등 쌓인 스택을 모두 날림
+    }
+    router.replace('/(tabs)/home');
+  }, []);
+
+  // 2. 키보드 리스너
   useEffect(() => {
     const onShow = (e: KeyboardEvent) => setKeyboardHeight(e.endCoordinates.height);
     const onHide = () => setKeyboardHeight(0);
@@ -188,18 +196,28 @@ export default function ChatScreen() {
     return () => { active = false; chatRef.current?.deactivate(); };
   }, [ROOM_KEY, userId, onIncoming]));
 
+  // 3. 안드로이드 시스템 백버튼 처리
+  useFocusEffect(
+  useCallback(() => {
+    const onBackPress = () => {
+      goToHomeCompletely();
+      return true; 
+    };
+    const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+
+    return () => subscription.remove();
+  }, [goToHomeCompletely])
+);
+
   const sendMessage = useCallback(async () => {
     if (!ROOM_KEY || !userId || sending || !text.trim()) return;
     const clientMsgId = uuid4();
     const currentText = text;
     setText('');
     setTimeout(scrollToBottom, 50);
-
     try {
       chatRef.current?.sendMessage(ROOM_KEY, Number(userId), { message: currentText.trim(), imageUrl: null, clientMsgId, createdAt: Date.now() });
-    } catch {
-      // 에러 처리 생략
-    }
+    } catch { }
   }, [ROOM_KEY, userId, sending, text, scrollToBottom]);
 
   const listData = useMemo(() => {
@@ -262,17 +280,16 @@ export default function ChatScreen() {
   const isIOS = Platform.OS === 'ios';
   const isKeyboardOpen = keyboardHeight > 0;
   
-  // 💡 [핵심수정] iOS 키보드 간격 문제 해결
-  // 키보드가 열렸을 때는 insets.bottom을 더하지 않아야 공백이 생기지 않습니다.
   const iosBottomPadding = isKeyboardOpen ? 8 : insets.bottom + 8;
   const androidPadding = isKeyboardOpen ? 60 + keyboardHeight : 12 + insets.bottom;
 
-  // Header와 상단 마진을 합친 정확한 Offset
   const verticalOffset = isIOS ? insets.top + (HEADER_HEIGHT*0.1) : 0;
 
   return (
     <View style={styles.wrap}>
-      {/* 이미지 확대 모달 */}
+      {/* 4. iOS 스와이프 백 방지 설정 */}
+      <Stack.Screen options={{ gestureEnabled: false }} />
+
       <Modal visible={viewerVisible} transparent={true} animationType="fade">
         <View style={styles.modalOverlay}>
           <Pressable style={styles.modalCloseBtn} onPress={() => setViewerVisible(false)}>
@@ -282,8 +299,11 @@ export default function ChatScreen() {
         </View>
       </Modal>
 
+      {/* 5. 헤더 버튼: 홈으로 이동 로직 적용 */}
       <View style={styles.header}>
-        <Pressable style={styles.backBtn} onPress={() => router.back()}><Ionicons name="chevron-back" size={24} color="#111" /></Pressable>
+        <Pressable style={styles.backBtn} onPress={goToHomeCompletely}>
+          <Ionicons name="chevron-back" size={24} color="#111" />
+        </Pressable>
         <AppText style={styles.headerTitle}>{userData?.partnerName || '애인'}{Platform.OS === 'android' ? '\u200A' : ''}</AppText>
       </View>
 

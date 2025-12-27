@@ -121,7 +121,7 @@ async function fetchTodayMissions(token: string) {
     });
     if (res.status === 404) return []; 
     if (!res.ok) throw new Error(`Today Mission Fetch Error: ${res.status}`);
-    // 🔥 수정: res가 아니라 실제 파싱된 데이터를 찍어야 합니다.
+
     const data = await res.json();
     console.log('✅ [REAL MISSION DATA]:', JSON.stringify(data, null, 2)); 
     
@@ -187,8 +187,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
           partnerProfileImageUrl: homeResponse.partnerProfileImageUrl || null,
           myName: homeResponse.myName || null,
           partnerName: homeResponse.partnerName || null,
-          
-          // 👇 마이페이지 API에서 가져온 정보 병합
+        
           birthday: myPageData?.birthday || null,
           partnerBirthday: myPageData?.birthdayCouple || null,
         };
