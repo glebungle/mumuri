@@ -60,14 +60,17 @@ function normalizeMission(raw: any): Photo | null {
   };
 }
 
-// --- 날짜 컴포넌트 ---
+// --- 날짜 컴포넌트 (수정됨) ---
 const MemoizedDay = React.memo(
-  ({ date, state, photos, isSelected, onPress, mode, textColor }: any) => {
+  ({ date, state, photos, schedules, isSelected, onPress, mode, textColor }: any) => {
     if (!date) return <View style={[styles.dayCellContainer, { width: DAY_WIDTH, height: DAY_HEIGHT }]} />;
     const dayNum = date.day;
     const isSunday = new Date(date.dateString).getDay() === 0;
     const isDisabled = state === 'disabled';
     const hasPhoto = mode === 'MISSION' && photos && photos.length > 0;
+    
+    // 일정 유무 확인
+    const hasSchedules = mode === 'SCHEDULE' && schedules && schedules.length > 0;
 
     return (
       <Pressable
@@ -88,24 +91,41 @@ const MemoizedDay = React.memo(
             </View>
           </View>
         ) : (
-          <Animated.Text
-            style={[
-              { fontFamily: 'Pretendard-Regular', fontSize: 13, color: textColor }, 
-              isDisabled && styles.dayTextDisabled,
-              isSunday && !isDisabled && styles.dayTextSunday,
-              isSelected && (mode === 'SCHEDULE' ? { color: '#000' } : styles.dayTextSelected),
-            ]}
-          >
-            {dayNum}
-          </Animated.Text>
+          <View style={{ alignItems: 'center', width: '100%', height: '100%', justifyContent: 'flex-start', paddingTop: 4 }}>
+            <Animated.Text
+              style={[
+                { fontFamily: 'Pretendard-Regular', fontSize: 13, color: textColor }, 
+                isDisabled && styles.dayTextDisabled,
+                isSunday && !isDisabled && styles.dayTextSunday,
+                isSelected && (mode === 'SCHEDULE' ? { color: '#000' } : styles.dayTextSelected),
+              ]}
+            >
+              {dayNum}
+            </Animated.Text>
+
+            {hasSchedules && (
+              <View style={styles.daySchedulesWrapper}>
+                {schedules.slice(0, 2).map((sch: Schedule) => {
+                  const barColor = sch.couple ? '#FF9191' : (sch.ownerType === 'ME' ? '#6198FF' : '#49DC95');
+                  return (
+                    <View key={sch.id} style={[styles.miniScheduleBar, { backgroundColor: barColor }]}>
+                      <AppText numberOfLines={1} ellipsizeMode="tail" style={styles.miniScheduleText}>
+                        {sch.title}
+                      </AppText>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+          </View>
         )}
       </Pressable>
     );
   },
-  (p, n) => p.isSelected === n.isSelected && p.photos === n.photos && p.mode === n.mode && p.textColor === n.textColor
+  (p, n) => p.isSelected === n.isSelected && p.photos === n.photos && p.schedules === n.schedules && p.mode === n.mode && p.textColor === n.textColor
 );
 
-// --- [수정] 일정 추가 모달 (깜빡임 및 진입 버그 해결) ---
+// --- 일정 추가 모달 ---
 const AddScheduleModal = ({ visible, onClose, onSave, selectedDate }: any) => {
   const insets = useSafeAreaInsets();
   const [title, setTitle] = useState('');
@@ -116,30 +136,19 @@ const AddScheduleModal = ({ visible, onClose, onSave, selectedDate }: any) => {
   const [endHour, setEndHour] = useState('15');
   const [endMin, setEndMin] = useState('00');
 
-  // 시작 위치를 화면 하단(SCREEN_HEIGHT)으로 설정하여 깜빡임 방지
   const panY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
 
-  // 진입 애니메이션 (Slide Up)
   useEffect(() => {
     if (visible) {
-      Animated.timing(panY, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
+      Animated.timing(panY, { toValue: 0, duration: 300, useNativeDriver: true }).start();
       setTitle(''); setStartHour('13'); setStartMin('00'); setEndHour('15'); setEndMin('00');
       setIsCouple(false); setIsAllDay(false);
     }
   }, [visible]);
 
-  // 퇴장 애니메이션 (Slide Down)
   const handleDismiss = () => {
-    Animated.timing(panY, {
-      toValue: SCREEN_HEIGHT,
-      duration: 250,
-      useNativeDriver: true,
-    }).start(() => {
-      onClose(); // 애니메이션이 완전히 끝난 후 모달 닫기
+    Animated.timing(panY, { toValue: SCREEN_HEIGHT, duration: 250, useNativeDriver: true }).start(() => {
+      onClose();
     });
   };
 
@@ -149,11 +158,8 @@ const AddScheduleModal = ({ visible, onClose, onSave, selectedDate }: any) => {
       onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 10,
       onPanResponderMove: (_, gs) => { if (gs.dy > 0) panY.setValue(gs.dy); },
       onPanResponderRelease: (_, gs) => {
-        if (gs.dy > 150) {
-          handleDismiss();
-        } else {
-          Animated.spring(panY, { toValue: 0, bounciness: 5, useNativeDriver: true }).start();
-        }
+        if (gs.dy > 150) handleDismiss();
+        else Animated.spring(panY, { toValue: 0, bounciness: 5, useNativeDriver: true }).start();
       },
     })
   ).current;
@@ -165,7 +171,7 @@ const AddScheduleModal = ({ visible, onClose, onSave, selectedDate }: any) => {
       start: { hour: parseInt(startHour, 10) || 0, minute: parseInt(startMin, 10) || 0 },
       end: { hour: parseInt(endHour, 10) || 0, minute: parseInt(endMin, 10) || 0 }
     });
-    handleDismiss(); // 저장 시에도 애니메이션과 함께 닫기
+    handleDismiss();
   };
 
   const formattedDate = React.useMemo(() => {
@@ -178,10 +184,7 @@ const AddScheduleModal = ({ visible, onClose, onSave, selectedDate }: any) => {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={handleDismiss}>
       <View style={styles.modalOverlay}>
-        <Animated.View 
-          style={[styles.modalContent, { transform: [{ translateY: panY }] }]} 
-          {...panResponder.panHandlers}
-        >
+        <Animated.View style={[styles.modalContent, { transform: [{ translateY: panY }] }]} {...panResponder.panHandlers}>
           <View style={styles.dragHandleContainer}><View style={styles.dragHandle} /></View>
           <View style={styles.titleInputRow}>
              <View style={styles.blueDot} />
@@ -245,7 +248,6 @@ const AddScheduleModal = ({ visible, onClose, onSave, selectedDate }: any) => {
   );
 };
 
-// --- 메인 스크린 ---
 export default function CalendarScreen() {
   const insets = useSafeAreaInsets();
   const { userData, refreshUserData } = useUser();
@@ -348,7 +350,6 @@ export default function CalendarScreen() {
         });
 
         if (res.ok) {
-            // handleAddSchedule 호출하는 쪽에서 바로 닫지 않고 처리하도록
             fetchSchedules(currentMonth); 
         } else {
             Alert.alert('실패', `등록 실패 (${res.status})`);
@@ -447,9 +448,14 @@ export default function CalendarScreen() {
           } as any}
           dayComponent={({ date, state }) => (
             <MemoizedDay 
-              date={date} state={state} photos={date ? photosByDate[date.dateString] : []} 
-              isSelected={date?.dateString === selectedDate} onPress={(d: any) => setSelectedDate(d.dateString)} 
-              mode={calendarMode} textColor={headerTextColor} 
+              date={date} 
+              state={state} 
+              photos={date ? photosByDate[date.dateString] : []} 
+              schedules={date ? schedulesByDate[date.dateString] : []} // 일정 데이터 전달
+              isSelected={date?.dateString === selectedDate} 
+              onPress={(d: any) => setSelectedDate(d.dateString)} 
+              mode={calendarMode} 
+              textColor={headerTextColor} 
             />
           )}
         />
@@ -556,8 +562,8 @@ const styles = StyleSheet.create({
   CalenderContainer: { paddingHorizontal: CALENDAR_HPADDING, flex: 1.2, justifyContent: 'flex-start' },
   dayCellContainer: { alignItems: 'center', justifyContent: 'flex-start' },
   dayCellSelectedBorder: { borderWidth: 2, borderColor: '#6198FF', borderRadius: 10 },
-  dayCellSelectedSchedule: { backgroundColor: '#FFF', borderRadius: 10 },
-  dayTextDisabled: { color: '#b7b7b7' },
+  dayCellSelectedSchedule: { backgroundColor: '#fff', borderRadius: 10 }, 
+  dayTextDisabled: { color: '#555' },
   dayTextSunday: { color: '#FF3B30' },
   dayTextSelected: { color: '#6198FF'},
   photoCell: { width: '100%', height: '100%', borderRadius: 8, overflow: 'hidden', backgroundColor: '#E5E5EA' },
@@ -585,6 +591,23 @@ const styles = StyleSheet.create({
   scheduleTitleText: { color: '#FFF', fontSize: 14 },
   fabBtn: { position: 'absolute', right: 20, width: 56, height: 56, borderRadius: 28, backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center', elevation: 4 },
   calendarImage: { width: 14, height: 14, tintColor: '#fff' },
+
+  daySchedulesWrapper: {
+    width: '90%',
+    marginTop: 2,
+    gap: 1.5,
+  },
+  miniScheduleBar: {
+    height: 14,
+    borderRadius: 2,
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  miniScheduleText: {
+    color: '#FFF',
+    fontSize: 8,
+    fontFamily: 'Pretendard-Medium',
+  },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
   modalContent: { width: '100%', height: '92%', backgroundColor: '#2C2C2E', borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingHorizontal: 20, paddingTop: 10 },
