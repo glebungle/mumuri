@@ -24,7 +24,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     supportsTablet: false,
     bundleIdentifier: 'com.growdy.mumuri', 
     googleServicesFile: "./GoogleService-Info.plist" ,
-    buildNumber: '3', 
+    buildNumber: '4', 
     infoPlist: {
       CFBundleURLTypes: [
         {
@@ -40,7 +40,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: 'com.growdy.mumuri',
-    versionCode: 3, 
+    versionCode: 4, 
     googleServicesFile: './google-services.json', 
     adaptiveIcon: {
       foregroundImage: './assets/images/logo.png',
