@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -7,6 +8,7 @@ import AppText from '../components/AppText';
 
 export default function AccountSettingScreen() {
   const insets = useSafeAreaInsets();
+  const appVersion = Constants.expoConfig?.version || '1.0.0';
 
   const handleBack = () => router.back();
 
@@ -25,7 +27,7 @@ export default function AccountSettingScreen() {
       <View style={styles.content}>
         <View style={styles.menuItem}>
           <AppText type="medium" style={styles.menuText}>나의 앱 버전</AppText>
-          <AppText type="medium" style={styles.subText}>25.12.1</AppText>
+          <AppText type="medium" style={styles.subText}>{appVersion}</AppText>
         </View>
 
         <Pressable 
