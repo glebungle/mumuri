@@ -40,7 +40,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: 'com.growdy.mumuri',
-    versionCode: 4, 
+    versionCode: 5, 
     googleServicesFile: './google-services.json', 
     adaptiveIcon: {
       foregroundImage: './assets/images/logo.png',
