@@ -6,6 +6,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Dimensions,
   Image,
@@ -70,8 +71,10 @@ export default function CameraHome() {
   const [layoutPhotos, setLayoutPhotos] = useState<string[]>([]);
   const dday = userData?.date ?? 0; 
 
+  // --- 미션 관련 상태 수정 ---
   const [missions, setMissions] = useState<TodayMission[]>([]);
   const [sel, setSel] = useState(0);
+  const [isLoadingMissions, setIsLoadingMissions] = useState(true); // 로딩 상태 추가
 
   const nextMission = useCallback(() => { if (!missions.length) return; setSel((i) => (i + 1) % missions.length); }, [missions.length]);
   const prevMission = useCallback(() => { if (!missions.length) return; setSel((i) => (i - 1 + missions.length) % missions.length); }, [missions.length]);
@@ -86,6 +89,7 @@ export default function CameraHome() {
 
   useEffect(() => { 
     const fetchTodayMission = async () => { 
+      setIsLoadingMissions(true); // 로딩 시작
       try { 
         const json = await authedFetch('/api/couples/missions/today', { method: 'GET' }); 
         let missionsData: TodayMission[] = []; 
@@ -102,13 +106,14 @@ export default function CameraHome() {
           setMissions(pendingMissions); 
           setSel(0); 
         } else { 
-          // 모든 미션을 완료했을 경우 빈 배열로 세팅
           setMissions([]); 
         } 
       } catch (e) { 
         console.error("미션 로드 실패:", e);
         setMissions([]); 
-      } 
+      } finally {
+        setIsLoadingMissions(false); // 로딩 끝
+      }
     }; 
     fetchTodayMission(); 
   }, []);
@@ -205,18 +210,12 @@ export default function CameraHome() {
 
   return (
     <View style={styles.fullScreenContainer}>
-      {/* justifyContent: 'center'를 사용하여 카메라 프레임을 화면 중앙으로 배치합니다.
-        edges={['top', 'bottom']}를 통해 노치 영역을 안전하게 보호합니다.
-      */}
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         
-        {/* 카메라 프레임 (기준점) */}
         <View style={styles.cameraFrame} onLayout={onCameraWrapLayout}>
           
-          {/* 1. 카메라 배경 */}
           <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
 
-          {/* 2. 카메라 뷰 */}
           {(!previewUri || previewUri === 'PENDING_MERGE') && (
             <CameraView
               ref={cameraRef}
@@ -226,12 +225,10 @@ export default function CameraHome() {
             />
           )}
 
-          {/* 3. 단일 사진 프리뷰 */}
           {previewUri && previewUri !== 'PENDING_MERGE' && (
             <Image source={{ uri: previewUri }} style={styles.previewFrameImage} resizeMode="cover" />
           )}
 
-          {/* 4. 레이아웃 모드 그리드 */}
           {isLayoutMode && (
             <ViewShot ref={viewShotRef} options={{ format: 'jpg', quality: 0.9 }} style={StyleSheet.absoluteFill}>
               <View style={styles.gridContainer}>
@@ -250,9 +247,8 @@ export default function CameraHome() {
             </ViewShot>
           )}
 
-          {/* ---------------- UI Overlays (Inside Camera Frame) ---------------- */}
+          {/* ---------------- UI Overlays ---------------- */}
 
-          {/* 상단 닫기/다시찍기 버튼 */}
           {previewUri && (
             <View style={[styles.topBarPreview, { top: 20 }]}>
               <Pressable onPress={retake} style={styles.topIconBtnRetake}>
@@ -261,7 +257,6 @@ export default function CameraHome() {
             </View>
           )}
 
-          {/* 헤더: 뒤로가기, 디데이, 레이아웃 토글 */}
           {!previewUri && (
             <View style={[styles.topHeaderContainer, { top: 20 }]}>
               <Pressable style={styles.headerBtn} onPress={() => router.back()}>
@@ -277,10 +272,16 @@ export default function CameraHome() {
             </View>
           )}
 
-          {/* 미션 힌트 버블 */}
+          {/* 미션 힌트 버블 (수정된 로딩 로직 적용) */}
           {!previewUri && layoutPhotos.length === 0 && (
             <View style={[styles.hintBubbleWrap, { top: screenHeight * 0.1 }]}>
-              {missions.length > 0 ? (
+              {isLoadingMissions ? (
+                // 로딩 중일 때 표시
+                <View style={styles.hintBubble}>
+                  <ActivityIndicator size="small" color="#3279FF" style={{ marginRight: 8 }} />
+                  <AppText style={styles.hintText}>오늘의 미션을 불러오는 중...</AppText>
+                </View>
+              ) : missions.length > 0 ? (
                 <>
                   <View style={styles.missionDotsRow}>
                     {missions.map((_, i) => (
@@ -308,6 +309,7 @@ export default function CameraHome() {
                   </View>
                 </>
               ) : (
+                // 로딩이 끝났는데 미션이 없을 때만 완료 문구 표시
                 <View style={styles.hintBubble}>
                   <AppText style={styles.hintText}>오늘의 모든 미션을 완료했습니다!</AppText>
                 </View>
@@ -315,7 +317,6 @@ export default function CameraHome() {
             </View>
           )}
 
-          {/* 하단 버튼 영역 */}
           <View style={[styles.bottomOverlay, { bottom: 10 }]}>
             {previewUri ? (
               <Pressable onPress={confirm} style={styles.confirmBtn}>
@@ -347,11 +348,7 @@ export default function CameraHome() {
 
 const styles = StyleSheet.create({
   fullScreenContainer: { flex: 1, backgroundColor: '#FFFCF5' },
-  safeArea: { 
-    flex: 1, 
-    justifyContent: 'center', 
-    alignItems: 'center' 
-  },
+  safeArea: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   cameraFrame: { 
     width: screenWidth, 
     height: CAMERA_HEIGHT, 
@@ -360,8 +357,6 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   previewFrameImage: { ...StyleSheet.absoluteFillObject },
-  
-  // Overlays
   topHeaderContainer: { 
     position: 'absolute', left: 0, right: 0, 
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', 
@@ -369,11 +364,9 @@ const styles = StyleSheet.create({
   },
   topBarPreview: { position: 'absolute', left: 20, zIndex: 20 },
   topIconBtnRetake: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' },
-  
   ddayBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 6, backgroundColor: 'rgba(77, 80, 83, 0.6)', borderRadius: 20 },
   ddayText: { marginLeft: 6, color: '#fff', fontSize: 14 },
   headerBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.7)', alignItems: 'center', justifyContent: 'center' },
-  
   hintBubbleWrap: { position: 'absolute', width: '100%', alignItems: 'center', paddingHorizontal: 20, zIndex: 15 },
   missionDotsRow: { flexDirection: 'row', marginBottom: 8 },
   missionDot: { width: 6, height: 6, borderRadius: 3, marginHorizontal: 3, backgroundColor: 'rgba(255, 255, 255, 0.5)' },
@@ -383,7 +376,6 @@ const styles = StyleSheet.create({
   innerArrowArea: { width: 32, alignItems: 'center', justifyContent: 'center' },
   hintTextWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
   hintText: { color: '#444444', fontSize: 12, textAlign: 'center' },
-
   bottomOverlay: { position: 'absolute', left: 0, right: 0, alignItems: 'center', justifyContent: 'center', zIndex: 50 },
   bottomButtonsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%', paddingHorizontal: 40 },
   galleryBtn: { width: 50, height: 50, position: 'absolute', left: 40 },
@@ -393,13 +385,10 @@ const styles = StyleSheet.create({
   flipBtn: { width: 50, height: 50, position: 'absolute', right: 40 },
   rotateImage: { width: 50, height: 50, borderRadius: 25 },
   confirmBtn: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#FF9191', alignItems: 'center', justifyContent: 'center' },
-
-  // Grid
   gridContainer: { flex: 1, flexDirection: 'row', flexWrap: 'wrap' },
   gridImage: { width: '50%', height: '50%' }, 
   gridLineVertical: { position: 'absolute', left: '50%', top: 0, bottom: 0, width: 1, backgroundColor: 'rgba(255,255,255,0.8)' },
   gridLineHorizontal: { position: 'absolute', top: '50%', left: 0, right: 0, height: 1, backgroundColor: 'rgba(255,255,255,0.8)' },
-
   loadingScreen: { flex: 1, backgroundColor: '#FFFCF5', alignItems: 'center', justifyContent: 'center' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
   permissionTitle: { fontSize: 18, marginBottom: 16 },

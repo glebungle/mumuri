@@ -100,16 +100,12 @@ export default function ShareScreen() {
 
       const fileKeyRaw = await upRes.text();
       const fileKey = fileKeyRaw.replace(/^"|"$/g, ''); 
-      
-      console.log('🔥 획득한 FileKey:', fileKey);
 
       // 2단계: 미션 완료 API 호출
       if (missionId) {
         const mid = Number(missionId);
         
         const completeUrl = `${BASE_URL}/api/couples/missions/${mid}/complete-v2?fileKey=${encodeURIComponent(fileKey)}`;
-
-        console.log('📤 완료 API 호출 (Query 방식):', completeUrl);
 
         const compRes = await fetch(completeUrl, {
           method: 'POST',
@@ -184,7 +180,7 @@ export default function ShareScreen() {
 
 const styles = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: '#FFFCF5', paddingHorizontal: 16, paddingTop: 24 },
-  title: { color: '#3279FF', fontSize: 12, marginTop: '5%', marginBottom: 12, textAlign: 'center' },
+  title: { color: '#3279FF', fontSize: 12, marginTop: '8%', marginBottom: 12, textAlign: 'center' },
   imageContainer: {
     width: '100%',
     height: '76%',
