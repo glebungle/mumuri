@@ -40,8 +40,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: 'com.growdy.mumuri',
-    versionCode: 5, 
+    versionCode: 7, 
     googleServicesFile: './google-services.json', 
+    blockedPermissions: [
+      'android.permission.READ_MEDIA_VIDEO',
+      'android.permission.READ_MEDIA_AUDIO'
+    ],
     adaptiveIcon: {
       foregroundImage: './assets/images/logo.png',
       backgroundColor: '#FFFCF5',
@@ -53,8 +57,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       'android.permission.CAMERA',
       'android.permission.READ_MEDIA_IMAGES',
       'android.permission.WRITE_EXTERNAL_STORAGE',
-      'android.permission.ACCESS_COARSE_LOCATION',
-      'android.permission.ACCESS_FINE_LOCATION',
       'android.permission.RECORD_AUDIO',
       'android.permission.RECEIVE_BOOT_COMPLETED',
       'android.permission.VIBRATE',
