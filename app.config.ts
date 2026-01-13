@@ -33,7 +33,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       ],
       NSCameraUsageDescription: '미션 사진 촬영을 위해 카메라 접근이 필요합니다.',
       NSPhotoLibraryAddUsageDescription: '촬영한 사진을 앨범에 저장합니다.',
-      NSLocationWhenInUseUsageDescription: '사진 촬영 시 촬영 장소를 기록하기 위해 위치 정보가 필요합니다.',
       UIBackgroundModes: ['remote-notification'], 
       "ITSAppUsesNonExemptEncryption": false
     },
@@ -44,7 +43,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     googleServicesFile: './google-services.json', 
     blockedPermissions: [
       'android.permission.READ_MEDIA_VIDEO',
-      'android.permission.READ_MEDIA_AUDIO'
+      'android.permission.READ_MEDIA_AUDIO',
+      'android.permission.ACCESS_COARSE_LOCATION', 
+      'android.permission.ACCESS_FINE_LOCATION',  
     ],
     adaptiveIcon: {
       foregroundImage: './assets/images/logo.png',
