@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useMemo } from 'react';
-import { Dimensions, Image, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Dimensions, Image, Linking, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native'; // Linking 추가
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppText from '../components/AppText';
 import { useUser } from './context/UserContext';
@@ -10,6 +10,7 @@ import { useUser } from './context/UserContext';
 const profileImg = require('../assets/images/userprofile.png');
 const settingsImg = require('../assets/images/Settings.png');
 const heartImg = require('../assets/images/Heart.png');
+const reportImg = require('../assets/images/report.png'); 
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -41,12 +42,17 @@ export default function MyPage() {
     }, [])
   );
 
+  // [추가] 신고하기 버튼 핸들러
+  const handlePressReport = () => {
+    Linking.openURL('mailto:jamie462000@naver.com?subject=[신고] 무무리 콘텐츠 및 사용자 신고&body=신고 사유를 적어주세요.');
+  };
+
   const handlePressSetting = () => {
     router.push('/setting');
   };
 
   const handlePressEditProfile = () => {
-    router.push('/edit'); 
+    router.push('/edit');
   };
 
   const handleBack = () => router.back();
@@ -86,17 +92,27 @@ export default function MyPage() {
         >
           {/* 1. 상단 헤더 */}
           <View style={styles.header}>
-              <Pressable onPress={handleBack} >
-                    <Ionicons name="chevron-back" size={24} color="#1E1E1E" />
-              </Pressable>
-            <View style={{ width: 24 }} />
-            <Pressable onPress={handlePressSetting}>
-              <Image 
-                source={settingsImg} 
-                style={styles.settingsImage} 
-                resizeMode="contain"
-              />
+            <Pressable onPress={handleBack}>
+              <Ionicons name="chevron-back" size={24} color="#1E1E1E" />
             </Pressable>
+            
+            {/* 설정 버튼 왼쪽에 신고 버튼 배치 */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 15 }}>
+              <Pressable onPress={handlePressReport}>
+                <Image 
+                  source={reportImg} 
+                  style={styles.settingsImage} 
+                  resizeMode="contain"
+                />
+              </Pressable>
+              <Pressable onPress={handlePressSetting}>
+                <Image 
+                  source={settingsImg} 
+                  style={styles.settingsImage} 
+                  resizeMode="contain"
+                />
+              </Pressable>
+            </View>
           </View>
 
           {/* 2. 프로필 섹션 */}

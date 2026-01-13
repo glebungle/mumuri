@@ -39,7 +39,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: 'com.growdy.mumuri',
-    versionCode: 7, 
+    versionCode: 8, 
     googleServicesFile: './google-services.json', 
     blockedPermissions: [
       'android.permission.READ_MEDIA_VIDEO',
