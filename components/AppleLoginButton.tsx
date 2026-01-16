@@ -22,11 +22,15 @@ export default function AppleLoginButton() {
       Alert.alert('1단계 성공', '애플 인증에 성공했습니다. 서버로 토큰을 전송합니다.');
 
       // 2. 서버로 identityToken 전송 
-      const response = await axios.post(`${BASE_URL}/api/auth/apple/callback`, {
-        identityToken: credential.identityToken,
-        fullName: credential.fullName, 
-        email: credential.email,    
-      });
+      const response = await axios.post(
+        `${BASE_URL}/api/auth/apple/callback`, 
+        {}, 
+        {
+          params: {
+            code: credential.authorizationCode, 
+          }
+        }
+      );
 
       // [디버그] 서버 응답 확인
       Alert.alert(
