@@ -33,6 +33,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       ],
       NSCameraUsageDescription: '미션 사진 촬영을 위해 카메라 접근이 필요합니다.',
       NSPhotoLibraryAddUsageDescription: '촬영한 사진을 앨범에 저장합니다.',
+      usesAppleSignIn: true,
       UIBackgroundModes: ['remote-notification'], 
       "ITSAppUsesNonExemptEncryption": false
     },

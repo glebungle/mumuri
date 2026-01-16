@@ -1,4 +1,5 @@
 // app/index.tsx
+import AppleLoginButton from '@/components/AppleLoginButton';
 import KakaoLoginButton from '@/components/KakaoLoginButton';
 import { router } from 'expo-router';
 import React from 'react';
@@ -43,9 +44,10 @@ export default function StartScreen() {
 
       <View style={s.bottom}>
         <KakaoLoginButton />
-          <Pressable onPress={() => router.push('/signup')} style={{ marginTop: 0 }}>
+        <AppleLoginButton />
+          {/* <Pressable onPress={() => router.push('/signup')} style={{ marginTop: 0 }}>
           <AppText type='regular'style={s.signupLink}>회원가입</AppText>
-        </Pressable>
+        </Pressable> */}
       </View>
     </SafeAreaView>
   );
