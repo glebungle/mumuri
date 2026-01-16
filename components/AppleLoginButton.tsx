@@ -24,10 +24,10 @@ export default function AppleLoginButton() {
       // 2. 서버로 identityToken 전송 
       const response = await axios.post(
         `${BASE_URL}/api/auth/apple/callback`, 
-        {}, 
+        null, 
         {
           params: {
-            code: credential.authorizationCode, 
+            code: credential.identityToken, 
           }
         }
       );
