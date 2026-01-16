@@ -1,7 +1,10 @@
+import AsyncStorage from '@react-native-async-storage/async-storage'; // 추가
 import axios from 'axios';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { router } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
+
+const BASE_URL = 'https://mumuri.shop'; // 사용자님의 실제 서버 주소
 
 export default function AppleLoginButton() {
   const handleAppleLogin = async () => {
@@ -13,21 +16,45 @@ export default function AppleLoginButton() {
         ],
       });
 
-      // 1. API로 identityToken 전송
-      const response = await axios.post('https://your-api-url.com/auth/apple', {
+      // 1. 서버로 identityToken 전송 (인경님 API 주소로 변경 필요)
+      const response = await axios.post(`${BASE_URL}/api/auth/apple/callback
+
+Parameters`, {
         identityToken: credential.identityToken,
         fullName: credential.fullName, 
         email: credential.email,    
       });
 
       if (response.status === 200) {
-        // 2. 서버에서 받은 자체 JWT 등을 저장하고 메인으로 이동
-        console.log('서버 로그인 성공');
-        router.replace('/signup');
+        const { accessToken, refreshToken, isNew, roomId } = response.data;
+
+        // 2. 카카오 핸들러처럼 AsyncStorage에 토큰 및 정보 저장
+        await AsyncStorage.setItem('token', String(accessToken));
+        if (refreshToken) await AsyncStorage.setItem('refreshToken', String(refreshToken));
+        if (roomId && roomId !== '0') await AsyncStorage.setItem('roomId', String(roomId));
+        
+        // 이메일/이름 저장
+        if (credential.email) await AsyncStorage.setItem('email', String(credential.email));
+        if (credential.fullName?.givenName) {
+            await AsyncStorage.setItem('name', String(credential.fullName.givenName));
+        }
+
+        // 3. 페이지 이동 (카카오 로직과 동일하게 적용)
+        if (isNew === true || isNew === 'true') {
+            router.replace('/signup');
+        } else {
+            router.replace('/(tabs)/home');
+        }
+        
+        console.log('애플 로그인 및 토큰 저장 완료');
       }
       
     } catch (e: any) {
-      console.error('Apple Login Error:', e);
+      if (e.code === 'ERR_REQUEST_CANCELED') {
+          console.log('사용자가 취소함');
+      } else {
+          console.error('Apple Login Error:', e);
+      }
     }
   };
 
