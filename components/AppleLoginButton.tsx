@@ -1,10 +1,10 @@
-import AsyncStorage from '@react-native-async-storage/async-storage'; // 추가
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { router } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
-const BASE_URL = 'https://mumuri.shop'; // 사용자님의 실제 서버 주소
+const BASE_URL = 'https://mumuri.shop'; 
 
 export default function AppleLoginButton() {
   const handleAppleLogin = async () => {
@@ -16,10 +16,8 @@ export default function AppleLoginButton() {
         ],
       });
 
-      // 1. 서버로 identityToken 전송 (인경님 API 주소로 변경 필요)
-      const response = await axios.post(`${BASE_URL}/api/auth/apple/callback
-
-Parameters`, {
+      // 1. 서버로 identityToken 전송 
+      const response = await axios.post(`${BASE_URL}/auth/apple/callback`, {
         identityToken: credential.identityToken,
         fullName: credential.fullName, 
         email: credential.email,    
