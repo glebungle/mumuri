@@ -24,7 +24,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     supportsTablet: false,
     bundleIdentifier: 'com.growdy.mumuri', 
     googleServicesFile: "./GoogleService-Info.plist" ,
-    buildNumber: '4', 
+    buildNumber: '5', 
     infoPlist: {
       CFBundleURLTypes: [
         {
