@@ -2,13 +2,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { router } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import React from 'react';
+import { Alert, StyleSheet, View } from 'react-native'; // Alert 추가
 
 const BASE_URL = 'https://mumuri.shop'; 
 
 export default function AppleLoginButton() {
   const handleAppleLogin = async () => {
     try {
+      // 1. 애플 시스템 인증 시작
       const credential = await AppleAuthentication.signInAsync({
         requestedScopes: [
           AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
@@ -16,41 +18,55 @@ export default function AppleLoginButton() {
         ],
       });
 
-      // 1. 서버로 identityToken 전송 
-      const response = await axios.post(`${BASE_URL}/auth/apple/callback`, {
+      // [디버그] 애플 인증 성공 알림
+      Alert.alert('1단계 성공', '애플 인증에 성공했습니다. 서버로 토큰을 전송합니다.');
+
+      // 2. 서버로 identityToken 전송 
+      const response = await axios.post(`${BASE_URL}/api/auth/apple/callback`, {
         identityToken: credential.identityToken,
         fullName: credential.fullName, 
         email: credential.email,    
       });
 
-      if (response.status === 200) {
+      // [디버그] 서버 응답 확인
+      Alert.alert(
+        '2단계: 서버 응답', 
+        `상태코드: ${response.status}\n데이터: ${JSON.stringify(response.data)}`
+      );
+
+      if (response.status === 200 || response.status === 201) {
         const { accessToken, refreshToken, isNew, roomId } = response.data;
 
-        // 2. 카카오 핸들러처럼 AsyncStorage에 토큰 및 정보 저장
+        // 3. AsyncStorage에 데이터 저장
         await AsyncStorage.setItem('token', String(accessToken));
         if (refreshToken) await AsyncStorage.setItem('refreshToken', String(refreshToken));
         if (roomId && roomId !== '0') await AsyncStorage.setItem('roomId', String(roomId));
         
-        // 이메일/이름 저장
         if (credential.email) await AsyncStorage.setItem('email', String(credential.email));
         if (credential.fullName?.givenName) {
             await AsyncStorage.setItem('name', String(credential.fullName.givenName));
         }
 
-        // 3. 페이지 이동 (카카오 로직과 동일하게 적용)
+        // [디버그] 저장 완료 알림
+        Alert.alert('3단계 성공', `저장 완료! 페이지를 이동합니다. (isNew: ${isNew})`);
+
+        // 4. 페이지 이동
         if (isNew === true || isNew === 'true') {
             router.replace('/signup');
         } else {
             router.replace('/(tabs)/home');
         }
-        
-        console.log('애플 로그인 및 토큰 저장 완료');
       }
       
     } catch (e: any) {
       if (e.code === 'ERR_REQUEST_CANCELED') {
           console.log('사용자가 취소함');
       } else {
+          // [디버그] 상세 에러 알림
+          const errorDetail = e.response 
+            ? `서버에러(${e.response.status}): ${JSON.stringify(e.response.data)}` 
+            : e.message;
+          Alert.alert('❌ 에러 발생', errorDetail);
           console.error('Apple Login Error:', e);
       }
     }
