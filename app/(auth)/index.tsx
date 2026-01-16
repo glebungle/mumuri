@@ -35,9 +35,9 @@ export default function StartScreen() {
       <View style={s.center}>
         <AppText style={s.title}>m</AppText>
       </View>
-        <Pressable onPress={handleSkipLogin} style={s.skipButton}>
+        {/* <Pressable onPress={handleSkipLogin} style={s.skipButton}>
             <AppText type='regular' style={s.skipButtonText}>카메라/메인 테스트 (임시)</AppText>
-        </Pressable>
+        </Pressable> */}
         <Pressable onPress={handleOnboarding} style={s.onboardingButton}>
             <AppText type='regular' style={s.skipButtonText}>온보딩 보기 (임시)</AppText>
         </Pressable>
