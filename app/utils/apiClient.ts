@@ -3,6 +3,7 @@ import { router } from "expo-router";
 
 const BASE_URL = "https://mumuri.shop";
 
+// 토큰 갱신 상태 관리 및 대기열
 let isRefreshing = false;
 let failedQueue: any[] = [];
 
@@ -15,56 +16,110 @@ const processQueue = (error: any, token: string | null = null) => {
 };
 
 /**
- * 리프레시 토큰
+ * 1. 리프레시 토큰
  */
 async function getNewToken() {
   try {
     const refreshToken = await AsyncStorage.getItem("refreshToken");
-    if (!refreshToken) throw new Error("리프레시 토큰 없음");
+    if (!refreshToken) throw new Error("Refresh token not found");
+
+    console.log("🔄 토큰 갱신 시도 중...");
 
     const res = await fetch(
-      `${BASE_URL}/api/auth/refresh?refreshToken=${encodeURIComponent(refreshToken)}`,
+      `${BASE_URL}/auth/refresh?refreshToken=${encodeURIComponent(refreshToken)}`,
       {
         method: "POST",
+        headers: {
+          Accept: "*/*",
+        },
       },
     );
 
     if (res.ok) {
       const data = await res.json();
-      await AsyncStorage.setItem("token", data.accessToken);
-      if (data.refreshToken)
-        await AsyncStorage.setItem("refreshToken", data.refreshToken);
-      return data.accessToken;
+      const newAccessToken = data.accessToken;
+      const newRefreshToken = data.refreshToken;
+
+      // 200 OK 시 두 토큰 모두 저장소에 갱신
+      const storageItems: [string, string][] = [
+        ["token", String(newAccessToken)],
+        ["refreshToken", String(newRefreshToken)],
+      ];
+      await AsyncStorage.multiSet(storageItems);
+
+      console.log("✅ 토큰 갱신 성공");
+      return newAccessToken;
     }
-    throw new Error("갱신 실패");
+
+    // 200이 아닌 응답이 오면 리프레시 토큰도 만료된 것으로 간주
+    throw new Error("Refresh request failed");
   } catch (e) {
-    // 리프레시 토큰까지 만료된 경우 강제 로그아웃
-    await AsyncStorage.multiRemove(["token", "refreshToken", "userId"]);
-    router.replace("/");
+    console.error("❌ 세션 만료: 모든 데이터 삭제 및 로그아웃");
+    // 기기 내 로그인 정보 완전 삭제
+    await AsyncStorage.multiRemove([
+      "token",
+      "refreshToken",
+      "userId",
+      "coupleId",
+      "userData",
+    ]);
+
+    // 즉시 로그인 화면으로 튕겨냄
+    router.replace("/(auth)");
     return null;
   }
 }
 
 /**
- * 공통 함수
+ * 2. 공통 인증 Fetch 함수
  */
 export async function authFetch(url: string, options: any = {}) {
-  const token = await AsyncStorage.getItem("token");
   const fullUrl = url.startsWith("http") ? url : `${BASE_URL}${url}`;
 
-  const execute = (t: string | null) =>
-    fetch(fullUrl, {
-      ...options,
-      headers: {
-        "Content-Type": "application/json",
-        ...options.headers,
-        Authorization: `Bearer ${t}`,
-      },
-    });
+  const execute = async (t: string | null) => {
+    const headers: any = { ...options.headers };
 
+    if (!(options.body instanceof FormData)) {
+      headers["Content-Type"] = "application/json";
+    }
+
+    if (t) {
+      headers["Authorization"] = `Bearer ${t}`;
+    }
+
+    return fetch(fullUrl, { ...options, headers });
+  };
+
+  // 1. 현재 저장된 액세스 토큰 확인
+  let token = await AsyncStorage.getItem("token");
+
+  // 액세스 토큰이 아예 없는 경우 첫 요청 전에 즉시 갱신 시도
+  if (!token && !isRefreshing) {
+    isRefreshing = true;
+    try {
+      token = await getNewToken();
+      processQueue(null, token);
+    } catch (e) {
+      processQueue(e, null);
+      return Promise.reject(e);
+    } finally {
+      isRefreshing = false;
+    }
+  }
+
+  // 다른 요청이 갱신 중인 경우 대기열에서 대기
+  if (isRefreshing && !token) {
+    return new Promise((resolve, reject) => {
+      failedQueue.push({ resolve, reject });
+    })
+      .then((newToken) => execute(newToken as string))
+      .catch((err) => Promise.reject(err));
+  }
+
+  // 2. 첫 번째 요청 실행
   let res = await execute(token);
 
-  // 토큰만료 발생 시 처리
+  // 3. 만약 401에러가 나면 토큰 만료로 판단하고 재시도 로직 실행
   if (res.status === 401) {
     if (isRefreshing) {
       return new Promise((resolve, reject) => {
