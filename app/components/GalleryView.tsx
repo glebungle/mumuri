@@ -115,6 +115,9 @@ export default function GalleryView({ onBackToHome }: GalleryViewProps) {
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(
     null,
   );
+
+  const [viewerPhoto, setViewerPhoto] = useState<Photo | null>(null);
+
   const [isMenuVisible, setIsMenuVisible] = useState(false);
   const [saving, setSaving] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
@@ -127,7 +130,13 @@ export default function GalleryView({ onBackToHome }: GalleryViewProps) {
     setToastVisible(true);
   };
 
-  // 뒤로가기
+  useEffect(() => {
+    if (selectedPhotoIndex !== null && photos[selectedPhotoIndex]) {
+      setViewerPhoto(photos[selectedPhotoIndex]);
+    }
+  }, [selectedPhotoIndex, photos]);
+
+  // 뒤로가기 핸들러
   useFocusEffect(
     useCallback(() => {
       const onBackPress = () => {
@@ -198,7 +207,6 @@ export default function GalleryView({ onBackToHome }: GalleryViewProps) {
     loadPhotos(page + 1);
   };
 
-  // 다운로드
   const handleDownload = async () => {
     if (selectedPhotoIndex === null) return;
     const photo = photos[selectedPhotoIndex];
@@ -209,7 +217,6 @@ export default function GalleryView({ onBackToHome }: GalleryViewProps) {
         Alert.alert("권한 필요", "갤러리 권한이 필요합니다.");
         return;
       }
-
       const filename = `mumuri_${photo.id}.jpg`;
       const fileUri = `${getWritableDir()}${filename}`;
       const { uri } = await FileSystem.downloadAsync(photo.url, fileUri);
@@ -224,18 +231,14 @@ export default function GalleryView({ onBackToHome }: GalleryViewProps) {
     }
   };
 
-  // 홈 화면 게시
   const handlePostToHome = async () => {
     if (selectedPhotoIndex === null) return;
     const photo = photos[selectedPhotoIndex];
     try {
       const res = await authFetch(
         `/calendar/missions/thumb?photoId=${photo.id}`,
-        {
-          method: "PUT",
-        },
+        { method: "PUT" },
       );
-
       if (res.ok) {
         setIsMenuVisible(false);
         showToast("홈 화면에 게시되었습니다.");
@@ -252,21 +255,17 @@ export default function GalleryView({ onBackToHome }: GalleryViewProps) {
     setIsMenuVisible(false);
     setSelectedPhotoIndex(null);
   };
+
   const closeMenu = () => {
     if (isMenuVisible) setIsMenuVisible(false);
   };
 
-  const currentPhoto =
-    selectedPhotoIndex !== null && photos[selectedPhotoIndex]
-      ? photos[selectedPhotoIndex]
-      : null;
-  const formattedDate = currentPhoto
-    ? format(addHours(parseISO(currentPhoto.createdAt), 9), "yyyy. MM. dd.")
+  const formattedDate = viewerPhoto
+    ? format(addHours(parseISO(viewerPhoto.createdAt), 9), "yyyy. MM. dd.")
     : "";
-  const nickname = currentPhoto?.ownerNickname || "알 수 없음";
+  const nickname = viewerPhoto?.ownerNickname || "알 수 없음";
 
   const handleViewerScrollEnd = (event: any) => {
-    if (selectedPhotoIndex === null) return;
     const offsetX = event.nativeEvent.contentOffset.x;
     const index = Math.round(offsetX / SCREEN_WIDTH);
     if (
@@ -377,15 +376,12 @@ export default function GalleryView({ onBackToHome }: GalleryViewProps) {
                     index,
                   })}
                   onScrollToIndexFailed={(info) => {
-                    const wait = new Promise((resolve) =>
-                      setTimeout(resolve, 100),
-                    );
-                    wait.then(() => {
+                    setTimeout(() => {
                       viewerListRef.current?.scrollToIndex({
                         index: info.index,
                         animated: false,
                       });
-                    });
+                    }, 100);
                   }}
                   renderItem={({ item }) => (
                     <View style={styles.viewerItem}>
