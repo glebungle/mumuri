@@ -1,9 +1,7 @@
-import React, { createContext, useContext, useState } from "react";
-import { authFetch } from "../utils/apiClient"; // 위에서 만든 파일 연결
+import React, { createContext, useCallback, useContext, useState } from "react";
+import { authFetch } from "../utils/apiClient";
 
-const BASE_URL = "https://mumuri.shop";
-
-// --- [1] 타입 정의 ---
+// --- 타입 정의  ---
 export interface MainPhoto {
   photoId: number;
   imageUrl: string;
@@ -67,14 +65,14 @@ const UserContext = createContext<UserContextType>({
 
 export const useUser = () => useContext(UserContext);
 
-// --- [2] Provider ---
-
 export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const [userData, setUserData] = useState<HomeData | null>(null);
   const [todayMissions, setTodayMissions] = useState<TodayMission[]>([]);
 
-  const refreshUserData = async () => {
+  const refreshUserData = useCallback(async () => {
     try {
+      console.log("[UserContext] 데이터 새로고침 시작");
+
       const [homeRes, userRes, myPageRes] = await Promise.all([
         authFetch("/home/main"),
         authFetch("/user/getuser"),
@@ -93,7 +91,6 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
         }
       }
 
-      // 데이터 조립 로직
       let extractedUserId: number | null = null;
       if (typeof userInfo === "number") {
         extractedUserId = userInfo;
@@ -102,31 +99,33 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
           userInfo.userId ?? userInfo.id ?? userInfo.memberId ?? null;
       }
 
-      if (homeResponse && extractedUserId !== null) {
+      if (extractedUserId !== null) {
         const myPageData = myPageResponse as MyPageResponse | null;
 
         const mergedData: HomeData = {
-          anniversary: homeResponse.anniversary,
-          date: homeResponse.dDay || 0,
-          roomId: homeResponse.roomId,
-          coupleId: homeResponse.coupleId,
+          anniversary: homeResponse?.anniversary || null,
+          date: homeResponse?.dDay || 0,
+          roomId: homeResponse?.roomId || 0,
+          coupleId: homeResponse?.coupleId || 0,
           userId: extractedUserId,
-          missionCompletedCount: homeResponse.missionCompletedCount || 0,
-          mainPhoto: homeResponse.mainPhoto || null,
-          myProfileImageUrl: homeResponse.myProfileImageUrl || null,
-          partnerProfileImageUrl: homeResponse.partnerProfileImageUrl || null,
-          myName: homeResponse.myName || null,
-          partnerName: homeResponse.partnerName || null,
+          missionCompletedCount: homeResponse?.missionCompletedCount || 0,
+          mainPhoto: homeResponse?.mainPhoto || null,
+          myProfileImageUrl: homeResponse?.myProfileImageUrl || null,
+          partnerProfileImageUrl: homeResponse?.partnerProfileImageUrl || null,
+          myName: homeResponse?.myName || myPageData?.name || null,
+          partnerName: homeResponse?.partnerName || "애인",
           birthday: myPageData?.birthday || null,
           partnerBirthday: myPageData?.birthdayCouple || null,
         };
         setUserData(mergedData);
       }
+
       setTodayMissions(Array.isArray(missionResponse) ? missionResponse : []);
+      console.log("✅ [UserContext] 데이터 갱신 완료");
     } catch (e) {
-      console.warn("[UserContext] 새로고침 실패:", e);
+      console.warn("❌ [UserContext] 새로고침 에러:", e);
     }
-  };
+  }, []);
 
   return (
     <UserContext.Provider
