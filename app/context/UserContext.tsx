@@ -1,18 +1,18 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { createContext, useContext, useState } from 'react';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { router } from "expo-router";
+import React, { createContext, useContext, useState } from "react";
 
-const BASE_URL = 'https://mumuri.shop';
+const BASE_URL = "https://mumuri.shop";
 
-// [1] MainPhoto 타입 정의
+// --- [1] 타입 정의 ---
 export interface MainPhoto {
   photoId: number;
   imageUrl: string;
-  uploaderType: string; // 'ME' | 'PARTNER'
+  uploaderType: string;
   uploaderNickname: string;
   createdAt: string;
 }
 
-// [추가] 마이페이지 API 응답 타입
 interface MyPageResponse {
   name: string;
   birthday: string;
@@ -21,31 +21,29 @@ interface MyPageResponse {
   dDay: number;
 }
 
-// [2] 홈 메인 데이터 타입 수정 (생일 정보 추가)
 export interface HomeData {
   anniversary: string;
-  date: number; // dDay
+  date: number;
   roomId: number;
-  userId: number; 
+  userId: number;
   coupleId: number;
   missionCompletedCount: number;
-  mainPhoto: MainPhoto | null; 
+  mainPhoto: MainPhoto | null;
   myProfileImageUrl: string | null;
   partnerProfileImageUrl: string | null;
   myName: string | null;
   partnerName: string | null;
-  // 👇 새로 추가된 필드
-  birthday: string | null;        
-  partnerBirthday: string | null; 
+  birthday: string | null;
+  partnerBirthday: string | null;
 }
 
 export interface TodayMission {
   missionId: number;
   title: string;
   description: string | null;
-  difficulty: string; 
+  difficulty: string;
   reward: number;
-  status: string;     
+  status: string;
   missionDate: string;
   progresses: any[];
   myDone: boolean;
@@ -70,67 +68,124 @@ const UserContext = createContext<UserContextType>({
 
 export const useUser = () => useContext(UserContext);
 
-// --- API 호출 함수들 ---
+// --- [2] 토큰 갱신  ---
 
-async function fetchHomeMain(token: string) {
+/**
+ * 리프레시 토큰
+ */
+async function getNewToken() {
   try {
-    const res = await fetch(`${BASE_URL}/home/main`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!res.ok) throw new Error(`Home Main Fetch Error: ${res.status}`);
-    const json = await res.json();
-    // console.log('Home Main Data:', JSON.stringify(json, null, 2));
-    return json;
-  } catch (error) {
-    console.error('❌ fetchHomeMain 실패:', error);
-    return null; 
-  }
-}
+    const refreshToken = await AsyncStorage.getItem("refreshToken");
+    if (!refreshToken) return null;
 
-async function fetchUserInfo(token: string) {
-  try {
-    const res = await fetch(`${BASE_URL}/user/getuser`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!res.ok) throw new Error(`User Info Fetch Error: ${res.status}`);
-    return res.json();
-  } catch (error) {
-    console.error('❌ fetchUserInfo 실패:', error);
+    const res = await fetch(
+      `${BASE_URL}/api/auth/refresh?refreshToken=${encodeURIComponent(refreshToken)}`,
+      {
+        method: "POST",
+      },
+    );
+
+    if (res.ok) {
+      const data = await res.json();
+      await AsyncStorage.setItem("token", data.accessToken);
+      if (data.refreshToken) {
+        await AsyncStorage.setItem("refreshToken", data.refreshToken);
+      }
+      console.log("✅ [Token Refresh] 새로운 토큰 발급 성공");
+      return data.accessToken;
+    }
+    return null;
+  } catch (e) {
+    console.error("❌ [Token Refresh] 에러:", e);
     return null;
   }
 }
 
-// [추가] 마이페이지 정보 호출 함수
-async function fetchMyPage(token: string) {
-  try {
-    const res = await fetch(`${BASE_URL}/api/mypage`, {
-      headers: { Authorization: `Bearer ${token}` },
+/**
+ * 자동 재발급
+ */
+async function authenticatedFetch(url: string, options: any = {}) {
+  let token = await AsyncStorage.getItem("token");
+
+  const executeFetch = (t: string | null) =>
+    fetch(url, {
+      ...options,
+      headers: {
+        ...options.headers,
+        Authorization: `Bearer ${t}`,
+      },
     });
-    if (!res.ok) throw new Error(`MyPage Fetch Error: ${res.status}`);
-    return res.json();
+
+  let res = await executeFetch(token);
+
+  // 401 발생 시 토큰 갱신 후 재시도
+  if (res.status === 401) {
+    console.log("🔄 [Auth] 토큰 만료 감지. 재발급 시도 중...");
+    const newToken = await getNewToken();
+
+    if (newToken) {
+      res = await executeFetch(newToken);
+    } else {
+      console.warn("⚠️ [Auth] 세션 만료. 로그인 화면으로 이동합니다.");
+      await AsyncStorage.multiRemove(["token", "refreshToken", "userId"]);
+      router.replace("/");
+    }
+  }
+
+  return res;
+}
+
+// --- [3] API 호출 함수들 ---
+
+async function fetchHomeMain() {
+  try {
+    const res = await authenticatedFetch(`${BASE_URL}/home/main`);
+    if (!res.ok) throw new Error(`Home Main Error: ${res.status}`);
+    return await res.json();
   } catch (error) {
-    console.error('❌ fetchMyPage 실패:', error);
+    console.error("❌ fetchHomeMain 실패:", error);
     return null;
   }
 }
 
-async function fetchTodayMissions(token: string) {
+async function fetchUserInfo() {
   try {
-    const res = await fetch(`${BASE_URL}/api/couples/missions/today`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (res.status === 404) return []; 
-    if (!res.ok) throw new Error(`Today Mission Fetch Error: ${res.status}`);
-
-    const data = await res.json();
-    console.log('✅ [REAL MISSION DATA]:', JSON.stringify(data, null, 2)); 
-    
-    return data;
+    const res = await authenticatedFetch(`${BASE_URL}/user/getuser`);
+    if (!res.ok) throw new Error(`User Info Error: ${res.status}`);
+    return await res.json();
   } catch (error) {
-    console.error('❌ fetchTodayMissions 실패:', error);
+    console.error("❌ fetchUserInfo 실패:", error);
+    return null;
+  }
+}
+
+async function fetchMyPage() {
+  try {
+    const res = await authenticatedFetch(`${BASE_URL}/api/mypage`);
+    if (!res.ok) throw new Error(`MyPage Error: ${res.status}`);
+    return await res.json();
+  } catch (error) {
+    console.error("❌ fetchMyPage 실패:", error);
+    return null;
+  }
+}
+
+async function fetchTodayMissions(coupleId: number) {
+  if (!coupleId || coupleId <= 0) return [];
+  try {
+    const res = await authenticatedFetch(
+      `${BASE_URL}/api/couples/missions/today`,
+    );
+    if (res.status === 404) return [];
+    if (!res.ok) throw new Error(`Today Mission Error: ${res.status}`);
+    return await res.json();
+  } catch (error) {
+    console.error("❌ fetchTodayMissions 실패:", error);
     return [];
   }
 }
+
+// --- [4] Provider ---
 
 export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const [userData, setUserData] = useState<HomeData | null>(null);
@@ -138,73 +193,62 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
   const refreshUserData = async () => {
     try {
-      const token = await AsyncStorage.getItem('token');
-      if (!token) {
-        console.log('토큰이 없습니다.');
-        return;
-      }
-
-      // [STEP 1] 홈, 유저정보, 마이페이지 정보를 병렬로 호출
       const [homeResponse, userInfo, myPageResponse] = await Promise.all([
-        fetchHomeMain(token),
-        fetchUserInfo(token),
-        fetchMyPage(token), 
+        fetchHomeMain(),
+        fetchUserInfo(),
+        fetchMyPage(),
       ]);
 
-      // [STEP 2] 커플 연결 여부에 따라 미션 API 호출 분기
       let missionResponse: TodayMission[] = [];
-      
-      if (homeResponse && homeResponse.coupleId && homeResponse.coupleId > 0) {
-          const missions = await fetchTodayMissions(token);
-          if (Array.isArray(missions)) {
-              missionResponse = missions;
-          }
+      if (homeResponse?.coupleId > 0) {
+        missionResponse = await fetchTodayMissions(homeResponse.coupleId);
       }
 
-      // [STEP 3] 데이터 조립 및 상태 업데이트
-      let mergedData: HomeData | null = null;
-      let extractedUserId = null;
-
-      if (typeof userInfo === 'number') {
+      // 데이터 조립 로직
+      let extractedUserId: number | null = null;
+      if (typeof userInfo === "number") {
         extractedUserId = userInfo;
-      } else if (typeof userInfo === 'object' && userInfo !== null) {
-        extractedUserId = userInfo.userId ?? userInfo.id ?? userInfo.memberId ?? null;
+      } else if (userInfo && typeof userInfo === "object") {
+        extractedUserId =
+          userInfo.userId ?? userInfo.id ?? userInfo.memberId ?? null;
       }
 
       if (homeResponse && extractedUserId !== null) {
-        // myPageResponse 데이터 안전하게 추출
         const myPageData = myPageResponse as MyPageResponse | null;
 
-        mergedData = {
+        const mergedData: HomeData = {
           anniversary: homeResponse.anniversary,
           date: homeResponse.dDay || 0,
           roomId: homeResponse.roomId,
-          coupleId: homeResponse.coupleId, 
-          userId: Number(extractedUserId),
+          coupleId: homeResponse.coupleId,
+          userId: extractedUserId,
           missionCompletedCount: homeResponse.missionCompletedCount || 0,
           mainPhoto: homeResponse.mainPhoto || null,
           myProfileImageUrl: homeResponse.myProfileImageUrl || null,
           partnerProfileImageUrl: homeResponse.partnerProfileImageUrl || null,
           myName: homeResponse.myName || null,
           partnerName: homeResponse.partnerName || null,
-        
           birthday: myPageData?.birthday || null,
           partnerBirthday: myPageData?.birthdayCouple || null,
         };
         setUserData(mergedData);
-      } else {
-        console.warn('⚠️ [UserContext] 데이터 로드 실패 (필수 정보 누락)');
       }
-
       setTodayMissions(missionResponse);
-
     } catch (e) {
-      console.warn('User data fetch failed', e);
+      console.warn("[UserContext] 전체 새로고침 실패:", e);
     }
   };
 
   return (
-    <UserContext.Provider value={{ userData, todayMissions, setUserData, setTodayMissions, refreshUserData }}>
+    <UserContext.Provider
+      value={{
+        userData,
+        todayMissions,
+        setUserData,
+        setTodayMissions,
+        refreshUserData,
+      }}
+    >
       {children}
     </UserContext.Provider>
   );
