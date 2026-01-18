@@ -1,9 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { format, parseISO } from "date-fns";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useMemo,
+  useRef,
+  useState
+} from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -58,10 +62,9 @@ const AlertModal = ({
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-
   const { userData, todayMissions, refreshUserData } = useUser();
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!userData);
   const [modalVisible, setModalVisible] = useState(false);
   const [modalMessage, setModalMessage] = useState("");
   const [activeTab, setActiveTab] = useState<0 | 1>(0);
@@ -77,28 +80,16 @@ export default function HomeScreen() {
     todayMissions && todayMissions.length > 0 ? todayMissions[0].title : null;
 
   const mainPhoto = userData?.mainPhoto;
-  const backgroundSource = mainPhoto?.imageUrl
-    ? { uri: mainPhoto.imageUrl }
-    : defaultBgImg;
-  const displayTitle = mainPhoto?.uploaderNickname
-    ? mainPhoto.uploaderNickname
-    : userData?.myName || "사용자";
 
-  let displayDateText = "";
-  if (mainPhoto?.createdAt) {
-    displayDateText = `${format(parseISO(mainPhoto.createdAt), "yyyy. MM. dd.")}`;
-  }
+  const backgroundSource = useMemo(() => {
+    return mainPhoto?.imageUrl ? { uri: mainPhoto.imageUrl } : defaultBgImg;
+  }, [mainPhoto?.imageUrl]);
 
-  // 좀비 데이터 정리 로직
-  useEffect(() => {
-    const cleanUpStaleData = async () => {
-      if (userData && (!userData.coupleId || userData.coupleId === 0)) {
-        const zombieId = await AsyncStorage.getItem("coupleId");
-        if (zombieId) await AsyncStorage.multiRemove(["coupleId", "roomId"]);
-      }
-    };
-    cleanUpStaleData();
-  }, [userData]);
+  const displayTitle =
+    mainPhoto?.uploaderNickname || userData?.myName || "사용자";
+  const displayDateText = mainPhoto?.createdAt
+    ? `${format(parseISO(mainPhoto.createdAt), "yyyy. MM. dd.")}`
+    : "";
 
   // 화면 포커스 시 데이터 새로고침
   useFocusEffect(
@@ -106,7 +97,9 @@ export default function HomeScreen() {
       let isActive = true;
       const load = async () => {
         try {
+          if (!userData) setLoading(true);
           await refreshUserData();
+          console.log("✅ [HomeScreen] 데이터 동기화 성공");
         } catch (error) {
           console.error("Home Data Refresh Fail:", error);
         } finally {
@@ -149,15 +142,11 @@ export default function HomeScreen() {
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
-      onStartShouldSetPanResponderCapture: () => false,
-      onMoveShouldSetPanResponderCapture: (_, gestureState) => {
-        const { dx, dy } = gestureState;
-        return Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.2;
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        const { dx } = gestureState;
-        if (dx < -30 && activeTab === 0) switchTab(1);
-        else if (dx > 30 && activeTab === 1) switchTab(0);
+      onMoveShouldSetPanResponderCapture: (_, gs) =>
+        Math.abs(gs.dx) > 10 && Math.abs(gs.dx) > Math.abs(gs.dy) * 1.2,
+      onPanResponderRelease: (_, gs) => {
+        if (gs.dx < -30 && activeTab === 0) switchTab(1);
+        else if (gs.dx > 30 && activeTab === 1) switchTab(0);
       },
     }),
   ).current;
@@ -184,13 +173,15 @@ export default function HomeScreen() {
     router.push("/chat");
   };
 
-  if (loading)
+  if (loading && !userData) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#333" />
       </View>
     );
+  }
 
+  // 애니메이션
   const indicatorTranslateX = tabAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [0, 51],
@@ -298,7 +289,7 @@ export default function HomeScreen() {
           />
           <View style={styles.dDayBadgeRow}>
             <View style={styles.dDayBadge}>
-              <Image source={heartImg} style={[styles.heartImage]} />
+              <Image source={heartImg} style={styles.heartImage} />
               <AppText type="bold" style={[styles.dDayText, { color: "#FFF" }]}>
                 {isCoupled ? `${dDay - 1}일째` : "연결 대기중"}
               </AppText>
@@ -334,7 +325,6 @@ export default function HomeScreen() {
 
             <View style={styles.homeContentContainer}>
               <View style={{ height: HEADER_HEIGHT }} />
-
               {backgroundSource !== defaultBgImg ? (
                 <View style={styles.infoSection}>
                   <View style={styles.nameDateContainer}>
@@ -344,7 +334,7 @@ export default function HomeScreen() {
                     <View style={styles.datewrap}>
                       <Image
                         source={calendarImg}
-                        style={[styles.calendarImage]}
+                        style={styles.calendarImage}
                       />
                       <AppText type="semibold" style={styles.dateText}>
                         {displayDateText}
@@ -360,19 +350,16 @@ export default function HomeScreen() {
                 style={[styles.dashboard, { paddingBottom: insets.bottom }]}
               >
                 <Pressable
-                  style={({ pressed }) => [
+                  style={[
                     styles.missionCard,
-                    pressed && styles.pressedCard,
                     !isCoupled && styles.disabledMissionCard,
                   ]}
                   onPress={handlePressCamera}
                 >
                   <View style={styles.missionwrap}>
-                    <View style={styles.missionHeader}>
-                      <AppText type="semibold" style={styles.cardTitle}>
-                        오늘의 미션
-                      </AppText>
-                    </View>
+                    <AppText type="semibold" style={styles.cardTitle}>
+                      오늘의 미션
+                    </AppText>
                     <AppText
                       type="regular"
                       style={[
@@ -392,13 +379,11 @@ export default function HomeScreen() {
                     </AppText>
                   </View>
                 </Pressable>
-
                 <View style={styles.bottomRow}>
                   <Pressable
-                    style={({ pressed }) => [
+                    style={[
                       styles.squareCard,
                       styles.calendarCard,
-                      pressed && styles.pressedCard,
                       !isCoupled && styles.disabledCard,
                     ]}
                     onPress={handlePressCalendar}
@@ -414,10 +399,9 @@ export default function HomeScreen() {
                     </AppText>
                   </Pressable>
                   <Pressable
-                    style={({ pressed }) => [
+                    style={[
                       styles.squareCard,
                       styles.chatCard,
-                      pressed && styles.pressedCard,
                       !isCoupled && styles.disabledCard,
                     ]}
                     onPress={handlePressChat}
@@ -437,10 +421,14 @@ export default function HomeScreen() {
             </View>
           </View>
         ) : (
-          <View style={{ flex: 1, backgroundColor: "#FFFCF5" }}>
-            <View style={{ flex: 1, paddingTop: HEADER_HEIGHT - 30 }}>
-              <GalleryView onBackToHome={() => switchTab(0)} />
-            </View>
+          <View
+            style={{
+              flex: 1,
+              backgroundColor: "#FFFCF5",
+              paddingTop: HEADER_HEIGHT - 30,
+            }}
+          >
+            <GalleryView onBackToHome={() => switchTab(0)} />
           </View>
         )}
       </Animated.View>
