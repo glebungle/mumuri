@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Linking from "expo-linking";
 import React, { useRef, useState } from "react";
@@ -7,16 +8,18 @@ import {
   Image,
   Modal,
   Pressable,
+  SafeAreaView,
   StyleSheet,
   View,
 } from "react-native";
 import { WebView } from "react-native-webview";
+import AppText from "./../components/AppText";
 
 const REST_API_KEY = process.env.EXPO_PUBLIC_KAKAO_REST_KEY || "";
 const BACKEND_CALLBACK_URL = "https://mumuri.shop/api/auth/kakao/callback";
 const REDIRECT_URI = BACKEND_CALLBACK_URL;
 
-// 기본 URL
+// 기본 인증 URL 구성
 const BASE_AUTH_URL =
   "https://kauth.kakao.com/oauth/authorize" +
   `?response_type=code` +
@@ -28,47 +31,54 @@ export default function KakaoLoginButton() {
   const [currentUrl, setCurrentUrl] = useState(BASE_AUTH_URL);
   const isHandled = useRef(false);
 
+  /**
+   * 로그인 시작
+   */
   const startLogin = async () => {
     if (!REST_API_KEY) {
-      Alert.alert("설정 오류", "카카오 키가 없습니다.");
+      Alert.alert(
+        "설정 오류",
+        "카카오 REST API 키가 환경 변수에 설정되지 않았습니다.",
+      );
       return;
     }
 
     isHandled.current = false;
 
-    // 로그아웃 했었는지 확인
+    // 로그아웃 했던 기록이 있는지 확인
     const wasLoggedOut = await AsyncStorage.getItem("isLoggingOut");
 
     if (wasLoggedOut === "true") {
-      console.log(
-        "🔒 [LoginButton] 로그아웃 기록 확인 -> 아이디/비번 입력 강제",
-      );
+      console.log("🔒 [Kakao] 로그아웃 기록 확인 -> 계정 재입력 강제");
       setCurrentUrl(`${BASE_AUTH_URL}&prompt=login`);
     } else {
-      console.log("⚡️ [LoginButton] 일반 로그인 (자동 로그인 허용)");
+      console.log("⚡️ [Kakao] 일반 로그인 진행");
       setCurrentUrl(BASE_AUTH_URL);
     }
 
     setWebViewVisible(true);
   };
 
+  /**
+   * WebView URL 변경 감지
+   */
   const handleWebViewChange = async (url: string) => {
     if (url.startsWith("mumuri:")) {
       if (isHandled.current) return false;
-
-      const fixedUrl = url.replace(/^mumuri:\/+/, "mumuri://");
-
-      console.log("🚀 [WebView] 교정된 URL:", fixedUrl);
       isHandled.current = true;
 
-      await AsyncStorage.removeItem("isLoggingOut");
+      // URL 스키마 교정 (mumuri:/// -> mumuri://)
+      const fixedUrl = url.replace(/^mumuri:\/+/, "mumuri://");
+      console.log("🚀 [Kakao] 딥링크 감지, 앱으로 복귀:", fixedUrl);
 
+      // 로그아웃 플래그 제거
+      await AsyncStorage.removeItem("isLoggingOut");
       setWebViewVisible(false);
 
-      // 교정된 URL로 실행
+      // Linking을 통해 DeepLinkHandler로 데이터 전달
       Linking.openURL(fixedUrl).catch((err) => {
         console.error("❌ Linking Error:", err);
-        Alert.alert("오류", "앱으로 돌아올 수 없습니다. 설정을 확인해주세요.");
+        Alert.alert("오류", "앱으로 돌아가는 중 문제가 발생했습니다.");
       });
 
       return false;
@@ -90,23 +100,37 @@ export default function KakaoLoginButton() {
         animationType="slide"
         onRequestClose={() => setWebViewVisible(false)}
       >
-        <View style={styles.webViewContainer}>
+        <SafeAreaView style={styles.webViewContainer}>
+          <View style={styles.webViewHeader}>
+            <Pressable
+              onPress={() => setWebViewVisible(false)}
+              style={styles.closeButton}
+            >
+              <Ionicons name="close" size={28} color="#333" />
+            </Pressable>
+            <AppText type="semibold" style={styles.headerTitle}>
+              카카오 로그인
+            </AppText>
+            <View style={{ width: 28 }} />
+          </View>
+
           {webViewVisible && (
             <WebView
               style={styles.webView}
               source={{ uri: currentUrl }}
               sharedCookiesEnabled={true}
               thirdPartyCookiesEnabled={true}
-              incognito={false}
-              javaScriptEnabled
-              domStorageEnabled
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
               originWhitelist={["*"]}
               onShouldStartLoadWithRequest={(req) => {
                 const shouldLoad = !req.url.startsWith("mumuri:");
                 if (!shouldLoad) handleWebViewChange(req.url);
                 return shouldLoad;
               }}
-              onNavigationStateChange={(e) => handleWebViewChange(e.url)}
+              onNavigationStateChange={(e) => {
+                if (e.url.startsWith("mumuri:")) handleWebViewChange(e.url);
+              }}
               startInLoadingState={true}
               renderLoading={() => (
                 <View style={styles.loadingOverlay}>
@@ -115,7 +139,7 @@ export default function KakaoLoginButton() {
               )}
             />
           )}
-        </View>
+        </SafeAreaView>
       </Modal>
     </>
   );
@@ -123,12 +147,24 @@ export default function KakaoLoginButton() {
 
 const styles = StyleSheet.create({
   buttonImage: { height: 55, width: 330, resizeMode: "contain" },
-  webViewContainer: { flex: 1, paddingTop: 40, backgroundColor: "white" },
+  webViewContainer: { flex: 1, backgroundColor: "white" },
+  webViewHeader: {
+    height: 50,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
+  },
+  headerTitle: { fontSize: 16, color: "#333" },
+  closeButton: { padding: 5 },
   webView: { flex: 1 },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "white",
     justifyContent: "center",
     alignItems: "center",
+    zIndex: 1,
   },
 });

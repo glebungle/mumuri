@@ -3,7 +3,7 @@ import axios from "axios";
 import * as AppleAuthentication from "expo-apple-authentication";
 import { router } from "expo-router";
 import React from "react";
-import { Alert, StyleSheet, View } from "react-native"; // Alert 추가
+import { Alert, StyleSheet, View } from "react-native";
 
 const BASE_URL = "https://mumuri.shop";
 
@@ -18,12 +18,6 @@ export default function AppleLoginButton() {
         ],
       });
 
-      // [디버그] 애플 인증 성공 알림
-      Alert.alert(
-        "1단계 성공",
-        "애플 인증에 성공했습니다. 서버로 토큰을 전송합니다.",
-      );
-
       // 2. 서버로 전송
       const response = await axios.post(
         `${BASE_URL}/api/auth/apple/callback`,
@@ -33,12 +27,6 @@ export default function AppleLoginButton() {
             code: credential.authorizationCode,
           },
         },
-      );
-
-      // [디버그] 서버 응답 확인
-      Alert.alert(
-        "2단계: 서버 응답",
-        `상태코드: ${response.status}\n데이터: ${JSON.stringify(response.data)}`,
       );
 
       if (response.status === 200 || response.status === 201) {
@@ -59,12 +47,6 @@ export default function AppleLoginButton() {
             String(credential.fullName.givenName),
           );
         }
-
-        // [디버그] 저장 완료 알림
-        Alert.alert(
-          "3단계 성공",
-          `저장 완료! 페이지를 이동합니다. (isNew: ${isNew})`,
-        );
 
         // 4. 페이지 이동
         if (isNew === true || isNew === "true") {

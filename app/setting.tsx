@@ -1,27 +1,17 @@
 // app/setting.tsx
-import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import React, { useState } from 'react';
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  View
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import AppText from '../components/AppText';
+import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
+import React from "react";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import AppText from "../components/AppText";
 
 export default function SettingScreen() {
   const insets = useSafeAreaInsets();
-  const [coupleCode, setCoupleCode] = useState<string | null>(null);
-
-  // 뒤로가기
   const handleBack = () => router.back();
-  
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      
       {/* 1. 상단 네비게이션 헤더 */}
       <View style={styles.header}>
         <Pressable onPress={handleBack} style={styles.backButton}>
@@ -32,18 +22,21 @@ export default function SettingScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        
         {/* 섹션 1: 프로필 관리 */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <AppText type='semibold' style={styles.sectionTitle}>프로필 관리</AppText>
-            <Pressable onPress={() => router.push('/profile')}>
+            <AppText type="semibold" style={styles.sectionTitle}>
+              프로필 관리
+            </AppText>
+            <Pressable onPress={() => router.push("/profile")}>
               <Ionicons name="chevron-forward" size={20} color="#000" />
             </Pressable>
           </View>
           <View style={styles.itemGroup}>
-            <Pressable onPress={() => router.push('/profile')}>
-              <AppText type='medium' style={styles.itemText}>마이 프로필</AppText>
+            <Pressable onPress={() => router.push("/profile")}>
+              <AppText type="medium" style={styles.itemText}>
+                마이 프로필
+              </AppText>
             </Pressable>
           </View>
         </View>
@@ -51,15 +44,19 @@ export default function SettingScreen() {
         {/* 섹션 2: 커플 연결 */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <AppText type='semibold' style={styles.sectionTitle}>커플 연결</AppText>
-            <Pressable onPress={()=> router.push('./couple-connect')}>
+            <AppText type="semibold" style={styles.sectionTitle}>
+              커플 연결
+            </AppText>
+            <Pressable onPress={() => router.push("./couple-connect")}>
               <Ionicons name="chevron-forward" size={20} color="#000" />
             </Pressable>
           </View>
           <View>
             <View style={styles.itemGroup}>
-              <Pressable onPress={() => router.push('/couple-connect')}>
-                <AppText type='medium' style={styles.itemText}>커플 연결하기</AppText>
+              <Pressable onPress={() => router.push("/couple-connect")}>
+                <AppText type="medium" style={styles.itemText}>
+                  커플 연결하기
+                </AppText>
               </Pressable>
             </View>
           </View>
@@ -68,38 +65,52 @@ export default function SettingScreen() {
         {/* 섹션 3: 계정 관리 */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <AppText type='semibold' style={styles.sectionTitle}>계정 관리</AppText>
-            <Pressable onPress={()=> router.push('./account-setting')}>
+            <AppText type="semibold" style={styles.sectionTitle}>
+              계정 관리
+            </AppText>
+            <Pressable onPress={() => router.push("./account-setting")}>
               <Ionicons name="chevron-forward" size={20} color="#000" />
             </Pressable>
           </View>
           <View style={styles.itemGroup}>
-            <Pressable onPress={() => router.push('/logout')}>
-                <AppText type='medium' style={styles.itemText}>로그아웃</AppText>
-              </Pressable>
-              <Pressable onPress={() => router.push('/withdraw')}>
-                <AppText type='medium' style={styles.itemText}>회원 탈퇴</AppText>
-              </Pressable>
+            <Pressable onPress={() => router.push("/logout")}>
+              <AppText type="medium" style={styles.itemText}>
+                로그아웃
+              </AppText>
+            </Pressable>
+            <Pressable onPress={() => router.push("/withdraw")}>
+              <AppText type="medium" style={styles.itemText}>
+                회원 탈퇴
+              </AppText>
+            </Pressable>
           </View>
         </View>
 
         {/* 섹션 4: 정보 */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <AppText type='semibold' style={styles.sectionTitle}>정보</AppText>
-            <Pressable onPress={()=> router.push('./info')}>
+            <AppText type="semibold" style={styles.sectionTitle}>
+              정보
+            </AppText>
+            <Pressable onPress={() => router.push("./info")}>
               <Ionicons name="chevron-forward" size={20} color="#000" />
             </Pressable>
           </View>
           <View style={styles.itemGroup}>
             <View style={styles.itemRow}>
-              <AppText type='medium' style={styles.itemText}>나의 앱 버전</AppText>
+              <AppText type="medium" style={styles.itemText}>
+                나의 앱 버전
+              </AppText>
             </View>
             <Pressable style={styles.itemRow}>
-              <AppText type='medium' style={styles.itemText}>이용약관</AppText>
+              <AppText type="medium" style={styles.itemText}>
+                이용약관
+              </AppText>
             </Pressable>
             <Pressable style={styles.itemRow}>
-              <AppText type='medium' style={styles.itemText}>개인정보 처리방침</AppText>
+              <AppText type="medium" style={styles.itemText}>
+                개인정보 처리방침
+              </AppText>
             </Pressable>
           </View>
         </View>
@@ -107,16 +118,18 @@ export default function SettingScreen() {
         {/* 섹션 5: 여유공간 (장식용) */}
         <View style={styles.storageSection}>
           <AppText style={styles.storageTitle}>여유공간</AppText>
-            <AppText type='medium' style={styles.text}> 추가 예정이에요. </AppText>
+          <AppText type="medium" style={styles.text}>
+            {" "}
+            추가 예정이에요.{" "}
+          </AppText>
           {/* <View style={styles.storageContent}>
             <AppText type='medium' style={styles.storageUsageText}>65.43GB / 100GB</AppText> */}
-            {/* 프로그레스 바 */}
-            {/* <View style={styles.progressBarBg}>
+          {/* 프로그레스 바 */}
+          {/* <View style={styles.progressBarBg}>
               <View style={[styles.progressBarFill, { width: '65%' }]} />
             </View> */}
           {/* </View> */}
         </View>
-
       </ScrollView>
     </View>
   );
@@ -125,24 +138,24 @@ export default function SettingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF',
+    backgroundColor: "#FFF",
   },
-  
+
   // 헤더 스타일
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingVertical: 14,
-    backgroundColor: '#FFF',
+    backgroundColor: "#FFF",
   },
   backButton: {
     padding: 4,
   },
   headerTitle: {
     fontSize: 18,
-    color: '#444444',
+    color: "#444444",
   },
 
   // 컨텐츠 영역
@@ -156,44 +169,41 @@ const styles = StyleSheet.create({
     marginTop: 32,
   },
   sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     borderBottomWidth: 1,
-    borderBottomColor: '#000000',
+    borderBottomColor: "#000000",
     paddingBottom: 8,
     marginBottom: 12,
   },
   sectionTitle: {
     fontSize: 16,
-    color: '#444444',
-    paddingLeft:8,
+    color: "#444444",
+    paddingLeft: 8,
   },
-  
+
   // 섹션 하위 아이템 (우측 정렬 텍스트)
   itemGroup: {
-    gap: 4, 
+    gap: 4,
   },
-  itemRow: {
-
-  },
+  itemRow: {},
   itemText: {
     fontSize: 15,
-    color: '#666', 
-    textAlign: 'right', 
+    color: "#666",
+    textAlign: "right",
   },
 
-  // 여유공간 섹션 
+  // 여유공간 섹션
   storageSection: {
     marginTop: 32,
-    
   },
   storageTitle: {
-    paddingLeft:8,
+    paddingLeft: 8,
     fontSize: 16,
-    color: '#444444',
+    color: "#444444",
     borderBottomWidth: 1,
-    borderBottomColor: '#000000',
+    borderBottomColor: "#000000",
     paddingBottom: 8,
     marginBottom: 12,
   },
@@ -201,22 +211,22 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   storageUsageText: {
-    paddingLeft:8,
+    paddingLeft: 8,
     fontSize: 14,
-    color: '#747474',
+    color: "#747474",
   },
   progressBarBg: {
     height: 16,
-    backgroundColor: '#E0E0E0',
+    backgroundColor: "#E0E0E0",
     borderRadius: 6,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   progressBarFill: {
-    height: '100%',
-    backgroundColor: '#363636', 
+    height: "100%",
+    backgroundColor: "#363636",
     borderRadius: 6,
   },
-  text:{
-    color:'#b3b3b3ff'
-  }
+  text: {
+    color: "#b3b3b3ff",
+  },
 });

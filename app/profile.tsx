@@ -1,35 +1,42 @@
-import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import React from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import AppText from '../components/AppText';
-import { useUser } from './context/UserContext';
+import { Ionicons } from "@expo/vector-icons";
+import { router, useFocusEffect } from "expo-router";
+import React, { useCallback } from "react";
+import { Platform, Pressable, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import AppText from "../components/AppText";
+import { useUser } from "./context/UserContext";
 
 export default function AccountSettingScreen() {
   const insets = useSafeAreaInsets();
-  const { userData } = useUser();
+  const { userData, refreshUserData } = useUser();
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshUserData();
+    }, [refreshUserData]),
+  );
 
   const handleBack = () => router.back();
-  const handleEdit = () => router.push('/edit');
+  const handleEdit = () => router.push("/edit");
 
+  // --- 날짜 포맷팅 유틸리티 ---
   const formatDate = (dateString?: string | null) => {
-    if (!dateString) return '';
+    if (!dateString) return "";
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return dateString;
     const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
     return `${year}. ${month}. ${day}`;
   };
 
   const formatBirthString = (raw?: string | null): string => {
-    if (!raw) return '--. --. --';
+    if (!raw) return "--. --. --";
     return formatDate(raw);
   };
 
-  const myName = userData?.myName || '사용자';
-  const myBirth = formatBirthString(userData?.birthday); 
+  const myName = userData?.myName || "사용자";
+  const myBirth = formatBirthString(userData?.birthday);
   const anniversaryDate = formatDate(userData?.anniversary);
 
   return (
@@ -47,32 +54,47 @@ export default function AccountSettingScreen() {
       <View style={styles.content}>
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <AppText type='medium' style={styles.sectionTitle}>마이 프로필</AppText>
+            <AppText type="medium" style={styles.sectionTitle}>
+              마이 프로필
+            </AppText>
           </View>
         </View>
-        
+
         <View style={styles.menuItem}>
-          <AppText type="semibold" style={styles.menuText}>이름</AppText>
-          <AppText type="pretendard-r" style={styles.subText}>{myName}</AppText>
+          <AppText type="semibold" style={styles.menuText}>
+            이름
+          </AppText>
+          <AppText type="pretendard-r" style={styles.subText}>
+            {myName}
+            {Platform.OS === "android" ? "\u200A" : ""}
+          </AppText>
         </View>
 
         <View style={styles.menuItem}>
-          <AppText type="semibold" style={styles.menuText}>생년월일</AppText>
-          <AppText type="regular" style={styles.subText}>{myBirth}</AppText>
+          <AppText type="semibold" style={styles.menuText}>
+            생년월일
+          </AppText>
+          <AppText type="regular" style={styles.subText}>
+            {myBirth}
+          </AppText>
         </View>
 
         <View style={styles.menuItem}>
-          <AppText type="semibold" style={styles.menuText}>기념일</AppText>
-          <AppText type="regular" style={styles.subText}>{anniversaryDate}</AppText>
+          <AppText type="semibold" style={styles.menuText}>
+            기념일
+          </AppText>
+          <AppText type="regular" style={styles.subText}>
+            {anniversaryDate || "--. --. --"}
+          </AppText>
         </View>
       </View>
-
       <View style={[styles.footer, { paddingBottom: 20 + insets.bottom }]}>
         <Pressable style={styles.Button} onPress={handleEdit}>
-          <AppText type="semibold" style={styles.ButtonText}>프로필 변경</AppText>
+          <AppText type="semibold" style={styles.ButtonText}>
+            프로필 변경
+          </AppText>
         </Pressable>
       </View>
-
     </View>
   );
 }
@@ -80,22 +102,22 @@ export default function AccountSettingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF',
+    backgroundColor: "#FFF",
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingVertical: 14,
-    backgroundColor: '#FFF',
+    backgroundColor: "#FFF",
   },
   backButton: {
     padding: 4,
   },
   headerTitle: {
     fontSize: 18,
-    color: '#444444',
+    color: "#444444",
   },
   content: {
     marginTop: 10,
@@ -105,45 +127,45 @@ const styles = StyleSheet.create({
     marginTop: 32,
   },
   sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     borderBottomWidth: 1,
-    borderBottomColor: '#000000',
+    borderBottomColor: "#000000",
     paddingBottom: 8,
     marginBottom: 12,
   },
   sectionTitle: {
     fontSize: 16,
-    color: '#444444',
+    color: "#444444",
   },
   menuItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingVertical: 18,
   },
   menuText: {
     fontSize: 14,
-    color: '#747474',
+    color: "#747474",
   },
   subText: {
     fontSize: 14,
-    color: '#747474',
+    color: "#747474",
   },
   footer: {
-    marginTop: 'auto', 
+    marginTop: "auto",
     paddingHorizontal: 24,
   },
   Button: {
-    backgroundColor: '#6198FF', 
-    borderRadius: 12, 
+    backgroundColor: "#6198FF",
+    borderRadius: 12,
     height: 56,
-    alignItems: 'center', 
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
-  ButtonText: { 
-    color: '#FFF', 
-    fontSize: 16, 
+  ButtonText: {
+    color: "#FFF",
+    fontSize: 16,
   },
 });
