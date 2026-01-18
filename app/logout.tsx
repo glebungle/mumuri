@@ -6,7 +6,8 @@ import { Alert, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AppText from "../components/AppText";
 import { useUser } from "./context/UserContext";
-import { authFetch } from "./utils/apiClient";
+
+const BASE_URL = "https://mumuri.shop";
 
 export default function LogoutScreen() {
   const insets = useSafeAreaInsets();
@@ -21,23 +22,30 @@ export default function LogoutScreen() {
     ]);
   };
 
-  // 로그아웃 로직
   const performLogout = async () => {
     setLoading(true);
-    try {
-      // 1. 서버에 로그아웃 알림
-      try {
-        const refreshToken = await AsyncStorage.getItem("refreshToken");
 
-        await authFetch("/auth/logout", {
+    // 1. 서버에 로그아웃 알림
+    try {
+      const accessToken = await AsyncStorage.getItem("token");
+      const refreshToken = await AsyncStorage.getItem("refreshToken");
+
+      if (accessToken) {
+        await fetch(`${BASE_URL}/auth/logout`, {
           method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
           body: JSON.stringify({ refreshToken: refreshToken || "" }),
         });
-      } catch (e) {
-        console.warn("Server logout skip or failed");
       }
+    } catch (e) {
+      console.log("Server logout failed, proceeding with local cleanup...");
+    }
 
-      // 2. 로컬 저장소 데이터 삭제 (전체 키 정리)
+    // 2. 로컬 저장소 데이터 삭제
+    try {
       const keysToRemove = [
         "token",
         "refreshToken",
@@ -46,25 +54,24 @@ export default function LogoutScreen() {
         "userData",
       ];
       await AsyncStorage.multiRemove(keysToRemove);
+      await AsyncStorage.setItem("isLoggingOut", "true");
 
-      // 3. 전역 상태(Context) 초기화
+      // 3. 전역 상태 초기화
       setUserData(null);
       setTodayMissions([]);
 
-      // 로그아웃 상태임을 기록 (필요 시 유지)
-      await AsyncStorage.setItem("isLoggingOut", "true");
-
-      // 4. 페이지 이동
-      if (router.canDismiss()) {
-        router.dismissAll();
-      }
-      router.replace("/");
-    } catch (error) {
-      console.error("Logout error:", error);
-      Alert.alert("오류", "로그아웃 처리 중 문제가 발생했습니다.");
-    } finally {
-      setLoading(false);
+      console.log("✅ Local data cleared");
+    } catch (e) {
+      console.error("Cleanup error:", e);
     }
+
+    // 4. 무조건 페이지 이동 (최우선 실행)
+    setLoading(false);
+    if (router.canDismiss()) {
+      router.dismissAll();
+    }
+
+    router.replace("/(auth)");
   };
 
   return (
