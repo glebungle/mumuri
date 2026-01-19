@@ -16,13 +16,21 @@ const processQueue = (error: any, token: string | null = null) => {
 };
 
 /**
- * 토큰 갱신 시도
+ * 1. 토큰 갱신 로직 (Atomic)
  */
 async function getNewToken() {
+  if (isRefreshing) {
+    return new Promise((resolve, reject) => {
+      failedQueue.push({ resolve, reject });
+    });
+  }
+
+  isRefreshing = true;
   try {
     const refreshToken = await AsyncStorage.getItem("refreshToken");
     if (!refreshToken) throw new Error("NO_REFRESH_TOKEN");
 
+    console.log("🔄 [apiClient] 토큰 갱신 시도...");
     const res = await fetch(
       `${BASE_URL}/auth/refresh?refreshToken=${encodeURIComponent(refreshToken)}`,
       { method: "POST", headers: { Accept: "*/*" } },
@@ -34,17 +42,20 @@ async function getNewToken() {
         ["token", String(data.accessToken)],
         ["refreshToken", String(data.refreshToken)],
       ]);
+      console.log("✅ [apiClient] 토큰 갱신 성공");
+      processQueue(null, data.accessToken);
       return data.accessToken;
     }
 
-    if (res.status === 401) {
+    // 400~499 사이의 에러는 세션 만료로 간주
+    if (res.status >= 400 && res.status < 500) {
       throw new Error("SESSION_EXPIRED");
     }
-
     throw new Error("SERVER_TEMPORARY_ERROR");
   } catch (e: any) {
-    if (e.message === "SESSION_EXPIRED") {
-      console.error("❌ 리프레시 토큰 만료: 로그아웃 처리");
+    if (e.message === "SESSION_EXPIRED" || e.message === "NO_REFRESH_TOKEN") {
+      processQueue(e, null);
+      console.error("❌ 세션 만료: 데이터 삭제 및 로그아웃");
       await AsyncStorage.multiRemove([
         "token",
         "refreshToken",
@@ -52,17 +63,20 @@ async function getNewToken() {
         "coupleId",
         "roomId",
       ]);
-      Alert.alert("리프레시 토큰 만료");
+      Alert.alert("로그인 세션 만료", "다시 로그인해주세요.");
       router.replace("/(auth)");
     } else {
-      console.warn("⚠️ 일시적 통신 장애: 데이터 보존함", e.message);
+      // 일시적 서버 에러 시 대기열에 에러 전달하여 무한 대기 방지
+      processQueue(e, null);
     }
     return null;
+  } finally {
+    isRefreshing = false;
   }
 }
 
 /**
- * 공통 fetch
+ * 2. 공통 인증 Fetch 함수
  */
 export async function authFetch(url: string, options: any = {}) {
   const fullUrl = url.startsWith("http") ? url : `${BASE_URL}${url}`;
@@ -79,30 +93,27 @@ export async function authFetch(url: string, options: any = {}) {
     return fetch(fullUrl, { ...options, headers });
   };
 
+  // [보강] 앱 재시작 시 토큰이 없으면 즉시 갱신부터 시도 (Proactive)
   let token = await AsyncStorage.getItem("token");
+  if (!token) {
+    const refreshToken = await AsyncStorage.getItem("refreshToken");
+    if (refreshToken) {
+      token = (await getNewToken()) as string;
+    }
+  }
+
+  if (isRefreshing && !token) {
+    token = (await new Promise((resolve, reject) => {
+      failedQueue.push({ resolve, reject });
+    })) as string;
+  }
+
   let res = await execute(token);
 
   if (res.status === 401) {
-    if (isRefreshing) {
-      const newToken = await new Promise((resolve, reject) => {
-        failedQueue.push({ resolve, reject });
-      });
+    const newToken = await getNewToken();
+    if (newToken) {
       return await execute(newToken as string);
-    }
-
-    isRefreshing = true;
-    try {
-      const newToken = await getNewToken();
-      if (newToken) {
-        processQueue(null, newToken);
-        return await execute(newToken);
-      }
-      return res;
-    } catch (e) {
-      processQueue(e, null);
-      return res;
-    } finally {
-      isRefreshing = false;
     }
   }
 
