@@ -47,18 +47,14 @@ async function refreshAccessToken(): Promise<string | null> {
     }
 
     console.log("🔄 [apiClient] 토큰 갱신 요청 중...");
-    const res = await fetch(
-      `${BASE_URL}/auth/refresh?refreshToken=${encodeURIComponent(refreshToken)}`,
-      {
-        method: "POST",
-        headers: {
-          Accept: "*/*",
-          "Content-Type": "application/json",
-        },
+    const res = await fetch(`${BASE_URL}/auth/refresh`, {
+      method: "POST",
+      headers: {
+        Accept: "*/*",
+        "Content-Type": "application/json",
       },
-    );
-
-    console.log(`📡 [apiClient] 리프레시 응답: ${res.status}`);
+      body: JSON.stringify({ refreshToken }),
+    });
 
     if (!res.ok) {
       const errorText = await res.text().catch(() => "");
@@ -66,20 +62,13 @@ async function refreshAccessToken(): Promise<string | null> {
         `❌ [apiClient] 리프레시 실패: ${res.status} - ${errorText}`,
       );
 
-      // 리프레시 토큰도 만료
       if (res.status === 401 || res.status === 403) {
         throw new Error("REFRESH_TOKEN_EXPIRED");
       }
-
-      // 서버 에러 (500번대)
       throw new Error(`SERVER_ERROR: ${res.status}`);
     }
 
     const data = await res.json();
-    console.log("📦 [apiClient] 리프레시 응답 데이터:", {
-      hasAccessToken: !!data.accessToken,
-      hasRefreshToken: !!data.refreshToken,
-    });
 
     if (!data.accessToken || !data.refreshToken) {
       console.error("❌ [apiClient] 응답에 토큰 없음:", data);
@@ -98,7 +87,6 @@ async function refreshAccessToken(): Promise<string | null> {
   } catch (error: any) {
     console.error("💥 [apiClient] 토큰 갱신 에러:", error.message);
 
-    // 리프레시 토큰까지 만료된 경우에만 로그아웃
     if (
       error.message === "REFRESH_TOKEN_EXPIRED" ||
       error.message === "NO_REFRESH_TOKEN"
@@ -121,7 +109,7 @@ async function refreshAccessToken(): Promise<string | null> {
  * 로그아웃 처리
  */
 async function handleLogout() {
-  console.log("🔐 [apiClient] 로그아웃 처리 시작");
+  console.log("[apiClient] 로그아웃 처리");
 
   await AsyncStorage.multiRemove([
     "token",
@@ -163,43 +151,32 @@ export async function authFetch(
       "Cache-Control": "no-cache",
       Pragma: "no-cache",
     };
-
-    if (!(options.body instanceof FormData)) {
+    if (!(options.body instanceof FormData))
       headers["Content-Type"] = "application/json";
-    }
+    if (token) headers["Authorization"] = `Bearer ${token}`;
 
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
-
-    console.log(`📤 [authFetch] ${url} (token: ${token ? "있음" : "없음"})`);
     return fetch(fullUrl, { ...options, headers });
   };
 
-  // 현재 저장된 토큰 가져오기
   let token = await AsyncStorage.getItem("token");
-
-  // 첫 번째 요청 시도
   let response = await executeRequest(token);
-  console.log(`📥 [authFetch] ${url} 응답: ${response.status}`);
 
-  // 401 에러 = 액세스 토큰 만료
-  if (response.status === 401) {
-    console.log(`🔓 [authFetch] ${url} 401 에러 - 토큰 갱신 시도`);
+  if (response.status === 401 || response.status === 403) {
+    console.log(
+      `🔓 [authFetch] ${url} ${response.status} 에러 - 세션 복구 시도`,
+    );
 
     try {
-      // 토큰 갱신 시도
       const newToken = await refreshAccessToken();
 
       if (newToken) {
-        console.log(`🔁 [authFetch] ${url} 갱신된 토큰으로 재시도`);
+        console.log(`🔁 [authFetch] ${url} 갱신 성공 - 재시도 실행`);
         response = await executeRequest(newToken);
-        console.log(`📥 [authFetch] ${url} 재시도 응답: ${response.status}`);
       } else {
-        console.log(`❌ [authFetch] ${url} 토큰 갱신 실패 - 로그인 필요`);
+        console.log(`❌ [authFetch] ${url} 세션 복구 불가`);
       }
     } catch (error: any) {
-      console.error(`💥 [authFetch] ${url} 토큰 갱신 중 에러:`, error.message);
+      console.error(`💥 [authFetch] ${url} 복구 중 에러:`, error.message);
     }
   }
 

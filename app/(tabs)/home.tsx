@@ -2,12 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { format, parseISO } from "date-fns";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
-import React, {
-  useCallback,
-  useMemo,
-  useRef,
-  useState
-} from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -62,7 +57,7 @@ const AlertModal = ({
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const { userData, todayMissions, refreshUserData } = useUser();
+  const { userData, todayMissions, refreshUserData, isRefreshing } = useUser();
 
   const [loading, setLoading] = useState(!userData);
   const [modalVisible, setModalVisible] = useState(false);
@@ -91,26 +86,33 @@ export default function HomeScreen() {
     ? `${format(parseISO(mainPhoto.createdAt), "yyyy. MM. dd.")}`
     : "";
 
-  // 화면 포커스 시 데이터 새로고침
   useFocusEffect(
     useCallback(() => {
       let isActive = true;
+
       const load = async () => {
+        if (isRefreshing) {
+          console.log("⏭️ [HomeScreen] 이미 새로고침 중 - 스킵");
+          return;
+        }
+
         try {
           if (!userData) setLoading(true);
           await refreshUserData();
           console.log("✅ [HomeScreen] 데이터 동기화 성공");
         } catch (error) {
-          console.error("Home Data Refresh Fail:", error);
+          console.error("❌ [HomeScreen] 데이터 새로고침 실패:", error);
         } finally {
           if (isActive) setLoading(false);
         }
       };
+
       load();
+
       return () => {
         isActive = false;
       };
-    }, [refreshUserData]),
+    }, []),
   );
 
   const showModal = (msg: string) => {
@@ -308,11 +310,14 @@ export default function HomeScreen() {
       <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
         {activeTab === 0 ? (
           <View style={{ flex: 1 }}>
+            {/* ✅ 배경 이미지 깜빡임 방지 */}
             <View style={styles.backgroundLayer}>
               <ImageBackground
+                key={mainPhoto?.imageUrl || "default"} // key 추가로 같은 이미지면 재렌더링 안함
                 source={backgroundSource}
                 style={styles.backgroundImage}
                 resizeMode="cover"
+                fadeDuration={0} // 페이드 애니메이션 제거
               >
                 <View style={styles.dimOverlay} />
                 <LinearGradient
