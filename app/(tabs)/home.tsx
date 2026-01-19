@@ -92,16 +92,13 @@ export default function HomeScreen() {
 
       const load = async () => {
         if (isRefreshing) {
-          console.log("⏭️ [HomeScreen] 이미 새로고침 중 - 스킵");
           return;
         }
 
         try {
           if (!userData) setLoading(true);
           await refreshUserData();
-          console.log("✅ [HomeScreen] 데이터 동기화 성공");
         } catch (error) {
-          console.error("❌ [HomeScreen] 데이터 새로고침 실패:", error);
         } finally {
           if (isActive) setLoading(false);
         }

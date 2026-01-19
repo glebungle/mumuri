@@ -79,8 +79,6 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     setIsRefreshing(true);
-    console.log("📡 [UserContext] 데이터 새로고침 시작");
-
     try {
       // 1단계: 기본 정보 로드
       const homeRes = await authFetch("/home/main");
@@ -149,13 +147,10 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
         setUserData(mergedData);
         setTodayMissions(Array.isArray(missionResponse) ? missionResponse : []);
-        console.log("✅ [UserContext] 동기화 완료: date =", mergedData.date);
       } else {
         console.warn("[UserContext] 사용자 ID 추출 실패");
       }
     } catch (error: any) {
-      console.error("❌ [UserContext] 에러:", error.message);
-
       // 인증 실패 시 데이터 초기화
       if (error.message === "AUTHENTICATION_FAILED") {
         setUserData(null);

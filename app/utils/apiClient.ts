@@ -13,9 +13,6 @@ let failedQueue: Array<{
 }> = [];
 
 const processQueue = (error: any, token: string | null = null) => {
-  console.log(
-    `🔔 [apiClient] 대기열 처리: ${failedQueue.length}개 요청, error=${!!error}`,
-  );
   failedQueue.forEach((prom) => {
     if (error) prom.reject(error);
     else prom.resolve(token!);
@@ -31,7 +28,6 @@ const processQueue = (error: any, token: string | null = null) => {
 async function refreshAccessToken(): Promise<string | null> {
   // 이미 갱신 중이면 대기열에 추가
   if (isRefreshing) {
-    console.log("⏳ [apiClient] 토큰 갱신 대기 중... (대기열 추가)");
     return new Promise((resolve, reject) => {
       failedQueue.push({ resolve, reject });
     });
@@ -46,7 +42,6 @@ async function refreshAccessToken(): Promise<string | null> {
       throw new Error("NO_REFRESH_TOKEN");
     }
 
-    console.log("🔄 [apiClient] 토큰 갱신 요청 중...");
     const res = await fetch(`${BASE_URL}/auth/refresh`, {
       method: "POST",
       headers: {
@@ -58,9 +53,6 @@ async function refreshAccessToken(): Promise<string | null> {
 
     if (!res.ok) {
       const errorText = await res.text().catch(() => "");
-      console.error(
-        `❌ [apiClient] 리프레시 실패: ${res.status} - ${errorText}`,
-      );
 
       if (res.status === 401 || res.status === 403) {
         throw new Error("REFRESH_TOKEN_EXPIRED");
@@ -71,7 +63,6 @@ async function refreshAccessToken(): Promise<string | null> {
     const data = await res.json();
 
     if (!data.accessToken || !data.refreshToken) {
-      console.error("❌ [apiClient] 응답에 토큰 없음:", data);
       throw new Error("INVALID_RESPONSE");
     }
 
@@ -81,23 +72,18 @@ async function refreshAccessToken(): Promise<string | null> {
       ["refreshToken", data.refreshToken],
     ]);
 
-    console.log("✅ [apiClient] 토큰 갱신 성공 및 저장 완료");
     processQueue(null, data.accessToken);
     return data.accessToken;
   } catch (error: any) {
-    console.error("💥 [apiClient] 토큰 갱신 에러:", error.message);
-
     if (
       error.message === "REFRESH_TOKEN_EXPIRED" ||
       error.message === "NO_REFRESH_TOKEN"
     ) {
-      console.log("🚪 [apiClient] 리프레시 토큰 만료 - 로그아웃 처리");
       await handleLogout();
       processQueue(error, null);
       return null;
     }
 
-    console.warn("⚠️ [apiClient] 일시적 에러 - 대기열 전달");
     processQueue(error, null);
     throw error;
   } finally {
@@ -162,22 +148,14 @@ export async function authFetch(
   let response = await executeRequest(token);
 
   if (response.status === 401 || response.status === 403) {
-    console.log(
-      `🔓 [authFetch] ${url} ${response.status} 에러 - 세션 복구 시도`,
-    );
-
     try {
       const newToken = await refreshAccessToken();
 
       if (newToken) {
-        console.log(`🔁 [authFetch] ${url} 갱신 성공 - 재시도 실행`);
         response = await executeRequest(newToken);
       } else {
-        console.log(`❌ [authFetch] ${url} 세션 복구 불가`);
       }
-    } catch (error: any) {
-      console.error(`💥 [authFetch] ${url} 복구 중 에러:`, error.message);
-    }
+    } catch (error: any) {}
   }
 
   return response;
@@ -191,11 +169,6 @@ export async function validateTokenOnStartup(): Promise<boolean> {
     const token = await AsyncStorage.getItem("token");
     const refreshToken = await AsyncStorage.getItem("refreshToken");
 
-    console.log("[Startup] 토큰 상태:", {
-      hasToken: !!token,
-      hasRefreshToken: !!refreshToken,
-    });
-
     // 둘 다 없으면 로그인 필요
     if (!token && !refreshToken) {
       return false;
@@ -203,14 +176,12 @@ export async function validateTokenOnStartup(): Promise<boolean> {
 
     // 액세스 토큰만 없으면 리프레시 시도
     if (!token && refreshToken) {
-      console.log("🔄 [Startup] 액세스 토큰 없음 - 리프레시 시도");
       const newToken = await refreshAccessToken();
       return !!newToken;
     }
 
     return true;
   } catch (error) {
-    console.error("❌ [Startup] 토큰 검증 에러:", error);
     return false;
   }
 }
