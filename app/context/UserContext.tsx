@@ -71,7 +71,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
   const refreshUserData = useCallback(async () => {
     try {
-      console.log("[UserContext] 데이터 새로고침 시작");
+      console.log("📡 [UserContext] 데이터 새로고침 시작");
 
       const [homeRes, userRes, myPageRes] = await Promise.all([
         authFetch("/home/main"),
@@ -79,15 +79,24 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
         authFetch("/api/mypage"),
       ]);
 
-      const homeResponse = homeRes.ok ? await homeRes.json() : null;
-      const userInfo = userRes.ok ? await userRes.json() : null;
-      const myPageResponse = myPageRes.ok ? await myPageRes.json() : null;
+      if (!homeRes.ok || !userRes.ok || !myPageRes.ok) {
+        console.warn("[UserContext] 일부 필수 API 호출 실패 - 데이터 보존");
+        return;
+      }
+
+      const homeResponse = await homeRes.json();
+      const userInfo = await userRes.json();
+      const myPageResponse = await myPageRes.json();
 
       let missionResponse: TodayMission[] = [];
       if (homeResponse?.coupleId > 0) {
-        const tRes = await authFetch("/api/couples/missions/today");
-        if (tRes.ok) {
-          missionResponse = await tRes.json();
+        try {
+          const tRes = await authFetch("/api/couples/missions/today");
+          if (tRes.ok) {
+            missionResponse = await tRes.json();
+          }
+        } catch (missionErr) {
+          console.warn("오늘의 미션 로드 실패(선택적 에러):", missionErr);
         }
       }
 
@@ -99,31 +108,32 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
           userInfo.userId ?? userInfo.id ?? userInfo.memberId ?? null;
       }
 
-      if (extractedUserId !== null) {
+      if (extractedUserId !== null && homeResponse) {
         const myPageData = myPageResponse as MyPageResponse | null;
 
         const mergedData: HomeData = {
-          anniversary: homeResponse?.anniversary || null,
-          date: homeResponse?.dDay || 0,
-          roomId: homeResponse?.roomId || 0,
-          coupleId: homeResponse?.coupleId || 0,
+          anniversary: homeResponse.anniversary || null,
+          date: homeResponse.dDay || 0,
+          roomId: homeResponse.roomId || 0,
+          coupleId: homeResponse.coupleId || 0,
           userId: extractedUserId,
-          missionCompletedCount: homeResponse?.missionCompletedCount || 0,
-          mainPhoto: homeResponse?.mainPhoto || null,
-          myProfileImageUrl: homeResponse?.myProfileImageUrl || null,
-          partnerProfileImageUrl: homeResponse?.partnerProfileImageUrl || null,
-          myName: homeResponse?.myName || myPageData?.name || null,
-          partnerName: homeResponse?.partnerName || "애인",
+          missionCompletedCount: homeResponse.missionCompletedCount || 0,
+          mainPhoto: homeResponse.mainPhoto || null,
+          myProfileImageUrl: homeResponse.myProfileImageUrl || null,
+          partnerProfileImageUrl: homeResponse.partnerProfileImageUrl || null,
+          myName: homeResponse.myName || myPageData?.name || "사용자",
+          partnerName: homeResponse.partnerName || "애인",
           birthday: myPageData?.birthday || null,
           partnerBirthday: myPageData?.birthdayCouple || null,
         };
-        setUserData(mergedData);
-      }
 
-      setTodayMissions(Array.isArray(missionResponse) ? missionResponse : []);
-      console.log("✅ [UserContext] 데이터 갱신 완료");
+        //업데이트
+        setUserData(mergedData);
+        setTodayMissions(Array.isArray(missionResponse) ? missionResponse : []);
+        console.log("✅ [UserContext] 모든 데이터 동기화 완료");
+      }
     } catch (e) {
-      console.warn("❌ [UserContext] 새로고침 에러:", e);
+      console.error("❌ [UserContext] 치명적 에러 발생:", e);
     }
   }, []);
 

@@ -146,7 +146,7 @@ export default function KakaoLoginButton() {
 }
 
 const styles = StyleSheet.create({
-  buttonImage: { height: 55, width: 330, resizeMode: "contain" },
+  buttonImage: { height: 55, width: 335, resizeMode: "contain" },
   webViewContainer: { flex: 1, backgroundColor: "white" },
   webViewHeader: {
     height: 50,
