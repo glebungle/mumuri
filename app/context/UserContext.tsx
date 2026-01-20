@@ -1,7 +1,13 @@
-import React, { createContext, useCallback, useContext, useState } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useRef,
+  useState,
+} from "react";
 import { authFetch } from "../utils/apiClient";
 
-// --- 타입 정의 ---
+// --- [1] 타입 정의 ---
 export interface MainPhoto {
   photoId: number;
   imageUrl: string;
@@ -67,59 +73,53 @@ const UserContext = createContext<UserContextType>({
 
 export const useUser = () => useContext(UserContext);
 
+// --- [2] Provider 구현 ---
 export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const [userData, setUserData] = useState<HomeData | null>(null);
   const [todayMissions, setTodayMissions] = useState<TodayMission[]>([]);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const refreshingRef = useRef(false);
+  const [isRefreshingState, setIsRefreshingState] = useState(false);
 
   const refreshUserData = useCallback(async () => {
-    if (isRefreshing) {
-      console.log("[UserContext] 이미 새로고침 중...");
+    // 1. 중복 호출 락(Lock)
+    if (refreshingRef.current) {
+      console.log("[UserContext] 이미 데이터를 가져오는 중입니다.");
       return;
     }
 
-    setIsRefreshing(true);
+    refreshingRef.current = true;
+    setIsRefreshingState(true);
+
     try {
-      // 1단계: 기본 정보 로드
-      const homeRes = await authFetch("/home/main");
+      console.log("📡 [UserContext] 데이터 새로고침 시작");
 
-      if (!homeRes.ok) {
-        console.warn("[UserContext] /home/main 실패:", homeRes.status);
-        if (homeRes.status === 401) {
-          throw new Error("AUTHENTICATION_FAILED");
-        }
-        return;
-      }
-
-      const homeResponse = await homeRes.json();
-
-      // 2단계: 사용자 정보 로드
-      const [userRes, myPageRes] = await Promise.all([
+      // 2. 필수 데이터 호출
+      const [homeRes, userRes, myPageRes] = await Promise.all([
+        authFetch("/home/main"),
         authFetch("/user/getuser"),
         authFetch("/api/mypage"),
       ]);
 
-      if (!userRes.ok || !myPageRes.ok) {
-        console.warn("[UserContext] 사용자 정보 로드 실패");
+      if (!homeRes.ok || !userRes.ok || !myPageRes.ok) {
+        console.warn("[UserContext] 필수 API 로드 실패 (상태 유지)");
+        return;
       }
 
-      const userInfo = userRes.ok ? await userRes.json() : null;
-      const myPageResponse = myPageRes.ok ? await myPageRes.json() : null;
+      const homeResponse = await homeRes.json();
+      const userInfo = await userRes.json();
+      const myPageResponse = await myPageRes.json();
 
-      // 3단계: 미션 정보 로드 (coupleId가 있을 때만)
+      // 3. 미션 정보 로드
       let missionResponse: TodayMission[] = [];
       if (homeResponse?.coupleId > 0) {
-        try {
-          const tRes = await authFetch("/api/couples/missions/today");
-          if (tRes.ok) {
-            missionResponse = await tRes.json();
-          }
-        } catch (error) {
-          console.warn("[UserContext] 미션 정보 로드 실패:", error);
+        const tRes = await authFetch("/api/couples/missions/today");
+        if (tRes.ok) {
+          missionResponse = await tRes.json();
         }
       }
 
-      // 4단계: 데이터 병합
+      // 4. 데이터 조립
       let extractedUserId: number | null = null;
       if (typeof userInfo === "number") {
         extractedUserId = userInfo;
@@ -129,6 +129,8 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       if (extractedUserId !== null && homeResponse) {
+        const myPageData = myPageResponse as MyPageResponse | null;
+
         const mergedData: HomeData = {
           anniversary: homeResponse.anniversary || null,
           date: homeResponse.dDay ?? 1,
@@ -139,27 +141,23 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
           mainPhoto: homeResponse.mainPhoto || null,
           myProfileImageUrl: homeResponse.myProfileImageUrl || null,
           partnerProfileImageUrl: homeResponse.partnerProfileImageUrl || null,
-          myName: homeResponse.myName || myPageResponse?.name || "사용자",
+          myName: homeResponse.myName || myPageData?.name || "사용자",
           partnerName: homeResponse.partnerName || "애인",
-          birthday: myPageResponse?.birthday || null,
-          partnerBirthday: myPageResponse?.birthdayCouple || null,
+          birthday: myPageData?.birthday || null,
+          partnerBirthday: myPageData?.birthdayCouple || null,
         };
 
         setUserData(mergedData);
         setTodayMissions(Array.isArray(missionResponse) ? missionResponse : []);
-      } else {
-        console.warn("[UserContext] 사용자 ID 추출 실패");
+        console.log("✅ [UserContext] 데이터 업데이트 완료");
       }
-    } catch (error: any) {
-      // 인증 실패 시 데이터 초기화
-      if (error.message === "AUTHENTICATION_FAILED") {
-        setUserData(null);
-        setTodayMissions([]);
-      }
+    } catch (e: any) {
+      console.error("❌ [UserContext] 새로고침 중 오류 발생:", e.message);
     } finally {
-      setIsRefreshing(false);
+      refreshingRef.current = false;
+      setIsRefreshingState(false);
     }
-  }, [isRefreshing]);
+  }, []);
 
   return (
     <UserContext.Provider
@@ -169,7 +167,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
         setUserData,
         setTodayMissions,
         refreshUserData,
-        isRefreshing,
+        isRefreshing: isRefreshingState,
       }}
     >
       {children}

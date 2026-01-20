@@ -307,14 +307,13 @@ export default function HomeScreen() {
       <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
         {activeTab === 0 ? (
           <View style={{ flex: 1 }}>
-            {/* ✅ 배경 이미지 깜빡임 방지 */}
             <View style={styles.backgroundLayer}>
               <ImageBackground
-                key={mainPhoto?.imageUrl || "default"} // key 추가로 같은 이미지면 재렌더링 안함
+                key={mainPhoto?.imageUrl || "default"}
                 source={backgroundSource}
                 style={styles.backgroundImage}
                 resizeMode="cover"
-                fadeDuration={0} // 페이드 애니메이션 제거
+                fadeDuration={0}
               >
                 <View style={styles.dimOverlay} />
                 <LinearGradient

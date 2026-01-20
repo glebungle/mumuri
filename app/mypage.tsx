@@ -18,7 +18,7 @@ import { useUser } from "./context/UserContext";
 
 const profileImg = require("../assets/images/userprofile.png");
 const settingsImg = require("../assets/images/Settings.png");
-const heartImg = require("../../assets/images/Heart.png");
+const heartImg = require("../assets/images/Heart.png");
 const reportImg = require("../assets/images/report.png");
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
