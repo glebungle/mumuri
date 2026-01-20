@@ -23,7 +23,7 @@ const reportImg = require("../assets/images/report.png");
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
-// --- 날짜 포맷팅 함수---
+// --- 날짜 포맷팅 함수 ---
 const formatDate = (dateString?: string | null) => {
   if (!dateString) return "";
   const date = new Date(dateString);
@@ -42,9 +42,11 @@ const formatBirthString = (raw?: string | null): string => {
 export default function MyPage() {
   const { userData, refreshUserData } = useUser();
 
-  const displayProfileImage = userData?.myProfileImageUrl
-    ? { uri: userData.myProfileImageUrl }
-    : profileImg;
+  const displayProfileImage = useMemo(() => {
+    return userData?.myProfileImageUrl
+      ? { uri: userData.myProfileImageUrl }
+      : profileImg;
+  }, [userData?.myProfileImageUrl]);
 
   useFocusEffect(
     useCallback(() => {
@@ -186,7 +188,7 @@ export default function MyPage() {
                   {anniversaryDate || "---. --. --"}
                 </AppText>
                 <AppText type="pretendard-m" style={styles.bigNumberText}>
-                  {dDayCount > 0 ? `${dDayCount - 1}일째` : "D-Day"}
+                  {dDayCount > 0 ? `${dDayCount}일째` : "D-Day"}
                 </AppText>
                 <AppText type="pretendard-m" style={styles.subLabelText}>
                   기념일
