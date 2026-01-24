@@ -79,7 +79,7 @@ function normalizeMission(raw: any): Photo | null {
   };
 }
 
-// 날짜 컴포넌트 ---
+// --- 날짜 컴포넌트  ---
 const MemoizedDay = React.memo(
   ({
     date,
@@ -214,7 +214,7 @@ const MemoizedDay = React.memo(
     p.isHoliday === n.isHoliday,
 );
 
-// --- 일정 추가 모달 ---
+// --- 모달 컴포넌트 ---
 const AddScheduleModal = ({ visible, onClose, onSave, selectedDate }: any) => {
   const insets = useSafeAreaInsets();
   const [title, setTitle] = useState("");
@@ -442,7 +442,6 @@ const AddScheduleModal = ({ visible, onClose, onSave, selectedDate }: any) => {
   );
 };
 
-// --- 메인 캘린더 스크린 ---
 export default function CalendarScreen() {
   const insets = useSafeAreaInsets();
   const { userData, refreshUserData } = useUser();
@@ -454,7 +453,7 @@ export default function CalendarScreen() {
   const [calendarMode, setCalendarMode] = useState<CalendarMode>("MISSION");
   const [photosByDate, setPhotosByDate] = useState<PhotosByDate>({});
   const [schedulesByDate, setSchedulesByDate] = useState<SchedulesByDate>({});
-  const [holidays, setHolidays] = useState<Set<string>>(new Set()); // [추가]
+  const [holidays, setHolidays] = useState<Set<string>>(new Set()); // 공휴일 상태 추가
   const [currentMonth, setCurrentMonth] = useState<string>(
     format(new Date(), "yyyy-MM-01"),
   );
@@ -466,7 +465,6 @@ export default function CalendarScreen() {
   const [addModalVisible, setAddModalVisible] = useState(false);
   const modeAnim = useRef(new Animated.Value(0)).current;
 
-  // 애니메이션 인터폴레이션
   const bgColor = modeAnim.interpolate({
     inputRange: [0, 1],
     outputRange: ["#FFFCF5", "#1C1C1E"],
@@ -484,7 +482,7 @@ export default function CalendarScreen() {
     outputRange: ["#999999", "#999999"],
   });
 
-  // [추가] 공휴일 API 호출
+  // --- 공휴일 가져오기 ---
   const fetchHolidays = useCallback(async () => {
     try {
       const res = await fetch(HOLIDAY_API_URL);
@@ -493,7 +491,7 @@ export default function CalendarScreen() {
         setHolidays(new Set(Object.keys(data)));
       }
     } catch (e) {
-      console.warn("공휴일 데이터 로드 실패:", e);
+      console.warn("공휴일 로드 실패");
     }
   }, []);
 
@@ -598,23 +596,17 @@ export default function CalendarScreen() {
           refreshUserData(),
           fetchMissions(currentMonth),
           fetchSchedules(currentMonth),
-          fetchHolidays(), // [추가]
+          fetchHolidays(),
         ]);
         setLoading(false);
       })();
-    }, [
-      currentMonth,
-      fetchHolidays,
-      fetchMissions,
-      fetchSchedules,
-      refreshUserData,
-    ]),
+    }, []),
   );
 
   useEffect(() => {
     fetchMissions(currentMonth);
     fetchSchedules(currentMonth);
-  }, [currentMonth, fetchMissions, fetchSchedules]);
+  }, [currentMonth]);
 
   useEffect(() => {
     if (calendarMode === "MISSION")
@@ -644,7 +636,6 @@ export default function CalendarScreen() {
         { backgroundColor: bgColor, paddingTop: insets.top },
       ]}
     >
-      {/* 헤더 */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Pressable onPress={() => router.back()} style={styles.backBtn}>
@@ -687,7 +678,6 @@ export default function CalendarScreen() {
         </Pressable>
       </View>
 
-      {/* 월 네비게이션 */}
       <View style={styles.monthNavRow}>
         <View style={styles.monthNavControls}>
           <Pressable
@@ -803,7 +793,7 @@ export default function CalendarScreen() {
               photos={date ? photosByDate[date.dateString] : []}
               schedules={date ? schedulesByDate[date.dateString] : []}
               isSelected={date?.dateString === selectedDate}
-              isHoliday={date ? holidays.has(date.dateString) : false} // [추가]
+              isHoliday={date ? holidays.has(date.dateString) : false}
               onPress={(d: any) => setSelectedDate(d.dateString)}
               mode={calendarMode}
               textColor={headerTextColor}
@@ -979,7 +969,6 @@ export default function CalendarScreen() {
   );
 }
 
-// --- 스타일 정의 ---
 const styles = StyleSheet.create({
   container: { flex: 1 },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
@@ -1022,7 +1011,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   dayCellSelectedSchedule: { backgroundColor: "#fff", borderRadius: 10 },
-  dayTextDisabled: { color: "#c6c6c6" },
+  dayTextDisabled: { color: "#bfbfbf" },
   dayTextSunday: { color: "#FF3B30" },
   dayTextSelected: { color: "#6198FF" },
   photoCell: {
