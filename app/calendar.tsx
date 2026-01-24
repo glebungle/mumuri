@@ -1003,7 +1003,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   dayCellSelectedSchedule: { backgroundColor: "#fff", borderRadius: 10 },
-  dayTextDisabled: { color: "#555" },
+  dayTextDisabled: { color: "#c6c6c6" },
   dayTextSunday: { color: "#FF3B30" },
   dayTextSelected: { color: "#6198FF" },
   photoCell: {
