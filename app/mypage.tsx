@@ -188,7 +188,7 @@ export default function MyPage() {
                 </AppText>
                 <AppText type="pretendard-m" style={styles.bigNumberText}>
                   {userData?.coupleId && userData.coupleId > 0
-                    ? `${dDayCount - 1}일째`
+                    ? `${dDayCount}일째`
                     : "D-Day"}
                 </AppText>
                 <AppText type="pretendard-m" style={styles.subLabelText}>

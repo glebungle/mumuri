@@ -444,7 +444,7 @@ export default function CameraHome() {
               </Pressable>
               <View style={styles.ddayBadge}>
                 <Image source={heartImg} style={styles.heartImage} />
-                <AppText style={styles.ddayText}>{dday - 1}</AppText>
+                <AppText style={styles.ddayText}>{dday}</AppText>
               </View>
               <Pressable
                 style={[

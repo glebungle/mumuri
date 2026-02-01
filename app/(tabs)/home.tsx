@@ -290,7 +290,7 @@ export default function HomeScreen() {
             <View style={styles.dDayBadge}>
               <Image source={heartImg} style={styles.heartImage} />
               <AppText type="bold" style={[styles.dDayText, { color: "#FFF" }]}>
-                {isCoupled ? `${dDay - 1}일째` : "연결 대기중"}
+                {isCoupled ? `${dDay}일째` : "연결 대기중"}
               </AppText>
             </View>
             {isCoupled && (
