@@ -10,6 +10,7 @@ import {
   Dimensions,
   Image,
   LayoutChangeEvent,
+  PanResponder,
   Platform,
   Pressable,
   StyleSheet,
@@ -83,6 +84,46 @@ export default function CameraHome() {
   const [sel, setSel] = useState(0);
   const [isLoadingMissions, setIsLoadingMissions] = useState(true);
 
+  // --- 줌 ---
+  const [zoom, setZoom] = useState(0);
+  const prevDistance = useRef<number | null>(null);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+
+      onMoveShouldSetPanResponder: (evt) => {
+        const { touches } = evt.nativeEvent;
+        return touches.length === 2;
+      },
+
+      onPanResponderMove: (evt) => {
+        const touches = evt.nativeEvent.touches;
+        if (touches.length === 2) {
+          const dist = Math.sqrt(
+            Math.pow(touches[0].pageX - touches[1].pageX, 2) +
+              Math.pow(touches[0].pageY - touches[1].pageY, 2),
+          );
+
+          if (prevDistance.current !== null) {
+            const delta = dist - prevDistance.current;
+            setZoom((prev) => {
+              const nextZoom = prev + delta * 0.002;
+              return Math.min(Math.max(nextZoom, 0), 1);
+            });
+          }
+          prevDistance.current = dist;
+        }
+      },
+      onPanResponderRelease: () => {
+        prevDistance.current = null;
+      },
+      // 안드로이드에서 다른 뷰가 터치를 가져가려 할 때의 처리
+      onPanResponderTerminationRequest: () => true,
+    }),
+  ).current;
+  // ------------------------------------
+
   const nextMission = useCallback(() => {
     if (!missions.length) return;
     setSel((i) => (i + 1) % missions.length);
@@ -111,27 +152,22 @@ export default function CameraHome() {
     }, [refreshUserData]),
   );
 
-  // 오늘의 미션 로드
   useEffect(() => {
     const fetchTodayMission = async () => {
       setIsLoadingMissions(true);
       try {
         const res = await authFetch("/api/couples/missions/today");
-
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = await res.json();
-
         let missionsData: TodayMission[] = [];
         if (Array.isArray(json)) {
           missionsData = json as TodayMission[];
         } else if (json && Array.isArray((json as any).missions)) {
           missionsData = (json as any).missions;
         }
-
         const pendingMissions = missionsData.filter(
           (mission) => !mission.myDone,
         );
-
         if (pendingMissions.length > 0) {
           setMissions(pendingMissions);
           setSel(0);
@@ -210,6 +246,7 @@ export default function CameraHome() {
         quality: 0.8,
         skipProcessing: false,
         exif: true,
+        shutterSound: false,
       });
       if (!pic?.uri) {
         Alert.alert("촬영 실패");
@@ -292,6 +329,7 @@ export default function CameraHome() {
   const retake = () => {
     setPreviewUri(null);
     setLayoutPhotos([]);
+    setZoom(0);
   };
 
   const confirm = async () => {
@@ -322,7 +360,11 @@ export default function CameraHome() {
   return (
     <View style={styles.fullScreenContainer}>
       <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
-        <View style={styles.cameraFrame} onLayout={onCameraWrapLayout}>
+        <View
+          style={styles.cameraFrame}
+          onLayout={onCameraWrapLayout}
+          {...panResponder.panHandlers}
+        >
           <View
             style={[StyleSheet.absoluteFill, { backgroundColor: "#000" }]}
           />
@@ -332,6 +374,7 @@ export default function CameraHome() {
               ref={cameraRef}
               style={getCameraTransformStyle()}
               facing={facing}
+              zoom={zoom}
               onCameraReady={() => setIsReady(true)}
             />
           )}
