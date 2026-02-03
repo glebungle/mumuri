@@ -105,6 +105,7 @@ type ChatMessage = {
   status?: SendStatus;
   clientMsgId?: string | null;
   isFirstInGroup?: boolean;
+  missionHistoryId?: number; // ✅ 추가
 };
 type DateMarker = { __type: "date"; key: string; ts: number };
 
@@ -163,6 +164,9 @@ export default function ChatScreen() {
 
   const onIncoming = useCallback(
     (p: ChatIncoming) => {
+      // ✅ 로그 1: 소켓 수신 데이터 확인
+      console.log("⚡ [Socket Incoming]:", JSON.stringify(p, null, 2));
+
       setMessages((prev) => {
         if (p.id != null && prev.some((x) => String(x.id) === String(p.id)))
           return prev;
@@ -171,6 +175,7 @@ export default function ChatScreen() {
           nextMessages = nextMessages.filter(
             (m) => m.clientMsgId !== p.clientMsgId,
           );
+
         const add: ChatMessage = {
           id: String(p.id ?? Date.now()),
           text: p.message ?? undefined,
@@ -184,6 +189,7 @@ export default function ChatScreen() {
                 ? "image"
                 : "text",
           status: "sent",
+          missionHistoryId: (p as any).missionHistoryId,
         };
         return [...nextMessages, add].sort((a, b) => a.createdAt - b.createdAt);
       });
@@ -200,38 +206,51 @@ export default function ChatScreen() {
       const init = async () => {
         setLoading(true);
         try {
-          // 1. 채팅 내역 불러오기
           const res = await authFetch(`/chat/${ROOM_KEY}/history?size=50`);
           if (!res.ok) throw new Error(`History Error: ${res.status}`);
 
           const historyData = await res.json();
+          // ✅ 로그 2: 히스토리 API 응답 원시 데이터 확인
+          console.log(
+            "📂 [History Raw Response]:",
+            JSON.stringify(historyData, null, 2),
+          );
+
           const rows = Array.isArray(historyData)
             ? historyData
             : historyData?.messages || [];
 
-          const historyMsgs = rows.map((r: any) => ({
-            id: String(r.id),
-            text: r.message,
-            imageUrl: r.imageUrl,
-            mine: String(r.senderId) === String(userId ?? ""),
-            createdAt: parseTSLocalOrISO(r.sentAt || r.createdAt) || Date.now(),
-            type:
-              r.type === "MISSION_TEXT"
-                ? "mission_text"
-                : r.imageUrl
-                  ? "image"
+          const historyMsgs = rows.map((r: any) => {
+            // ✅ 로그 3: 이미지 메시지 매핑 전 상태 확인
+            if (r.imageUrl) {
+              console.log(
+                `📸 [History Item ID: ${r.id}] Msg: "${r.message}", MissionHistoryID: ${r.missionHistoryId}`,
+              );
+            }
+
+            return {
+              id: String(r.id),
+              text: r.message,
+              imageUrl: r.imageUrl,
+              mine: String(r.senderId) === String(userId ?? ""),
+              createdAt:
+                parseTSLocalOrISO(r.sentAt || r.createdAt) || Date.now(),
+              type: r.imageUrl
+                ? "image"
+                : r.type === "MISSION_TEXT"
+                  ? "mission_text"
                   : "text",
-            status: "sent",
-          }));
+              status: "sent",
+              missionHistoryId: r.missionHistoryId,
+            };
+          });
 
           if (active)
             setMessages(
               historyMsgs.sort((a: any, b: any) => a.createdAt - b.createdAt),
             );
 
-          // 2. 웹소켓 연결용 최신 토큰 가져오기
           const currentToken = await AsyncStorage.getItem("token");
-
           chatRef.current = createChatClient({
             wsUrl: WS_URL,
             token: currentToken!,
@@ -324,6 +343,14 @@ export default function ChatScreen() {
           </View>
         );
       const m = item as ChatMessage;
+
+      // ✅ 로그 4: 렌더링 시점에 이미지와 텍스트 상태 확인
+      if (m.type === "image") {
+        console.log(
+          `🎨 [Render Image ID: ${m.id}] hasText: ${!!m.text}, content: "${m.text}"`,
+        );
+      }
+
       const nextMsg = listData[index - 1];
       const showTime =
         !nextMsg ||
@@ -340,13 +367,7 @@ export default function ChatScreen() {
             ? styles.bubbleMine
             : styles.bubbleOther
       ) as ViewStyle;
-      const containerStyle = (
-        m.type === "image"
-          ? m.mine
-            ? styles.imageBoxMine
-            : styles.imageBoxOther
-          : [styles.bubble, bubbleStyle]
-      ) as ViewStyle;
+
       const partnerProfileSource = userData?.partnerProfileImageUrl
         ? { uri: userData.partnerProfileImageUrl }
         : require("../assets/images/userprofile.png");
@@ -380,7 +401,6 @@ export default function ChatScreen() {
             {!m.mine && m.isFirstInGroup && (
               <AppText type="pretendard-m" style={styles.partnerName}>
                 {userData?.partnerName || "애인"}
-                {Platform.OS === "android" ? "\u200A" : ""}
               </AppText>
             )}
             <View
@@ -396,18 +416,47 @@ export default function ChatScreen() {
                   {formatTime(m.createdAt)}
                 </ChatText>
               )}
-              <View style={containerStyle}>
+
+              {/* 메시지 내용부 */}
+              <View
+                style={
+                  m.type === "image"
+                    ? m.mine
+                      ? styles.imageBoxMine
+                      : styles.imageBoxOther
+                    : [styles.bubble, bubbleStyle]
+                }
+              >
                 {m.type === "mission_text" ? (
                   <AppText type="pretendard-b" style={styles.msgText}>
                     {m.text}
                   </AppText>
                 ) : m.type === "image" ? (
-                  <Pressable onPress={() => openImageViewer(m.imageUrl!)}>
+                  <Pressable
+                    onPress={() => openImageViewer(m.imageUrl!)}
+                    style={styles.imageWrapper}
+                  >
                     <Image
                       source={{ uri: m.imageUrl! }}
                       style={styles.missionImage}
                       resizeMode="cover"
+                      // ✅ 텍스트가 있을 때 블러 처리 (BeReal 방식)
+                      blurRadius={m.text ? 15 : 0}
                     />
+                    {/* ✅ 문구가 있을 때 사진 위 오버레이 띄우기 */}
+                    {m.text && (
+                      <View style={styles.imageOverlay}>
+                        <Ionicons
+                          name="eye-off"
+                          size={24}
+                          color="#fff"
+                          style={{ marginBottom: 6 }}
+                        />
+                        <AppText type="pretendard-b" style={styles.overlayText}>
+                          {m.text}
+                        </AppText>
+                      </View>
+                    )}
                   </Pressable>
                 ) : (
                   <AppText
@@ -415,10 +464,10 @@ export default function ChatScreen() {
                     style={m.mine ? styles.msgTextMine : styles.msgTextOther}
                   >
                     {m.text}
-                    {Platform.OS === "android" ? "\u200A" : ""}
                   </AppText>
                 )}
               </View>
+
               {!m.mine && showTime && (
                 <ChatText style={styles.timeTextOther}>
                   {formatTime(m.createdAt)}
@@ -433,12 +482,9 @@ export default function ChatScreen() {
   );
 
   const isIOS = Platform.OS === "ios";
-  const isKeyboardOpen = keyboardHeight > 0;
-  const iosBottomPadding = isKeyboardOpen ? 8 : insets.bottom + 8;
-  const androidPadding = isKeyboardOpen
-    ? 60 + keyboardHeight
-    : 12 + insets.bottom;
-  const verticalOffset = isIOS ? insets.top + HEADER_HEIGHT * 0.1 : 0;
+  const iosBottomPadding = keyboardHeight > 0 ? 8 : insets.bottom + 8;
+  const androidPadding =
+    keyboardHeight > 0 ? 60 + keyboardHeight : 12 + insets.bottom;
 
   return (
     <View style={styles.wrap}>
@@ -468,14 +514,13 @@ export default function ChatScreen() {
         </Pressable>
         <AppText style={styles.headerTitle}>
           {userData?.partnerName || "애인"}
-          {Platform.OS === "android" ? "\u200A" : ""}
         </AppText>
       </View>
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={isIOS ? "padding" : undefined}
-        keyboardVerticalOffset={verticalOffset}
+        keyboardVerticalOffset={isIOS ? insets.top + 5 : 0}
       >
         <View style={{ flex: 1 }}>
           {loading ? (
@@ -493,22 +538,23 @@ export default function ChatScreen() {
                 paddingHorizontal: 12,
                 paddingVertical: 12,
               }}
-              keyboardShouldPersistTaps="handled"
               onViewableItemsChanged={({ viewableItems }) => {
                 if (!viewableItems.length) return;
                 const latest = viewableItems.find(
                   (v) => !isDateMarker(v.item),
                 )?.item;
-                if (latest && !isDateMarker(latest) && latest.id) {
-                  if (latest.id !== latestVisibleMsgId.current) {
-                    latestVisibleMsgId.current = latest.id;
-                    if (ROOM_KEY && userId)
-                      chatRef.current?.markAsRead(
-                        ROOM_KEY,
-                        Number(userId),
-                        latest.id,
-                      );
-                  }
+                if (
+                  latest &&
+                  !isDateMarker(latest) &&
+                  latest.id !== latestVisibleMsgId.current
+                ) {
+                  latestVisibleMsgId.current = latest.id;
+                  if (ROOM_KEY && userId)
+                    chatRef.current?.markAsRead(
+                      ROOM_KEY,
+                      Number(userId),
+                      latest.id,
+                    );
                 }
               }}
             />
@@ -573,7 +619,7 @@ const styles = StyleSheet.create({
   profileImage: {
     width: 36,
     height: 36,
-    borderRadius: 99,
+    borderRadius: 18,
     backgroundColor: "#DDD",
   },
   profileSpacer: { width: 0 },
@@ -613,6 +659,23 @@ const styles = StyleSheet.create({
     height: STICKER_SIZE * 2.5,
     backgroundColor: "#DDE7FF",
   },
+
+  // ✅ 오버레이용 스타일 추가
+  imageWrapper: { position: "relative", borderRadius: 18, overflow: "hidden" },
+  imageOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 12,
+  },
+  overlayText: {
+    color: "#fff",
+    fontSize: 13,
+    textAlign: "center",
+    lineHeight: 18,
+  },
+
   msgText: { fontSize: 15, lineHeight: 20, color: "#fff" },
   msgTextMine: { fontSize: 14, color: "#3F3F3F" },
   msgTextOther: { fontSize: 14, color: "#3F3F3F" },

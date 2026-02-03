@@ -10,6 +10,7 @@ import {
   FlatList,
   Image,
   ImageBackground,
+  Keyboard,
   Modal,
   PanResponder,
   Platform,
@@ -56,6 +57,8 @@ type Photo = {
   missionTitle?: string | null;
   ownerType?: "ME" | "PARTNER";
   ownerNickname?: string;
+  blurred: boolean; // ✅ 추가
+  blurMessage?: string; // ✅ 추가
 };
 type Schedule = {
   id: number;
@@ -78,6 +81,8 @@ function normalizeMission(raw: any): Photo | null {
     missionTitle: raw.missionText || null,
     ownerType: raw.ownerType,
     ownerNickname: raw.ownerNickname,
+    blurred: raw.blurred ?? false, // ✅ 매핑 추가
+    blurMessage: raw.blurMessage || "", // ✅ 매핑 추가
   };
 }
 
@@ -131,6 +136,7 @@ const MemoizedDay = React.memo(
               source={{ uri: photos[0].url }}
               style={styles.photoCellImage}
               resizeMode="cover"
+              blurRadius={photos[0].blurred ? 15 : 0} //미리보기 블러
             />
             {isSelected && <View style={styles.photoSelectedOverlay} />}
             <View style={styles.photoDateOverlay}>
@@ -309,138 +315,140 @@ const AddScheduleModal = ({ visible, onClose, onSave, selectedDate }: any) => {
       animationType="fade"
       onRequestClose={handleDismiss}
     >
-      <View style={styles.modalOverlay}>
+      <Pressable style={styles.modalOverlay} onPress={Keyboard.dismiss}>
         <Animated.View
           style={[styles.modalContent, { transform: [{ translateY: panY }] }]}
           {...panResponder.panHandlers}
         >
-          <View style={styles.dragHandleContainer}>
-            <View style={styles.dragHandle} />
-          </View>
-          <View style={styles.titleInputRow}>
-            <View style={styles.blueDot} />
-            <TextInput
-              style={[
-                styles.modalTitleInput,
-                { fontFamily: "Pretendard-Bold" },
-              ]}
-              placeholder="제목"
-              placeholderTextColor="#999"
-              value={title}
-              onChangeText={setTitle}
-            />
-          </View>
-          <View style={styles.timeSection}>
-            <View style={styles.timeRow}>
-              <Image source={clockImg} style={styles.clockImage} />
-              <View style={styles.timeInputContainer}>
-                <AppText type="semibold" style={styles.timeDateText}>
-                  {formattedDate}
-                </AppText>
-                {!isAllDay && (
-                  <View style={styles.timeInputBox}>
-                    <TextInput
-                      style={styles.timeInput}
-                      keyboardType="number-pad"
-                      value={startHour}
-                      onChangeText={setStartHour}
-                      maxLength={2}
-                    />
-                    <AppText type="semibold" style={styles.timeColon}>
-                      :
-                    </AppText>
-                    <TextInput
-                      style={styles.timeInput}
-                      keyboardType="number-pad"
-                      value={startMin}
-                      onChangeText={setStartMin}
-                      maxLength={2}
-                    />
-                  </View>
-                )}
+          <Pressable onPress={Keyboard.dismiss} style={{ flex: 1 }}>
+            <View style={styles.dragHandleContainer}>
+              <View style={styles.dragHandle} />
+            </View>
+            <View style={styles.titleInputRow}>
+              <View style={styles.blueDot} />
+              <TextInput
+                style={[
+                  styles.modalTitleInput,
+                  { fontFamily: "Pretendard-Bold" },
+                ]}
+                placeholder="제목"
+                placeholderTextColor="#999"
+                value={title}
+                onChangeText={setTitle}
+              />
+            </View>
+            <View style={styles.timeSection}>
+              <View style={styles.timeRow}>
+                <Image source={clockImg} style={styles.clockImage} />
+                <View style={styles.timeInputContainer}>
+                  <AppText type="semibold" style={styles.timeDateText}>
+                    {formattedDate}
+                  </AppText>
+                  {!isAllDay && (
+                    <View style={styles.timeInputBox}>
+                      <TextInput
+                        style={styles.timeInput}
+                        keyboardType="number-pad"
+                        value={startHour}
+                        onChangeText={setStartHour}
+                        maxLength={2}
+                      />
+                      <AppText type="semibold" style={styles.timeColon}>
+                        :
+                      </AppText>
+                      <TextInput
+                        style={styles.timeInput}
+                        keyboardType="number-pad"
+                        value={startMin}
+                        onChangeText={setStartMin}
+                        maxLength={2}
+                      />
+                    </View>
+                  )}
+                </View>
+              </View>
+              <View style={styles.timeConnector} />
+              <View style={styles.timeRow}>
+                <Image source={clockImg} style={styles.clockImage} />
+                <View style={styles.timeInputContainer}>
+                  <AppText type="semibold" style={styles.timeDateText}>
+                    {formattedDate}
+                  </AppText>
+                  {!isAllDay && (
+                    <View style={styles.timeInputBox}>
+                      <TextInput
+                        style={styles.timeInput}
+                        keyboardType="number-pad"
+                        value={endHour}
+                        onChangeText={setEndHour}
+                        maxLength={2}
+                      />
+                      <AppText type="semibold" style={styles.timeColon}>
+                        :
+                      </AppText>
+                      <TextInput
+                        style={styles.timeInput}
+                        keyboardType="number-pad"
+                        value={endMin}
+                        onChangeText={setEndMin}
+                        maxLength={2}
+                      />
+                    </View>
+                  )}
+                </View>
               </View>
             </View>
-            <View style={styles.timeConnector} />
-            <View style={styles.timeRow}>
-              <Image source={clockImg} style={styles.clockImage} />
-              <View style={styles.timeInputContainer}>
-                <AppText type="semibold" style={styles.timeDateText}>
-                  {formattedDate}
-                </AppText>
-                {!isAllDay && (
-                  <View style={styles.timeInputBox}>
-                    <TextInput
-                      style={styles.timeInput}
-                      keyboardType="number-pad"
-                      value={endHour}
-                      onChangeText={setEndHour}
-                      maxLength={2}
-                    />
-                    <AppText type="semibold" style={styles.timeColon}>
-                      :
-                    </AppText>
-                    <TextInput
-                      style={styles.timeInput}
-                      keyboardType="number-pad"
-                      value={endMin}
-                      onChangeText={setEndMin}
-                      maxLength={2}
-                    />
-                  </View>
-                )}
-              </View>
-            </View>
-          </View>
-          <View style={styles.toggleRow}>
-            <AppText type="semibold" style={styles.modalLabel}>
-              하루종일
-            </AppText>
-            <Pressable
-              onPress={() => setIsAllDay(!isAllDay)}
-              style={styles.checkboxArea}
-            >
-              <View
-                style={[styles.checkbox, isAllDay && styles.checkboxChecked]}
-              >
-                {isAllDay && (
-                  <Ionicons name="checkmark" size={14} color="#333" />
-                )}
-              </View>
-            </Pressable>
-          </View>
-          <View style={styles.toggleRow}>
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
-            >
-              <Image source={heartImg} style={styles.heartImage} />
+            <View style={styles.toggleRow}>
               <AppText type="semibold" style={styles.modalLabel}>
-                커플 일정으로 등록
+                하루종일
               </AppText>
-            </View>
-            <Pressable
-              onPress={() => setIsCouple(!isCouple)}
-              style={styles.checkboxArea}
-            >
-              <View
-                style={[styles.checkbox, isCouple && styles.checkboxChecked]}
+              <Pressable
+                onPress={() => setIsAllDay(!isAllDay)}
+                style={styles.checkboxArea}
               >
-                {isCouple && (
-                  <Ionicons name="checkmark" size={14} color="#333" />
-                )}
+                <View
+                  style={[styles.checkbox, isAllDay && styles.checkboxChecked]}
+                >
+                  {isAllDay && (
+                    <Ionicons name="checkmark" size={14} color="#333" />
+                  )}
+                </View>
+              </Pressable>
+            </View>
+            <View style={styles.toggleRow}>
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+              >
+                <Image source={heartImg} style={styles.heartImage} />
+                <AppText type="semibold" style={styles.modalLabel}>
+                  커플 일정으로 등록
+                </AppText>
               </View>
+              <Pressable
+                onPress={() => setIsCouple(!isCouple)}
+                style={styles.checkboxArea}
+              >
+                <View
+                  style={[styles.checkbox, isCouple && styles.checkboxChecked]}
+                >
+                  {isCouple && (
+                    <Ionicons name="checkmark" size={14} color="#333" />
+                  )}
+                </View>
+              </Pressable>
+            </View>
+            <View style={{ flex: 1 }} />
+            <Pressable
+              style={[styles.saveButton, { marginBottom: insets.bottom + 20 }]}
+              onPress={handleSave}
+            >
+              <AppText type="bold" style={styles.saveButtonText}>
+                저장
+              </AppText>
             </Pressable>
-          </View>
-          <View style={{ flex: 1 }} />
-          <Pressable
-            style={[styles.saveButton, { marginBottom: insets.bottom + 20 }]}
-            onPress={handleSave}
-          >
-            <AppText type="bold" style={styles.saveButtonText}>
-              저장
-            </AppText>
           </Pressable>
         </Animated.View>
-      </View>
+      </Pressable>
     </Modal>
   );
 };
@@ -469,7 +477,6 @@ export default function CalendarScreen() {
 
   const [holidaySet, setHolidaySet] = useState<Set<string>>(new Set());
   const holidayYearCache = useRef<Record<string, Record<string, string[]>>>({});
-  const holidayAlertedYear = useRef<Set<string>>(new Set());
 
   const bgColor = modeAnim.interpolate({
     inputRange: [0, 1],
@@ -511,7 +518,6 @@ export default function CalendarScreen() {
     }
   }, []);
 
-  // 미션 호출
   const fetchMissions = useCallback(async (targetMonth: string) => {
     try {
       const dateObj = parseISO(targetMonth);
@@ -534,7 +540,6 @@ export default function CalendarScreen() {
     }
   }, []);
 
-  //일정 호출
   const fetchSchedules = useCallback(async (targetMonth: string) => {
     try {
       const date = parseISO(targetMonth);
@@ -556,7 +561,6 @@ export default function CalendarScreen() {
     }
   }, []);
 
-  // 일정 삭제:
   const handleDeleteSchedule = (schedule: Schedule) => {
     if (schedule.ownerType === "PARTNER" && !schedule.couple) {
       Alert.alert("알림", "상대방 단독 일정은 삭제할 수 없어요.");
@@ -581,7 +585,6 @@ export default function CalendarScreen() {
     ]);
   };
 
-  // 일정 추가
   const handleAddSchedule = async (input: any) => {
     try {
       const pad = (n: number) => n.toString().padStart(2, "0");
@@ -870,7 +873,21 @@ export default function CalendarScreen() {
                       source={{ uri: item.url }}
                       style={styles.previewImage}
                       resizeMode="cover"
+                      blurRadius={item.blurred ? 20 : 0} // 블러처리
                     >
+                      {item.blurred && (
+                        <View style={styles.blurOverlay}>
+                          <Ionicons
+                            name="eye-off"
+                            size={32}
+                            color="#fff"
+                            style={{ marginBottom: 12 }}
+                          />
+                          <AppText type="pretendard-r" style={styles.blurText}>
+                            {item.blurMessage}
+                          </AppText>
+                        </View>
+                      )}
                       <View style={styles.previewHeaderOverlay}>
                         <View style={styles.previewAvatar}>
                           <Image
@@ -908,13 +925,12 @@ export default function CalendarScreen() {
                           </View>
                         </View>
                       </View>
-                      {item.missionTitle && (
-                        <View style={styles.previewMissionBadge}>
-                          <AppText style={styles.previewMissionText}>
-                            {item.missionTitle}
-                          </AppText>
-                        </View>
-                      )}
+
+                      <View style={styles.previewMissionBadge}>
+                        <AppText style={styles.previewMissionText}>
+                          {item.missionTitle}
+                        </AppText>
+                      </View>
                     </ImageBackground>
                   </View>
                 );
@@ -1242,4 +1258,19 @@ const styles = StyleSheet.create({
   saveButtonText: { color: "#000", fontSize: 16 },
   heartImage: { width: 20, height: 20, tintColor: "#fff" },
   clockImage: { width: 20, height: 20, tintColor: "#fff", marginRight: 4 },
+
+  blurOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+    zIndex: 10,
+  },
+  blurText: {
+    color: "#fff",
+    fontSize: 16,
+    textAlign: "center",
+    lineHeight: 22,
+  },
 });

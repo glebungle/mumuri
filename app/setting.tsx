@@ -116,20 +116,20 @@ export default function SettingScreen() {
         </View>
 
         {/* 섹션 5: 여유공간 (장식용) */}
-        <View style={styles.storageSection}>
+        {/* <View style={styles.storageSection}>
           <AppText style={styles.storageTitle}>여유공간</AppText>
           <AppText type="medium" style={styles.text}>
             {" "}
             추가 예정이에요.{" "}
-          </AppText>
-          {/* <View style={styles.storageContent}>
+          </AppText> */}
+        {/* <View style={styles.storageContent}>
             <AppText type='medium' style={styles.storageUsageText}>65.43GB / 100GB</AppText> */}
-          {/* 프로그레스 바 */}
-          {/* <View style={styles.progressBarBg}>
+        {/* 프로그레스 바 */}
+        {/* <View style={styles.progressBarBg}>
               <View style={[styles.progressBarFill, { width: '65%' }]} />
             </View> */}
-          {/* </View> */}
-        </View>
+        {/* </View> */}
+        {/* </View> */}
       </ScrollView>
     </View>
   );
