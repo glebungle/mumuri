@@ -477,7 +477,6 @@ export default function CalendarScreen() {
   const [holidaySet, setHolidaySet] = useState<Set<string>>(new Set());
   const holidayYearCache = useRef<Record<string, Record<string, string[]>>>({});
 
-  // ✅ FlatList 참조 및 인덱스 상태
   const photoListRef = useRef<FlatList>(null);
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
 
@@ -610,7 +609,6 @@ export default function CalendarScreen() {
     }
   };
 
-  // ✅ 화살표 터치 시 스크롤 이동 함수
   const handleArrowPress = (direction: "prev" | "next") => {
     const nextIndex =
       direction === "prev" ? activePhotoIndex - 1 : activePhotoIndex + 1;
@@ -947,7 +945,6 @@ export default function CalendarScreen() {
                   );
                 }}
               />
-              {/* ✅ 터치 가능한 왼쪽 화살표 */}
               {activePhotoIndex > 0 && (
                 <Pressable
                   style={styles.arrowLeft}
@@ -956,7 +953,6 @@ export default function CalendarScreen() {
                   <Ionicons name="chevron-back" size={32} color="#fff" />
                 </Pressable>
               )}
-              {/* ✅ 터치 가능한 오른쪽 화살표 */}
               {activePhotoIndex < selectedPhotos.length - 1 && (
                 <Pressable
                   style={styles.arrowRight}
@@ -1297,13 +1293,12 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
 
-  // ✅ 터치 활성화를 위해 스타일 수정
   arrowLeft: {
     position: "absolute",
-    left: 0, // 터치 영역 확보를 위해 여백 제거
+    left: 0,
     top: "40%",
     zIndex: 100,
-    padding: 15, // 터치 히트슬롭 확보
+    padding: 15,
   },
   arrowRight: {
     position: "absolute",

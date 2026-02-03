@@ -3,10 +3,18 @@ import * as ImageManipulator from "expo-image-manipulator";
 import * as MediaLibrary from "expo-media-library";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
-import { Alert, Image, Pressable, StyleSheet, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  Pressable,
+  StyleSheet,
+  View,
+} from "react-native";
 import AppText from "../components/AppText";
 import { useUser } from "./context/UserContext";
 import { authFetch } from "./utils/apiClient";
+
 const sendImg = require("../assets/images/Send.png");
 const downloadImg = require("../assets/images/Download.png");
 
@@ -154,7 +162,11 @@ export default function ShareScreen() {
 
       <View style={styles.bottomActions}>
         <View style={styles.sideAction}>
-          <Pressable style={styles.iconCircle} onPress={handleBack}>
+          <Pressable
+            style={styles.iconCircle}
+            onPress={handleBack}
+            disabled={sending}
+          >
             <Ionicons name="chevron-back" size={28} color="#1E1E1E" />
           </Pressable>
         </View>
@@ -164,11 +176,15 @@ export default function ShareScreen() {
           onPress={sendToPartner}
           disabled={sending || !coupleId || !userId}
         >
-          <Image
-            source={sendImg}
-            style={styles.sendImage}
-            resizeMode="contain"
-          />
+          {sending ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Image
+              source={sendImg}
+              style={styles.sendImage}
+              resizeMode="contain"
+            />
+          )}
         </Pressable>
 
         <View style={styles.sideAction}>
@@ -185,6 +201,15 @@ export default function ShareScreen() {
           </Pressable>
         </View>
       </View>
+
+      {sending && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color="#3279FF" />
+          <AppText style={styles.loadingText}>
+            소중한 순간을 보내는 중...
+          </AppText>
+        </View>
+      )}
     </View>
   );
 }
@@ -238,4 +263,16 @@ const styles = StyleSheet.create({
   },
   sendImage: { width: 40, height: 40, paddingTop: 3 },
   downloadImage: { width: 30, height: 30 },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(255, 252, 245, 0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 999,
+  },
+  loadingText: {
+    marginTop: 15,
+    color: "#3279FF",
+    fontSize: 14,
+  },
 });

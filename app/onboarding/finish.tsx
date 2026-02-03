@@ -26,37 +26,37 @@ const ballData = [
     initialX: SCREEN_WIDTH * 0.1,
     initialY: SCREEN_HEIGHT * 0.2,
     size: 22,
-  }, // 좌측 상단
+  },
   {
     id: 2,
     initialX: SCREEN_WIDTH * 0.4,
     initialY: SCREEN_HEIGHT * 0.1,
     size: 18,
-  }, // 중앙 상단
+  },
   {
     id: 3,
     initialX: SCREEN_WIDTH * 0.8,
     initialY: SCREEN_HEIGHT * 0.18,
     size: 24,
-  }, // 우측 상단
+  },
   {
     id: 4,
     initialX: SCREEN_WIDTH * 0.08,
     initialY: SCREEN_HEIGHT * 0.55,
     size: 20,
-  }, // 좌측 중앙
+  },
   {
     id: 5,
     initialX: SCREEN_WIDTH * 0.85,
     initialY: SCREEN_HEIGHT * 0.62,
     size: 22,
-  }, // 우측 중앙
+  },
   {
     id: 6,
     initialX: SCREEN_WIDTH * 0.05,
     initialY: SCREEN_HEIGHT * 0.88,
     size: 24,
-  }, // 좌측 하단
+  },
 ];
 
 export default function OnboardingFinish() {
@@ -90,7 +90,6 @@ export default function OnboardingFinish() {
 
     const runAnimation = () => {
       Animated.sequence([
-        // 회전 및 공 이동 시작 (
         Animated.parallel([
           Animated.timing(rotateVal, {
             toValue: 1,

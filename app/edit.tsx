@@ -174,7 +174,6 @@ export default function EditProfileScreen() {
         onPress: async () => {
           try {
             setLoading(true);
-            // [수정] authFetch 사용
             const res = await authFetch("/api/setting/profile-photo", {
               method: "DELETE",
             });

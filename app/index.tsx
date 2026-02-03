@@ -8,14 +8,14 @@ export default function Gate() {
 
   useEffect(() => {
     (async () => {
-      // 1. 필요한 정보를 한꺼번에 가져옵니다.
+      // 1. 필요한 정보
       const [token, refreshToken, hasSeenOnboarding] = await Promise.all([
         AsyncStorage.getItem("token"),
         AsyncStorage.getItem("refreshToken"),
         AsyncStorage.getItem("hasSeenOnboarding"),
       ]);
 
-      // 2. 로그인 여부 판단: 액세스 토큰이나 리프레시 토큰 중 하나라도 있으면 로그인 상태로 간주합니다.
+      // 2. 로그인 여부 판단: 액세스 토큰이나 리프레시 토큰 중 하나라도 있으면 로그인 상태로 간주
       if (token || refreshToken) {
         router.replace("/(tabs)/home");
       } else {
