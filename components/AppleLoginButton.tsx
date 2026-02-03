@@ -57,7 +57,6 @@ export default function AppleLoginButton() {
       }
     } catch (e: any) {
       if (e.code === "ERR_REQUEST_CANCELED") {
-        console.log("사용자가 취소함");
       } else {
         // [디버그] 상세 에러 알림
         const errorDetail = e.response

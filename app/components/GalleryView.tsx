@@ -3,7 +3,7 @@ import { addHours, format, parseISO } from "date-fns";
 import * as FileSystem from "expo-file-system/legacy";
 import { LinearGradient } from "expo-linear-gradient";
 import * as MediaLibrary from "expo-media-library";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -42,12 +42,14 @@ type Photo = {
   createdAt: string;
   missionTitle?: string;
   ownerNickname?: string;
+  blurred: boolean;
+  blurMessage?: string;
 };
 
 function normalizePhoto(raw: any): Photo | null {
   if (!raw || typeof raw !== "object") return null;
-  const id = raw.photoId ?? raw.id;
-  const url = raw.imageUrl ?? raw.photoUrl ?? raw.url;
+  const id = raw.id ?? raw.photoId;
+  const url = raw.presignedUrl ?? raw.imageUrl ?? raw.photoUrl ?? raw.url;
   const createdAt = raw.createdAt;
   if (!id || !url || !createdAt) return null;
   return {
@@ -56,6 +58,8 @@ function normalizePhoto(raw: any): Photo | null {
     createdAt: String(createdAt),
     missionTitle: raw.missionText || undefined,
     ownerNickname: raw.ownerNickname,
+    blurred: raw.blurred ?? false,
+    blurMessage: raw.blurMessage || "",
   };
 }
 
@@ -102,6 +106,7 @@ interface GalleryViewProps {
 
 export default function GalleryView({ onBackToHome }: GalleryViewProps) {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { userData, refreshUserData } = useUser();
   const coupleId = userData?.coupleId || null;
 
@@ -115,6 +120,8 @@ export default function GalleryView({ onBackToHome }: GalleryViewProps) {
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(
     null,
   );
+  const [displayInfo, setDisplayInfo] = useState({ nickname: "", date: "" });
+
   const [isMenuVisible, setIsMenuVisible] = useState(false);
   const [saving, setSaving] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
@@ -127,7 +134,6 @@ export default function GalleryView({ onBackToHome }: GalleryViewProps) {
     setToastVisible(true);
   };
 
-  // 뒤로가기
   useFocusEffect(
     useCallback(() => {
       const onBackPress = () => {
@@ -198,7 +204,6 @@ export default function GalleryView({ onBackToHome }: GalleryViewProps) {
     loadPhotos(page + 1);
   };
 
-  // 다운로드
   const handleDownload = async () => {
     if (selectedPhotoIndex === null) return;
     const photo = photos[selectedPhotoIndex];
@@ -224,16 +229,13 @@ export default function GalleryView({ onBackToHome }: GalleryViewProps) {
     }
   };
 
-  // 홈 화면 게시
   const handlePostToHome = async () => {
     if (selectedPhotoIndex === null) return;
     const photo = photos[selectedPhotoIndex];
     try {
       const res = await authFetch(
         `/calendar/missions/thumb?photoId=${photo.id}`,
-        {
-          method: "PUT",
-        },
+        { method: "PUT" },
       );
 
       if (res.ok) {
@@ -260,10 +262,18 @@ export default function GalleryView({ onBackToHome }: GalleryViewProps) {
     selectedPhotoIndex !== null && photos[selectedPhotoIndex]
       ? photos[selectedPhotoIndex]
       : null;
-  const formattedDate = currentPhoto
-    ? format(addHours(parseISO(currentPhoto.createdAt), 9), "yyyy. MM. dd.")
-    : "";
-  const nickname = currentPhoto?.ownerNickname || "알 수 없음";
+
+  useEffect(() => {
+    if (currentPhoto) {
+      setDisplayInfo({
+        nickname: currentPhoto.ownerNickname || "알 수 없음",
+        date: format(
+          addHours(parseISO(currentPhoto.createdAt), 9),
+          "yyyy. MM. dd.",
+        ),
+      });
+    }
+  }, [currentPhoto]);
 
   const handleViewerScrollEnd = (event: any) => {
     if (selectedPhotoIndex === null) return;
@@ -342,6 +352,7 @@ export default function GalleryView({ onBackToHome }: GalleryViewProps) {
                 source={{ uri: item.url }}
                 style={styles.gridImage}
                 resizeMode="cover"
+                blurRadius={item.blurred ? 10 : 0}
               />
             </Pressable>
           )}
@@ -393,7 +404,38 @@ export default function GalleryView({ onBackToHome }: GalleryViewProps) {
                         source={{ uri: item.url }}
                         style={styles.fullScreenImage}
                         resizeMode="contain"
+                        blurRadius={item.blurred ? 25 : 0}
                       />
+                      {item.blurred && (
+                        <View style={styles.viewerBlurOverlay}>
+                          <Ionicons
+                            name="eye-off"
+                            size={40}
+                            color="#FFF"
+                            style={{ marginBottom: 15 }}
+                          />
+                          <AppText
+                            type="pretendard-b"
+                            style={styles.blurOverlayText}
+                          >
+                            {item.blurMessage}
+                          </AppText>
+                          <Pressable
+                            style={styles.cameraBtn}
+                            onPress={() => {
+                              handleCloseViewer();
+                              router.push("/camera");
+                            }}
+                          >
+                            <AppText
+                              type="pretendard-b"
+                              style={styles.cameraBtnText}
+                            >
+                              사진 찍으러 가기
+                            </AppText>
+                          </Pressable>
+                        </View>
+                      )}
                     </View>
                   )}
                 />
@@ -406,7 +448,7 @@ export default function GalleryView({ onBackToHome }: GalleryViewProps) {
                   <View style={styles.nicknameRow}>
                     <View style={styles.dot} />
                     <AppText type="pretendard-b" style={styles.nicknameText}>
-                      {nickname}
+                      {displayInfo.nickname}
                       {Platform.OS === "android" ? "\u200A" : ""}
                     </AppText>
                   </View>
@@ -422,18 +464,24 @@ export default function GalleryView({ onBackToHome }: GalleryViewProps) {
                       style={[styles.calendarImage]}
                     />
                     <AppText type="semibold" style={styles.dateText}>
-                      {formattedDate}
+                      {displayInfo.date}
                     </AppText>
                   </View>
                 </View>
 
                 <View style={styles.headerButtons}>
-                  <Pressable
-                    onPress={() => setIsMenuVisible(!isMenuVisible)}
-                    style={styles.iconButton}
-                  >
-                    <Ionicons name="ellipsis-vertical" size={24} color="#FFF" />
-                  </Pressable>
+                  {!currentPhoto?.blurred && (
+                    <Pressable
+                      onPress={() => setIsMenuVisible(!isMenuVisible)}
+                      style={styles.iconButton}
+                    >
+                      <Ionicons
+                        name="ellipsis-vertical"
+                        size={24}
+                        color="#FFF"
+                      />
+                    </Pressable>
+                  )}
                   <Pressable
                     onPress={handleCloseViewer}
                     style={styles.iconButton}
@@ -552,5 +600,34 @@ const styles = StyleSheet.create({
     zIndex: 100,
   },
   toastText: { color: "#FFF", fontSize: 14 },
-  viewerItem: { width: SCREEN_WIDTH, height: SCREEN_HEIGHT },
+  viewerItem: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  viewerBlurOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 30,
+  },
+  blurOverlayText: {
+    color: "#FFF",
+    fontSize: 16,
+    textAlign: "center",
+    lineHeight: 24,
+    marginBottom: 25,
+  },
+  cameraBtn: {
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
+  },
+  cameraBtnText: {
+    color: "#000",
+    fontSize: 14,
+  },
 });

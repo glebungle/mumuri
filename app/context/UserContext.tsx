@@ -84,7 +84,6 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const refreshUserData = useCallback(async () => {
     // 1. 중복 호출 락(Lock)
     if (refreshingRef.current) {
-      console.log("[UserContext] 이미 데이터를 가져오는 중입니다.");
       return;
     }
 
@@ -92,8 +91,6 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     setIsRefreshingState(true);
 
     try {
-      console.log("📡 [UserContext] 데이터 새로고침 시작");
-
       // 2. 필수 데이터 호출
       const [homeRes, userRes, myPageRes] = await Promise.all([
         authFetch("/home/main"),
@@ -149,10 +146,9 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
         setUserData(mergedData);
         setTodayMissions(Array.isArray(missionResponse) ? missionResponse : []);
-        console.log("✅ [UserContext] 데이터 업데이트 완료");
       }
     } catch (e: any) {
-      console.error("❌ [UserContext] 새로고침 중 오류 발생:", e.message);
+      console.error(" [UserContext] 새로고침 중 오류 발생:", e.message);
     } finally {
       refreshingRef.current = false;
       setIsRefreshingState(false);

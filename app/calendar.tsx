@@ -57,8 +57,8 @@ type Photo = {
   missionTitle?: string | null;
   ownerType?: "ME" | "PARTNER";
   ownerNickname?: string;
-  blurred: boolean; // ✅ 추가
-  blurMessage?: string; // ✅ 추가
+  blurred: boolean;
+  blurMessage?: string;
 };
 type Schedule = {
   id: number;
@@ -81,12 +81,11 @@ function normalizeMission(raw: any): Photo | null {
     missionTitle: raw.missionText || null,
     ownerType: raw.ownerType,
     ownerNickname: raw.ownerNickname,
-    blurred: raw.blurred ?? false, // ✅ 매핑 추가
-    blurMessage: raw.blurMessage || "", // ✅ 매핑 추가
+    blurred: raw.blurred ?? false,
+    blurMessage: raw.blurMessage || "",
   };
 }
 
-// --- 날짜 컴포넌트 & 모달 컴포넌트---
 const MemoizedDay = React.memo(
   ({
     date,
@@ -136,7 +135,7 @@ const MemoizedDay = React.memo(
               source={{ uri: photos[0].url }}
               style={styles.photoCellImage}
               resizeMode="cover"
-              blurRadius={photos[0].blurred ? 15 : 0} //미리보기 블러
+              blurRadius={photos[0].blurred ? 15 : 0}
             />
             {isSelected && <View style={styles.photoSelectedOverlay} />}
             <View style={styles.photoDateOverlay}>
@@ -478,6 +477,10 @@ export default function CalendarScreen() {
   const [holidaySet, setHolidaySet] = useState<Set<string>>(new Set());
   const holidayYearCache = useRef<Record<string, Record<string, string[]>>>({});
 
+  // ✅ FlatList 참조 및 인덱스 상태
+  const photoListRef = useRef<FlatList>(null);
+  const [activePhotoIndex, setActivePhotoIndex] = useState(0);
+
   const bgColor = modeAnim.interpolate({
     inputRange: [0, 1],
     outputRange: ["#FFFCF5", "#1C1C1E"],
@@ -498,19 +501,15 @@ export default function CalendarScreen() {
   const fetchHolidays = useCallback(async (targetMonth: string) => {
     try {
       const year = format(parseISO(targetMonth), "yyyy");
-
       if (holidayYearCache.current[year]) {
         const keys = Object.keys(holidayYearCache.current[year]);
         setHolidaySet(new Set(keys));
         return;
       }
-
       const res = await fetch(HOLIDAYS_JSON_URL);
       const all = await res.json();
-
       const yearMap: Record<string, string[]> = all?.[year] ?? {};
       holidayYearCache.current[year] = yearMap;
-
       const keys = Object.keys(yearMap);
       setHolidaySet(new Set(keys));
     } catch (e) {
@@ -523,7 +522,6 @@ export default function CalendarScreen() {
       const dateObj = parseISO(targetMonth);
       const url = `/calendar/missions?year=${dateObj.getFullYear()}&month=${dateObj.getMonth() + 1}`;
       const res = await authFetch(url);
-
       const data = res.ok ? await res.json() : [];
       const grouped: PhotosByDate = {};
       (data || []).forEach((item: any) => {
@@ -545,7 +543,6 @@ export default function CalendarScreen() {
       const date = parseISO(targetMonth);
       const url = `/calendar/schedules?year=${date.getFullYear()}&month=${date.getMonth() + 1}`;
       const res = await authFetch(url);
-
       const data = res.ok ? await res.json() : [];
       const uniqueDataMap = new Map();
       (data || []).forEach((sch: any) => uniqueDataMap.set(sch.id, sch));
@@ -594,7 +591,6 @@ export default function CalendarScreen() {
       const endTimeStr = input.isAllDay
         ? "23:59:59"
         : `${pad(input.end.hour)}:${pad(input.end.minute)}:00`;
-
       const body = {
         title: input.title,
         date: selectedDate,
@@ -603,19 +599,24 @@ export default function CalendarScreen() {
         allDay: input.isAllDay,
         couple: input.isCouple,
       };
-
       const res = await authFetch("/calendar/schedules", {
         method: "POST",
         body: JSON.stringify(body),
       });
-
-      if (res.ok) {
-        fetchSchedules(currentMonth);
-      } else {
-        Alert.alert("실패", `등록 실패 (${res.status})`);
-      }
+      if (res.ok) fetchSchedules(currentMonth);
+      else Alert.alert("실패", `등록 실패 (${res.status})`);
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  // ✅ 화살표 터치 시 스크롤 이동 함수
+  const handleArrowPress = (direction: "prev" | "next") => {
+    const nextIndex =
+      direction === "prev" ? activePhotoIndex - 1 : activePhotoIndex + 1;
+    if (nextIndex >= 0 && nextIndex < selectedPhotos.length) {
+      photoListRef.current?.scrollToIndex({ index: nextIndex, animated: true });
+      setActivePhotoIndex(nextIndex);
     }
   };
 
@@ -641,6 +642,7 @@ export default function CalendarScreen() {
   }, [currentMonth]);
 
   useEffect(() => {
+    setActivePhotoIndex(0);
     if (calendarMode === "MISSION")
       setSelectedPhotos(photosByDate[selectedDate] || []);
     else setSelectedSchedules(schedulesByDate[selectedDate] || []);
@@ -848,94 +850,122 @@ export default function CalendarScreen() {
               </AppText>
             </View>
           ) : (
-            <FlatList
-              data={selectedPhotos}
-              keyExtractor={(item) => item.id}
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              renderItem={({ item }) => {
-                const avatar = (
-                  item.ownerType === "ME"
-                    ? userData?.myProfileImageUrl
-                    : userData?.partnerProfileImageUrl
-                )
-                  ? {
-                      uri:
-                        item.ownerType === "ME"
-                          ? userData?.myProfileImageUrl
-                          : userData?.partnerProfileImageUrl,
-                    }
-                  : defaultProfileImg;
-                return (
-                  <View style={styles.previewCard}>
-                    <ImageBackground
-                      source={{ uri: item.url }}
-                      style={styles.previewImage}
-                      resizeMode="cover"
-                      blurRadius={item.blurred ? 20 : 0} // 블러처리
-                    >
-                      {item.blurred && (
-                        <View style={styles.blurOverlay}>
-                          <Ionicons
-                            name="eye-off"
-                            size={32}
-                            color="#fff"
-                            style={{ marginBottom: 12 }}
-                          />
-                          <AppText type="pretendard-r" style={styles.blurText}>
-                            {item.blurMessage}
-                          </AppText>
-                        </View>
-                      )}
-                      <View style={styles.previewHeaderOverlay}>
-                        <View style={styles.previewAvatar}>
-                          <Image
-                            source={avatar}
-                            style={{ width: "100%", height: "100%" }}
-                          />
-                        </View>
-                        <View>
-                          <AppText
-                            type="pretendard-b"
-                            style={styles.previewNameText}
-                          >
-                            {item.ownerNickname}
-                          </AppText>
-                          <View
-                            style={{
-                              flexDirection: "row",
-                              alignItems: "center",
-                              gap: 4,
-                            }}
-                          >
-                            <Image
-                              source={calendarImg}
-                              style={styles.calendarImage}
+            <View style={{ flex: 1 }}>
+              <FlatList
+                ref={photoListRef}
+                data={selectedPhotos}
+                keyExtractor={(item) => item.id}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                onMomentumScrollEnd={(e) => {
+                  const x = e.nativeEvent.contentOffset.x;
+                  const index = Math.round(x / (SCREEN_WIDTH - 32));
+                  setActivePhotoIndex(index);
+                }}
+                renderItem={({ item }) => {
+                  const avatar = (
+                    item.ownerType === "ME"
+                      ? userData?.myProfileImageUrl
+                      : userData?.partnerProfileImageUrl
+                  )
+                    ? {
+                        uri:
+                          item.ownerType === "ME"
+                            ? userData?.myProfileImageUrl
+                            : userData?.partnerProfileImageUrl,
+                      }
+                    : defaultProfileImg;
+                  return (
+                    <View style={styles.previewCard}>
+                      <ImageBackground
+                        source={{ uri: item.url }}
+                        style={styles.previewImage}
+                        resizeMode="cover"
+                        blurRadius={item.blurred ? 20 : 0}
+                      >
+                        {item.blurred && (
+                          <View style={styles.blurOverlay}>
+                            <Ionicons
+                              name="eye-off"
+                              size={32}
+                              color="#fff"
+                              style={{ marginBottom: 12 }}
                             />
                             <AppText
-                              type="semibold"
-                              style={styles.previewDateText}
+                              type="pretendard-r"
+                              style={styles.blurText}
                             >
-                              {format(
-                                parseISO(item.createdAt),
-                                "yyyy. MM. dd.",
-                              )}
+                              {item.blurMessage}
                             </AppText>
                           </View>
+                        )}
+                        <View style={styles.previewHeaderOverlay}>
+                          <View style={styles.previewAvatar}>
+                            <Image
+                              source={avatar}
+                              style={{ width: "100%", height: "100%" }}
+                            />
+                          </View>
+                          <View>
+                            <AppText
+                              type="pretendard-b"
+                              style={styles.previewNameText}
+                            >
+                              {item.ownerNickname}
+                            </AppText>
+                            <View
+                              style={{
+                                flexDirection: "row",
+                                alignItems: "center",
+                                gap: 4,
+                              }}
+                            >
+                              <Image
+                                source={calendarImg}
+                                style={styles.calendarImage}
+                              />
+                              <AppText
+                                type="semibold"
+                                style={styles.previewDateText}
+                              >
+                                {format(
+                                  parseISO(item.createdAt),
+                                  "yyyy. MM. dd.",
+                                )}
+                              </AppText>
+                            </View>
+                          </View>
                         </View>
-                      </View>
-
-                      <View style={styles.previewMissionBadge}>
-                        <AppText style={styles.previewMissionText}>
-                          {item.missionTitle}
-                        </AppText>
-                      </View>
-                    </ImageBackground>
-                  </View>
-                );
-              }}
-            />
+                        <View style={styles.previewMissionBadge}>
+                          <AppText style={styles.previewMissionText}>
+                            {item.missionTitle}
+                          </AppText>
+                        </View>
+                      </ImageBackground>
+                    </View>
+                  );
+                }}
+              />
+              {/* ✅ 터치 가능한 왼쪽 화살표 */}
+              {activePhotoIndex > 0 && (
+                <Pressable
+                  style={styles.arrowLeft}
+                  onPress={() => handleArrowPress("prev")}
+                >
+                  <Ionicons name="chevron-back" size={32} color="#fff" />
+                </Pressable>
+              )}
+              {/* ✅ 터치 가능한 오른쪽 화살표 */}
+              {activePhotoIndex < selectedPhotos.length - 1 && (
+                <Pressable
+                  style={styles.arrowRight}
+                  onPress={() => handleArrowPress("next")}
+                >
+                  <Ionicons name="chevron-forward" size={32} color="#fff" />
+                </Pressable>
+              )}
+            </View>
           )
         ) : (
           <>
@@ -1145,12 +1175,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   calendarImage: { width: 14, height: 14, tintColor: "#fff" },
-
-  daySchedulesWrapper: {
-    width: "90%",
-    marginTop: 2,
-    gap: 1.5,
-  },
+  daySchedulesWrapper: { width: "90%", marginTop: 2, gap: 1.5 },
   miniScheduleBar: {
     height: 14,
     borderRadius: 2,
@@ -1162,7 +1187,6 @@ const styles = StyleSheet.create({
     fontSize: 8,
     fontFamily: "Pretendard-Medium",
   },
-
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.7)",
@@ -1258,7 +1282,6 @@ const styles = StyleSheet.create({
   saveButtonText: { color: "#000", fontSize: 16 },
   heartImage: { width: 20, height: 20, tintColor: "#fff" },
   clockImage: { width: 20, height: 20, tintColor: "#fff", marginRight: 4 },
-
   blurOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0, 0, 0, 0.4)",
@@ -1272,5 +1295,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: "center",
     lineHeight: 22,
+  },
+
+  // ✅ 터치 활성화를 위해 스타일 수정
+  arrowLeft: {
+    position: "absolute",
+    left: 0, // 터치 영역 확보를 위해 여백 제거
+    top: "40%",
+    zIndex: 100,
+    padding: 15, // 터치 히트슬롭 확보
+  },
+  arrowRight: {
+    position: "absolute",
+    right: 0,
+    top: "40%",
+    zIndex: 100,
+    padding: 15,
   },
 });

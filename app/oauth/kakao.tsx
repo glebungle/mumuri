@@ -20,7 +20,6 @@ async function fetchUserId(token: string) {
     }
     return text;
   } catch (e) {
-    console.log("User ID 조회 실패:", e);
     return null;
   }
 }
@@ -52,14 +51,11 @@ export default function KakaoDeepLinkHandler() {
     // 1. 좀비 토큰 방지 체크
     const logoutFlag = await AsyncStorage.getItem("isLoggingOut");
     if (logoutFlag === "true") {
-      console.log("[Login Handler] 로그아웃 직후 진입 차단");
       router.replace("/");
       return;
     }
 
     try {
-      console.log("🚀 [Login Handler] 토큰 저장 및 유저 정보 확인 중...");
-
       // 2. 일괄 저장을 위한 데이터 준비 (multiSet)
       const storageItems: [string, string][] = [
         ["token", String(params.accessToken)],
@@ -78,8 +74,6 @@ export default function KakaoDeepLinkHandler() {
       // 4. 저장소에 한꺼번에 반영
       await AsyncStorage.multiSet(storageItems);
       await AsyncStorage.removeItem("isLoggingOut");
-
-      console.log("✅ [Login Handler] 모든 정보 저장 완료");
 
       // 5. 페이지 이동
       if (params.isNew === "true") {

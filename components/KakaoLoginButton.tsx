@@ -49,10 +49,8 @@ export default function KakaoLoginButton() {
     const wasLoggedOut = await AsyncStorage.getItem("isLoggingOut");
 
     if (wasLoggedOut === "true") {
-      console.log("🔒 [Kakao] 로그아웃 기록 확인 -> 계정 재입력 강제");
       setCurrentUrl(`${BASE_AUTH_URL}&prompt=login`);
     } else {
-      console.log("⚡️ [Kakao] 일반 로그인 진행");
       setCurrentUrl(BASE_AUTH_URL);
     }
 
@@ -69,7 +67,6 @@ export default function KakaoLoginButton() {
 
       // URL 스키마 교정 (mumuri:/// -> mumuri://)
       const fixedUrl = url.replace(/^mumuri:\/+/, "mumuri://");
-      console.log("🚀 [Kakao] 딥링크 감지, 앱으로 복귀:", fixedUrl);
 
       // 로그아웃 플래그 제거
       await AsyncStorage.removeItem("isLoggingOut");
