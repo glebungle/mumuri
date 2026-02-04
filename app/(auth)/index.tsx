@@ -6,7 +6,6 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator, // 로딩 표시용
   Dimensions,
-  Pressable,
   StyleSheet,
   View,
 } from "react-native";
@@ -90,12 +89,11 @@ export default function StartScreen() {
         <AppText style={s.title}>m</AppText>
       </View>
 
-      <Pressable onPress={handleOnboarding} style={s.onboardingButton}>
+      {/* <Pressable onPress={handleOnboarding} style={s.onboardingButton}>
         <AppText type="regular" style={s.skipButtonText}>
           온보딩 보기 (임시)
         </AppText>
-      </Pressable>
-
+      </Pressable> */}
       <View style={s.bottom}>
         <KakaoLoginButton />
         <AppleLoginButton />

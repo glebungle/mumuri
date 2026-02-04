@@ -5,10 +5,14 @@ import React from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AppText from "../components/AppText";
+import { useUser } from "./context/UserContext";
 
 export default function SettingScreen() {
   const insets = useSafeAreaInsets();
+  const { userData } = useUser(); // 유저 데이터 가져오기
   const handleBack = () => router.back();
+
+  const isConnected = !!userData?.coupleId;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -43,22 +47,38 @@ export default function SettingScreen() {
 
         {/* 섹션 2: 커플 연결 */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <AppText type="semibold" style={styles.sectionTitle}>
+          <View
+            style={[
+              styles.sectionHeader,
+              // isConnected && { borderBottomColor: "#E0E0E0" }, // 연결 시 하단 선 흐리게
+            ]}
+          >
+            <AppText type="semibold" style={[styles.sectionTitle]}>
               커플 연결
             </AppText>
-            <Pressable onPress={() => router.push("./couple-connect")}>
-              <Ionicons name="chevron-forward" size={20} color="#000" />
+            <Pressable
+              onPress={() => router.push("/couple-connect")}
+              disabled={isConnected}
+            >
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color={isConnected ? "#CCCCCC" : "#000"}
+              />
             </Pressable>
           </View>
-          <View>
-            <View style={styles.itemGroup}>
-              <Pressable onPress={() => router.push("/couple-connect")}>
-                <AppText type="medium" style={styles.itemText}>
-                  커플 연결하기
-                </AppText>
-              </Pressable>
-            </View>
+          <View style={styles.itemGroup}>
+            <Pressable
+              onPress={() => router.push("/couple-connect")}
+              disabled={isConnected}
+            >
+              <AppText
+                type="medium"
+                style={[styles.itemText, isConnected && { color: "#CCCCCC" }]}
+              >
+                {isConnected ? "커플 연결 완료" : "커플 연결하기"}
+              </AppText>
+            </Pressable>
           </View>
         </View>
 
@@ -114,22 +134,6 @@ export default function SettingScreen() {
             </Pressable>
           </View>
         </View>
-
-        {/* 섹션 5: 여유공간 (장식용) */}
-        {/* <View style={styles.storageSection}>
-          <AppText style={styles.storageTitle}>여유공간</AppText>
-          <AppText type="medium" style={styles.text}>
-            {" "}
-            추가 예정이에요.{" "}
-          </AppText> */}
-        {/* <View style={styles.storageContent}>
-            <AppText type='medium' style={styles.storageUsageText}>65.43GB / 100GB</AppText> */}
-        {/* 프로그레스 바 */}
-        {/* <View style={styles.progressBarBg}>
-              <View style={[styles.progressBarFill, { width: '65%' }]} />
-            </View> */}
-        {/* </View> */}
-        {/* </View> */}
       </ScrollView>
     </View>
   );
@@ -194,7 +198,6 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
 
-  // 여유공간 섹션
   storageSection: {
     marginTop: 32,
   },

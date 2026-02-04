@@ -24,7 +24,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     supportsTablet: false,
     bundleIdentifier: "com.growdy.mumuri",
     googleServicesFile: "./GoogleService-Info.plist",
-    buildNumber: "6",
+    buildNumber: "7",
     infoPlist: {
       CFBundleURLTypes: [
         {
@@ -41,7 +41,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: "com.growdy.mumuri",
-    versionCode: 10,
+    versionCode: 11,
     googleServicesFile: "./google-services.json",
     blockedPermissions: [
       "android.permission.READ_MEDIA_VIDEO",

@@ -52,7 +52,6 @@ export default function CoupleConnectScreen() {
 
       if (res.ok) {
         const code = await res.text();
-        console.log("내 코드:", code || null);
         setMyCode(code);
       } else {
         console.warn("커플 코드 발급 실패:", res.status);
@@ -99,7 +98,6 @@ export default function CoupleConnectScreen() {
 
     try {
       setLoading(true);
-      console.log("🔗 [Connect] 커플 연결 시도:", partnerCode);
 
       const res = await authFetch(
         `/user/couple?coupleCode=${encodeURIComponent(partnerCode)}`,
@@ -109,7 +107,6 @@ export default function CoupleConnectScreen() {
       );
 
       const text = await res.text();
-      console.log("🔗 [Connect] 원본 응답:", text);
 
       let data;
       try {
@@ -222,7 +219,7 @@ export default function CoupleConnectScreen() {
         <View style={{ marginTop: 40, alignItems: "center" }}>
           <Pressable onPress={handleTestGo} style={styles.testButton}>
             <AppText style={{ color: "#FF6B6B", fontSize: 13 }}>
-              (TEST) 가상 상대방 생성하기
+              가상 상대방 생성하기
             </AppText>
           </Pressable>
         </View>
@@ -271,7 +268,7 @@ export default function CoupleConnectScreen() {
               <Ionicons name="people" size={32} color="#6198FF" />
             </View>
             <AppText type="bold" style={styles.modalTitle}>
-              테스트 상대 생성 완료
+              가상의 상대 생성 완료
             </AppText>
             <AppText type="medium" style={styles.modalMessage}>
               코드: {testCode}

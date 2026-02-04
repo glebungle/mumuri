@@ -11,10 +11,11 @@ import {
   Image,
   LayoutChangeEvent,
   PanResponder,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
-  View
+  View,
 } from "react-native";
 import {
   SafeAreaView,
@@ -79,11 +80,11 @@ export default function CameraHome() {
   const [layoutPhotos, setLayoutPhotos] = useState<string[]>([]);
   const dday = userData?.date ?? 0;
 
-  const [messages, setMissions] = useState<TodayMission[]>([]);
+  const [missions, setMissions] = useState<TodayMission[]>([]);
   const [sel, setSel] = useState(0);
   const [isLoadingMissions, setIsLoadingMissions] = useState(true);
 
-  // --- 줌 ---
+  // --- 줌 로직  ---
   const [zoom, setZoom] = useState(0);
   const prevDistance = useRef<number | null>(null);
 
@@ -119,13 +120,13 @@ export default function CameraHome() {
   ).current;
 
   const nextMission = useCallback(() => {
-    if (!messages.length) return;
-    setSel((i) => (i + 1) % messages.length);
-  }, [messages.length]);
+    if (!missions.length) return;
+    setSel((i) => (i + 1) % missions.length);
+  }, [missions.length]);
   const prevMission = useCallback(() => {
-    if (!messages.length) return;
-    setSel((i) => (i - 1 + messages.length) % messages.length);
-  }, [messages.length]);
+    if (!missions.length) return;
+    setSel((i) => (i - 1 + missions.length) % missions.length);
+  }, [missions.length]);
 
   const onCameraWrapLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
@@ -236,7 +237,7 @@ export default function CameraHome() {
     setCapturing(true);
     try {
       const pic = await cameraRef.current.takePictureAsync({
-        quality: 1, // 최대 품질 유지
+        quality: 1,
         skipProcessing: false,
         exif: true,
         shutterSound: false,
@@ -247,64 +248,49 @@ export default function CameraHome() {
         return;
       }
 
-      // [핵심 수정] WYSIWYG 구현을 위한 정규화 및 크롭 로직
-      // 1. 이미지를 EXIF 정보에 맞춰 물리적으로 회전시킴 (정규화)
-      let rotation = 0;
-      if (pic.exif?.Orientation === 3) rotation = 180;
-      else if (pic.exif?.Orientation === 6) rotation = 90;
-      else if (pic.exif?.Orientation === 8) rotation = 270;
-
-      const preActions: any[] = [];
-      if (rotation !== 0) preActions.push({ rotate: rotation });
-      if (facing === "front")
-        preActions.push({ flip: ImageManipulator.FlipType.Horizontal });
-
-      // 1단계: 회전 및 반전 적용
-      const normalized = await ImageManipulator.manipulateAsync(
-        pic.uri,
-        preActions,
-        { format: ImageManipulator.SaveFormat.JPEG },
-      );
-
-      // 2단계: 정규화된 이미지(이제 항상 화면에 보이는 방향과 일치함)를 기준으로 크롭
-      const srcW = normalized.width;
-      const srcH = normalized.height;
       const targetAspect = viewW / viewH;
-      const srcAspect = srcW / srcH;
+      let srcW = pic.width;
+      let srcH = pic.height;
+      const orientation = pic.exif?.Orientation;
 
+      const isRotated =
+        Platform.OS === "android" && (orientation === 6 || orientation === 8);
+      if (isRotated) {
+        [srcW, srcH] = [srcH, srcW];
+      }
+
+      const srcAspect = srcW / srcH;
       let crop: CropRect;
       if (srcAspect > targetAspect) {
-        // 이미지가 UI보다 가로로 김 -> 양 옆을 자름
-        const newW = srcH * targetAspect;
+        const newW = Math.round(srcH * targetAspect);
         crop = {
-          originX: Math.floor((srcW - newW) / 2),
+          originX: Math.max(0, Math.floor((srcW - newW) / 2)),
           originY: 0,
-          width: Math.floor(newW),
+          width: newW,
           height: srcH,
         };
       } else {
-        // 이미지가 UI보다 세로로 길거나 같음 -> 위 아래를 자름
-        const newH = srcW / targetAspect;
+        const newH = Math.round(srcW / targetAspect);
         crop = {
           originX: 0,
-          originY: Math.floor((srcH - newH) / 2),
+          originY: Math.max(0, Math.floor((srcH - newH) / 2)),
           width: srcW,
-          height: Math.floor(newH),
+          height: newH,
         };
       }
 
-      const finalManipulated = await ImageManipulator.manipulateAsync(
-        normalized.uri,
-        [{ crop }, { resize: { width: 1080 } }], // 고화질을 위해 1080px로 리사이즈
+      const manipulated = await ImageManipulator.manipulateAsync(
+        pic.uri,
+        [{ crop }, { resize: { width: 1080 } }], // 고화질 리사이즈
         { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG },
       );
 
       if (isLayoutMode) {
-        const newLayout = [...layoutPhotos, finalManipulated.uri];
+        const newLayout = [...layoutPhotos, manipulated.uri];
         setLayoutPhotos(newLayout);
         if (newLayout.length === 4) setPreviewUri("PENDING_MERGE");
       } else {
-        setPreviewUri(finalManipulated.uri);
+        setPreviewUri(manipulated.uri);
       }
     } catch (e) {
       Alert.alert("오류", "사진 처리에 실패했습니다.");
@@ -341,7 +327,7 @@ export default function CameraHome() {
   const retake = () => {
     setPreviewUri(null);
     setLayoutPhotos([]);
-    setZoom(0);
+    setZoom(0); // 줌 리셋
   };
 
   const confirm = async () => {
@@ -357,7 +343,7 @@ export default function CameraHome() {
       }
     }
     if (!uriToSend || uriToSend === "PENDING_MERGE") return;
-    const picked = messages[sel];
+    const picked = missions[sel];
     router.push({
       pathname: "/share",
       params: {
@@ -479,10 +465,10 @@ export default function CameraHome() {
                     오늘의 미션을 불러오는 중...
                   </AppText>
                 </View>
-              ) : messages.length > 0 ? (
+              ) : missions.length > 0 ? (
                 <>
                   <View style={styles.missionDotsRow}>
-                    {messages.map((_, i) => (
+                    {missions.map((_, i) => (
                       <View
                         key={i}
                         style={[
@@ -494,7 +480,7 @@ export default function CameraHome() {
                   </View>
                   <View style={styles.hintRow}>
                     <View style={styles.hintBubble}>
-                      {messages.length > 1 && (
+                      {missions.length > 1 && (
                         <Pressable
                           style={styles.innerArrowArea}
                           onPress={prevMission}
@@ -510,10 +496,10 @@ export default function CameraHome() {
                       )}
                       <View style={styles.hintTextWrap}>
                         <AppText style={styles.hintText}>
-                          {messages[sel]?.description || messages[sel]?.title}
+                          {missions[sel]?.description || missions[sel]?.title}
                         </AppText>
                       </View>
-                      {messages.length > 1 && (
+                      {missions.length > 1 && (
                         <Pressable
                           style={styles.innerArrowArea}
                           onPress={nextMission}
