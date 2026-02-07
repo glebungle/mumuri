@@ -95,7 +95,6 @@ async function refreshAccessToken(): Promise<string | null> {
  * 로그아웃 처리
  */
 async function handleLogout() {
-  console.log("[apiClient] 로그아웃 처리");
 
   await AsyncStorage.multiRemove([
     "token",

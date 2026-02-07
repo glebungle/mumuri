@@ -60,7 +60,6 @@ export default function LogoutScreen() {
       setUserData(null);
       setTodayMissions([]);
 
-      console.log("✅ Local data cleared");
     } catch (e) {
       console.error("Cleanup error:", e);
     }

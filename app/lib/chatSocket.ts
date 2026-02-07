@@ -60,7 +60,6 @@ export function createChatClient({
   let _connected = false;
   const _queue: Array<() => void> = [];
   const _safePublish = (destination: string, body: unknown) => {
-    console.log('[PUB]', destination, body);
     const job = () =>
       client.publish({
         destination,
@@ -97,7 +96,6 @@ export function createChatClient({
     c.onConnect = () => {
       _connected = true;
       clearTimeout(fallbackTimer);
-      console.log('[STOMP] connected');
       c.subscribe(`/topic/messages/${roomId}`, (frame: IMessage) => {
         try {
           const data = JSON.parse(frame.body) as ChatIncoming;
@@ -124,7 +122,6 @@ export function createChatClient({
 
     c.onWebSocketClose = (ev) => {
       _connected = false;
-      console.log('[STOMP] ws closed', ev);
       handlers.onDisconnected?.();
     };
 

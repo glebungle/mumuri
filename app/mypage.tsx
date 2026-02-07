@@ -184,7 +184,7 @@ export default function MyPage() {
 
               <View style={styles.dashboardItem}>
                 <AppText type="pretendard-m" style={styles.smallDateText}>
-                  {anniversaryDate || "---. --. --"}
+                  {anniversaryDate || "----. --. --"}
                 </AppText>
                 <AppText type="pretendard-m" style={styles.bigNumberText}>
                   {userData?.coupleId && userData.coupleId > 0

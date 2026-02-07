@@ -9,7 +9,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   owner: "starsam",
   name: "mumuri",
   slug: "mumuri",
-  version: "1.0.1",
+  version: "1.0.2",
   orientation: "portrait",
   icon: "./assets/images/logo.png",
   scheme: "mumuri",
@@ -24,7 +24,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     supportsTablet: false,
     bundleIdentifier: "com.growdy.mumuri",
     googleServicesFile: "./GoogleService-Info.plist",
-    buildNumber: "7",
+    buildNumber: "8",
     infoPlist: {
       CFBundleURLTypes: [
         {
@@ -32,8 +32,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         },
       ],
       NSCameraUsageDescription:
-        "미션 사진 촬영을 위해 카메라 접근이 필요합니다.",
-      NSPhotoLibraryAddUsageDescription: "촬영한 사진을 앨범에 저장합니다.",
+        "커플 미션 수행을 위한 사진 촬영 및 프로필 이미지 설정을 위해 카메라 접근 권한이 필요합니다. 촬영된 사진은 커플끼리 공유됩니다.",
+
+      NSPhotoLibraryUsageDescription:
+        "갤러리에 있는 사진을 선택하여 미션 인증샷으로 게시하거나 커플 프로필 이미지를 설정하기 위해 사진 라이브러리 접근 권한을 사용합니다.",
+
+      NSPhotoLibraryAddUsageDescription:
+        "앱에서 촬영한 미션 인증 사진을 사용자의 기기 앨범에 안전하게 저장하기 위해 권한이 필요합니다.",
       usesAppleSignIn: true,
       UIBackgroundModes: ["remote-notification"],
       ITSAppUsesNonExemptEncryption: false,
@@ -41,7 +46,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: "com.growdy.mumuri",
-    versionCode: 11,
+    versionCode: 12,
     googleServicesFile: "./google-services.json",
     blockedPermissions: [
       "android.permission.READ_MEDIA_VIDEO",

@@ -48,6 +48,8 @@ export default function EditProfileScreen() {
   };
 
   const isValidDate = (dateStr: string) => {
+    if (!dateStr.trim()) return true;
+
     const numbers = dateStr.replace(/[^0-9]/g, "");
     if (numbers.length !== 8) return false;
 
@@ -193,7 +195,7 @@ export default function EditProfileScreen() {
     ]);
   };
 
-  // --- 저장 로직 (authFetch 적용) ---
+  // --- 저장 로직 ---
   const handleSaveAll = async () => {
     if (!name.trim()) {
       Alert.alert("알림", "이름을 입력해주세요.");
@@ -201,7 +203,7 @@ export default function EditProfileScreen() {
     }
 
     // 1. 생년월일 유효성 검사
-    if (birthday && !isValidDate(birthday)) {
+    if (!isValidDate(birthday)) {
       Alert.alert(
         "알림",
         "생년월일이 올바르지 않습니다.\n존재하는 날짜를 입력해주세요.",
@@ -233,9 +235,9 @@ export default function EditProfileScreen() {
         );
       }
 
-      if (apiBirth && birthday !== initialValues.birthday) {
+      if (birthday !== initialValues.birthday) {
         promises.push(
-          authFetch(`/api/setting/birthday?birthday=${apiBirth}`, {
+          authFetch(`/api/setting/birthday?birthday=${apiBirth || ""}`, {
             method: "POST",
           }),
         );
@@ -256,7 +258,7 @@ export default function EditProfileScreen() {
       }
 
       await Promise.all(promises);
-      await refreshUserData(); // 저장 후 전역 Context 갱신
+      await refreshUserData();
 
       Alert.alert("성공", "정보가 수정되었습니다.", [
         { text: "확인", onPress: () => router.back() },
@@ -339,7 +341,7 @@ export default function EditProfileScreen() {
 
               <View style={styles.inputRow}>
                 <AppText type="semibold" style={styles.label}>
-                  생년월일
+                  생년월일 (선택)
                 </AppText>
                 <TextInput
                   style={styles.inputBox}
