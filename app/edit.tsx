@@ -341,7 +341,7 @@ export default function EditProfileScreen() {
 
               <View style={styles.inputRow}>
                 <AppText type="semibold" style={styles.label}>
-                  생년월일 (선택)
+                  {"생년월일\n(선택)"}
                 </AppText>
                 <TextInput
                   style={styles.inputBox}
