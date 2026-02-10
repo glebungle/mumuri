@@ -240,7 +240,6 @@ export default function Signup() {
         const appleName = await AsyncStorage.getItem("temp_apple_name");
         if (appleName) {
           setValues((prev) => ({ ...prev, name: appleName }));
-          // 사용 후 삭제
           await AsyncStorage.removeItem("temp_apple_name");
         }
       } catch (e) {
@@ -650,6 +649,24 @@ export default function Signup() {
                 keyboardType={current.key === "name" ? "default" : "number-pad"}
                 accentColor={current.accent}
               />
+              {current.key === "birthday" && (
+                <TouchableOpacity
+                  onPress={() => setStep(step + 1)}
+                  style={{ marginTop: 16, alignItems: "center" }}
+                >
+                  <AppText style={{ color: "#9CA3AF", fontSize: 12 }}>
+                    입력 없이 넘어갈게요.{" "}
+                    <AppText
+                      style={{
+                        textDecorationLine: "underline",
+                        color: "#6B7280",
+                      }}
+                    >
+                      건너뛰기
+                    </AppText>
+                  </AppText>
+                </TouchableOpacity>
+              )}
             </View>
           )}
         </View>
