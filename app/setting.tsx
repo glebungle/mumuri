@@ -47,12 +47,7 @@ export default function SettingScreen() {
 
         {/* 섹션 2: 커플 연결 */}
         <View style={styles.section}>
-          <View
-            style={[
-              styles.sectionHeader,
-              // isConnected && { borderBottomColor: "#E0E0E0" }, // 연결 시 하단 선 흐리게
-            ]}
-          >
+          <View style={[styles.sectionHeader]}>
             <AppText type="semibold" style={[styles.sectionTitle]}>
               커플 연결
             </AppText>

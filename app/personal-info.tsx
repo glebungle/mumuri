@@ -1,10 +1,10 @@
-import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import React from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import Markdown from 'react-native-markdown-display';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import AppText from '../components/AppText';
+import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
+import React from "react";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import Markdown from "react-native-markdown-display";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import AppText from "../components/AppText";
 
 const TERMS_TEXT = `# 개인정보처리방침 VER 25.12.16
 
@@ -22,8 +22,8 @@ const TERMS_TEXT = `# 개인정보처리방침 VER 25.12.16
 
 ### ● 서비스 이용을 위해 추가로 입력하는 정보
 
-- 이름
-- 생년월일
+- 닉네임
+- 생년월일(선택)
 - 사귄 날짜
 - 취미
 - 데이트 취향
@@ -37,7 +37,6 @@ const TERMS_TEXT = `# 개인정보처리방침 VER 25.12.16
 ### ● 사진 촬영 및 업로드 시
 
 - 사진 파일
-- EXIF 기반 위치 정보(사용자가 위치 권한을 허용한 경우에 한함)
 
 ### ● 기기 및 로그 정보
 
@@ -97,23 +96,7 @@ https://developers.kakao.com/docs/latest/ko/kakaologin/overview
 
 ---
 
-# 6. 위치정보 처리 방침
-
-- 사진 촬영 시 포함될 수 있는 EXIF 위치 정보는
-    
-    사용자가 위치 권한을 허용한 경우에만 수집됩니다.
-    
-- 수집된 위치 정보는
-    - 사진 앨범 정리
-    - (향후) 사용자 활동 기반 미션 추천
-        
-        등의 목적에 사용될 수 있습니다.
-        
-- 사용자는 언제든지 기기 설정에서 위치 권한을 변경하거나 철회할 수 있습니다.
-
----
-
-# 7. 이용자의 권리
+# 6. 이용자의 권리
 
 이용자는 언제든지 자신의 개인정보에 대해 다음을 요청할 수 있습니다.
 
@@ -126,7 +109,7 @@ https://developers.kakao.com/docs/latest/ko/kakaologin/overview
 
 ---
 
-# 8. 개인정보의 안전성 확보 조치
+# 7. 개인정보의 안전성 확보 조치
 
 서비스 제공자는 이용자의 개인정보를 안전하게 관리하기 위해 아래 조치를 시행합니다.
 
@@ -137,7 +120,7 @@ https://developers.kakao.com/docs/latest/ko/kakaologin/overview
 
 ---
 
-# 9. 아동의 개인정보 보호
+# 8. 아동의 개인정보 보호
 
 서비스는 만 13세 미만 아동을 대상으로 하지 않습니다.
 
@@ -145,7 +128,7 @@ https://developers.kakao.com/docs/latest/ko/kakaologin/overview
 
 ---
 
-# 10. 개인정보처리방침 변경 안내
+# 9. 개인정보처리방침 변경 안내
 
 본 방침은 서비스 운영 정책, 법령 변경 등에 따라 개정될 수 있으며,
 
@@ -153,7 +136,7 @@ https://developers.kakao.com/docs/latest/ko/kakaologin/overview
 
 ---
 
-# 11. 문의처
+# 10. 문의처
 
 개인정보 관련 문의는 아래 연락처로 접수할 수 있습니다.
 
@@ -165,10 +148,9 @@ https://developers.kakao.com/docs/latest/ko/kakaologin/overview
 본 개인정보처리방침은 2025년 12월 16일부터 시행됩니다.
 `;
 
-
 export default function PersonalInfoScreen() {
   const insets = useSafeAreaInsets();
-  
+
   const handleBack = () => router.back();
 
   return (
@@ -185,14 +167,12 @@ export default function PersonalInfoScreen() {
       {/* 본문 (스크롤 박스) */}
       <View style={styles.content}>
         <View style={styles.termsBox}>
-          <ScrollView 
+          <ScrollView
             contentContainerStyle={styles.scrollContent}
             indicatorStyle="black" // iOS 스크롤바 색상
             showsVerticalScrollIndicator={true}
           >
-            <Markdown style={markdownStyles}>
-              {TERMS_TEXT}
-            </Markdown>
+            <Markdown style={markdownStyles}>{TERMS_TEXT}</Markdown>
           </ScrollView>
         </View>
       </View>
@@ -204,36 +184,36 @@ const markdownStyles = {
   body: {
     fontSize: 13,
     lineHeight: 22,
-    color: '#555555',
-    fontFamily: 'Pretendard-Medium',
+    color: "#555555",
+    fontFamily: "Pretendard-Medium",
   },
   heading1: {
     fontSize: 20,
-    color: '#1E1E1E',
-    fontFamily: 'Pretendard-Bold',
+    color: "#1E1E1E",
+    fontFamily: "Pretendard-Bold",
     marginTop: 20,
     marginBottom: 10,
   },
   heading2: {
     fontSize: 16,
-    color: '#333333',
-    fontFamily: 'Pretendard-Bold',
+    color: "#333333",
+    fontFamily: "Pretendard-Bold",
     marginTop: 15,
     marginBottom: 8,
   },
   heading3: {
     fontSize: 14,
-    color: '#444444',
-    fontFamily: 'Pretendard-Bold',
+    color: "#444444",
+    fontFamily: "Pretendard-Bold",
     marginTop: 10,
     marginBottom: 5,
   },
   strong: {
-    fontFamily: 'Pretendard-Bold',
-    color: '#111111',
+    fontFamily: "Pretendard-Bold",
+    color: "#111111",
   },
   hr: {
-    backgroundColor: '#E3E7EB',
+    backgroundColor: "#E3E7EB",
     marginVertical: 15,
   },
   list_item: {
@@ -241,42 +221,42 @@ const markdownStyles = {
   },
   bullet_list: {
     marginBottom: 10,
-  }
+  },
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF',
+    backgroundColor: "#FFF",
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingVertical: 14,
-    backgroundColor: '#FFF',
+    backgroundColor: "#FFF",
     borderBottomWidth: 1,
-    borderBottomColor: '#F2F2F2', 
+    borderBottomColor: "#F2F2F2",
   },
   backButton: {
     padding: 4,
   },
   headerTitle: {
     fontSize: 18,
-    color: '#444444',
+    color: "#444444",
   },
   content: {
     flex: 1,
-    padding: 20, 
+    padding: 20,
   },
   termsBox: {
     flex: 1,
-    backgroundColor: '#F8F9FA', 
+    backgroundColor: "#F8F9FA",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E3E7EB',
-    overflow: 'hidden', 
+    borderColor: "#E3E7EB",
+    overflow: "hidden",
   },
   scrollContent: {
     padding: 20,
@@ -284,6 +264,6 @@ const styles = StyleSheet.create({
   termsText: {
     fontSize: 12,
     lineHeight: 24,
-    color: '#555555',
+    color: "#555555",
   },
 });

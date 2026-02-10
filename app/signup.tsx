@@ -250,10 +250,10 @@ export default function Signup() {
     () => [
       {
         key: "name",
-        title: "이름 입력",
+        title: "닉네임 입력",
         hint: "연인과 부르는 애칭도 좋아요. 사용자님을 어떻게 부를까요?",
         accent: "#6198FF",
-        placeholder: "이름을 입력해주세요",
+        placeholder: "닉네임을 입력해주세요",
       },
       {
         key: "birthday",
@@ -616,7 +616,7 @@ export default function Signup() {
               <InputField
                 label={
                   current.key === "name"
-                    ? "이름"
+                    ? "닉네임"
                     : current.key === "birthday"
                       ? "생년월일"
                       : "기념일"

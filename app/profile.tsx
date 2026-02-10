@@ -62,7 +62,7 @@ export default function AccountSettingScreen() {
 
         <View style={styles.menuItem}>
           <AppText type="semibold" style={styles.menuText}>
-            이름
+            닉네임
           </AppText>
           <AppText type="pretendard-r" style={styles.subText}>
             {myName}

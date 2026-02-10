@@ -198,7 +198,7 @@ export default function EditProfileScreen() {
   // --- 저장 로직 ---
   const handleSaveAll = async () => {
     if (!name.trim()) {
-      Alert.alert("알림", "이름을 입력해주세요.");
+      Alert.alert("알림", "닉네임을 입력해주세요.");
       return;
     }
 
@@ -328,13 +328,13 @@ export default function EditProfileScreen() {
             <View style={styles.formContainer}>
               <View style={styles.inputRow}>
                 <AppText type="semibold" style={styles.label}>
-                  이름
+                  닉네임
                 </AppText>
                 <TextInput
                   style={styles.inputBox}
                   value={name}
                   onChangeText={setName}
-                  placeholder="이름을 입력하세요"
+                  placeholder="닉네임을 입력하세요"
                   placeholderTextColor="#999"
                 />
               </View>
