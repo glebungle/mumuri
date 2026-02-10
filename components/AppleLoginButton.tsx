@@ -41,11 +41,15 @@ export default function AppleLoginButton() {
 
         if (credential.email)
           await AsyncStorage.setItem("email", String(credential.email));
-        if (credential.fullName?.givenName) {
-          await AsyncStorage.setItem(
-            "name",
-            String(credential.fullName.givenName),
-          );
+
+        if (credential.fullName) {
+          const familyName = credential.fullName.familyName || "";
+          const givenName = credential.fullName.givenName || "";
+          const fullName = `${familyName}${givenName}`.trim();
+
+          if (fullName) {
+            await AsyncStorage.setItem("temp_apple_name", fullName);
+          }
         }
 
         // 4. 페이지 이동
@@ -58,7 +62,6 @@ export default function AppleLoginButton() {
     } catch (e: any) {
       if (e.code === "ERR_REQUEST_CANCELED") {
       } else {
-        // [디버그] 상세 에러 알림
         const errorDetail = e.response
           ? `서버에러(${e.response.status}): ${JSON.stringify(e.response.data)}`
           : e.message;
