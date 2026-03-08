@@ -466,8 +466,6 @@ export default function ChatScreen() {
   const isIOS = Platform.OS === "ios";
   const isKeyboardOpen = keyboardHeight > 0;
 
-  // ✅ 핵심 수정: TypeScript 에러 방지를 위해 Platform.OS 확인 후 isPad 체크
-  // 아이패드면 8 유지, 아이폰이면 0으로 설정하여 이중 오프셋 제거
   const isPad = Platform.OS === "ios" && (Platform as any).isPad;
   const iosBottomPadding = isKeyboardOpen ? (isPad ? 8 : 0) : insets.bottom + 8;
 
@@ -475,7 +473,6 @@ export default function ChatScreen() {
     ? 60 + keyboardHeight
     : 12 + insets.bottom;
 
-  // 가장 안정적이었던 "Good" 코드 기반의 오프셋
   const verticalOffset = isIOS ? insets.top + HEADER_HEIGHT * 0.5 : 0;
 
   return (

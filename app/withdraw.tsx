@@ -5,7 +5,7 @@ import React, { useState } from "react";
 import { Alert, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AppText from "../components/AppText";
-import { authFetch } from "./utils/apiClient"; // [추가] 공통 API 클라이언트 임포트
+import { authFetch } from "./utils/apiClient";
 
 export default function WithdrawScreen() {
   const insets = useSafeAreaInsets();
